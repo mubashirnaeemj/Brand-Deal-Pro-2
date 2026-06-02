@@ -8,6 +8,7 @@ import BrandMatches from "@/pages/BrandMatches";
 import BrandDetail from "@/pages/BrandDetail";
 import PitchDeck from "@/pages/PitchDeck";
 import OutreachEmail from "@/pages/OutreachEmail";
+import Dashboard from "@/pages/Dashboard";
 
 const queryClient = new QueryClient();
 
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/brands/:slug" component={BrandDetail} />
       <Route path="/pitch-deck" component={PitchDeck} />
       <Route path="/outreach-email" component={OutreachEmail} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route component={NotFound} />
     </Switch>
   );

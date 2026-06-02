@@ -142,12 +142,7 @@ function CopyButton({ value }: { value: string }) {
 
 export default function BrandDetail() {
   const [, setLocation] = useLocation();
-  const [emailToast, setEmailToast] = useState(false);
-
-  const handleDraftEmail = () => {
-    setEmailToast(true);
-    setTimeout(() => setEmailToast(false), 2500);
-  };
+  const handleDraftEmail = () => setLocation("/outreach-email");
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -411,19 +406,6 @@ export default function BrandDetail() {
           </div>
         </div>
       </main>
-
-      {/* Draft email toast */}
-      {emailToast && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-secondary border border-border rounded-xl px-5 py-3 text-sm font-semibold text-white shadow-2xl z-50 flex items-center gap-2"
-        >
-          <CheckCircle2 size={15} className="text-green-400" />
-          Outreach email drafted — opening editor...
-        </motion.div>
-      )}
 
       <Footer />
     </div>

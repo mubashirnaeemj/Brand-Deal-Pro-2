@@ -7,6 +7,7 @@ import Home from "@/pages/Home";
 import BrandMatches from "@/pages/BrandMatches";
 import BrandDetail from "@/pages/BrandDetail";
 import PitchDeck from "@/pages/PitchDeck";
+import OutreachEmail from "@/pages/OutreachEmail";
 
 const queryClient = new QueryClient();
 
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/brand-matches" component={BrandMatches} />
       <Route path="/brands/:slug" component={BrandDetail} />
       <Route path="/pitch-deck" component={PitchDeck} />
+      <Route path="/outreach-email" component={OutreachEmail} />
       <Route component={NotFound} />
     </Switch>
   );

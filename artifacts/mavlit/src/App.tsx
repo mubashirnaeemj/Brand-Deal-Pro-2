@@ -11,6 +11,7 @@ import OutreachEmail from "@/pages/OutreachEmail";
 import Dashboard from "@/pages/Dashboard";
 import ProfileSettings from "@/pages/ProfileSettings";
 import RateCalculator from "@/pages/RateCalculator";
+import DealsTracker from "@/pages/DealsTracker";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/profile" component={ProfileSettings} />
       <Route path="/rate-calculator" component={RateCalculator} />
+      <Route path="/deals" component={DealsTracker} />
       <Route component={NotFound} />
     </Switch>
   );

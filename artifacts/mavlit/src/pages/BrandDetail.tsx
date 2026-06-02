@@ -239,6 +239,7 @@ export default function BrandDetail() {
               >
                 <button
                   data-testid="button-generate-pitch"
+                  onClick={() => setLocation("/pitch-deck")}
                   className="flex items-center justify-center gap-2.5 py-4 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-sm shadow-lg shadow-primary/30 transition-all hover:shadow-primary/50 hover:-translate-y-0.5 active:translate-y-0"
                 >
                   <Zap size={16} />

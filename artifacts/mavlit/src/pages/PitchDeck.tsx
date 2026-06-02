@@ -41,6 +41,13 @@ const DEFAULT_FORM: StatsForm = {
   facebook:  { followers: "", engagementRate: "", avgWatchTime: "", avgViews: "" },
 };
 
+const DEMO_FORM: StatsForm = {
+  instagram: { followers: "52000", engagementRate: "5.8", avgWatchTime: "1:45", avgViews: "8400"  },
+  tiktok:    { followers: "31000", engagementRate: "7.2", avgWatchTime: "0:52", avgViews: "14200" },
+  youtube:   { followers: "18500", engagementRate: "3.9", avgWatchTime: "6:30", avgViews: "3800"  },
+  facebook:  { followers: "9200",  engagementRate: "2.1", avgWatchTime: "0:45", avgViews: "1900"  },
+};
+
 // ── Platform metadata ────────────────────────────────────────────────────────
 
 const PLATFORMS: {
@@ -575,8 +582,9 @@ function DeckPreview({ form, onBack }: { form: StatsForm; onBack: () => void }) 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PitchDeck() {
-  const [step, setStep] = useState<"form" | "preview">("form");
-  const [formData, setFormData] = useState<StatsForm>(DEFAULT_FORM);
+  const isDemo = typeof window !== "undefined" && sessionStorage.getItem("demoMode") === "1";
+  const [step, setStep] = useState<"form" | "preview">(isDemo ? "preview" : "form");
+  const [formData, setFormData] = useState<StatsForm>(isDemo ? DEMO_FORM : DEFAULT_FORM);
 
   const handleFormSubmit = (data: StatsForm) => {
     setFormData(data);

@@ -1,8 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { ArrowRight, Sparkles, BarChart3, Mail, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Sparkles, BarChart3, Mail } from "lucide-react";
+import { useLocation } from "wouter";
 
 export default function Hero() {
+  const [, setLocation] = useLocation();
+
+  const startDemo = (href: string) => {
+    sessionStorage.setItem("demoMode", "1");
+    setLocation(href);
+  };
+
   return (
     <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden">
       {/* Background glow effects */}
@@ -46,11 +54,22 @@ export default function Hero() {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Button size="lg" className="w-full sm:w-auto h-14 px-8 text-base bg-primary hover:bg-primary/90 shadow-[0_0_30px_rgba(124,58,237,0.4)]">
+            <Button
+              size="lg"
+              data-testid="button-start-trial"
+              onClick={() => startDemo("/dashboard")}
+              className="w-full sm:w-auto h-14 px-8 text-base bg-primary hover:bg-primary/90 shadow-[0_0_30px_rgba(124,58,237,0.4)]"
+            >
               Start Free Trial
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-            <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-base border-white/10 hover:bg-white/5 hover:text-white">
+            <Button
+              size="lg"
+              variant="outline"
+              data-testid="button-how-it-works"
+              onClick={() => startDemo("/brand-matches")}
+              className="w-full sm:w-auto h-14 px-8 text-base border-white/10 hover:bg-white/5 hover:text-white"
+            >
               See How It Works
             </Button>
           </motion.div>

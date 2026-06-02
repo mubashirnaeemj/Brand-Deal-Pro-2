@@ -1,14 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { ArrowRight, Sparkles, BarChart3, Mail } from "lucide-react";
-import { useLocation } from "wouter";
 
 export default function Hero() {
-  const [, setLocation] = useLocation();
-
   const startDemo = (href: string) => {
     sessionStorage.setItem("demoMode", "1");
-    setLocation(href);
+    window.location.assign(href);
   };
 
   return (

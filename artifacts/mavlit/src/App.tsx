@@ -9,6 +9,8 @@ import BrandDetail from "@/pages/BrandDetail";
 import PitchDeck from "@/pages/PitchDeck";
 import OutreachEmail from "@/pages/OutreachEmail";
 import Dashboard from "@/pages/Dashboard";
+import ProfileSettings from "@/pages/ProfileSettings";
+import RateCalculator from "@/pages/RateCalculator";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +23,8 @@ function Router() {
       <Route path="/pitch-deck" component={PitchDeck} />
       <Route path="/outreach-email" component={OutreachEmail} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/profile" component={ProfileSettings} />
+      <Route path="/rate-calculator" component={RateCalculator} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "MAVLIT"
+version = "1.0.0"
+id = "artifacts/mavlit"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18749
+
+[services.development]
+run = "pnpm --filter @workspace/mavlit run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mavlit", "run", "build" ]
+publicDir = "artifacts/mavlit/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18749"
+BASE_PATH = "/"

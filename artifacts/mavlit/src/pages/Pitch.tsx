@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import {
   Sparkles, Copy, Check, ChevronDown, AlertTriangle, Lightbulb,
-  Headphones, Music, Cpu, Camera, ShoppingBag, Zap
+  Headphones, Music, Cpu, Camera, ShoppingBag, Zap, User, ArrowRight
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -298,6 +298,22 @@ export default function Pitch() {
                     <Label>Content niche</Label>
                     <Select value={form.niche} onChange={v => set("niche", v)} options={NICHES} />
                   </div>
+                </div>
+
+                {/* Profile prompt */}
+                <div className="flex items-start justify-between gap-4 pt-1 px-4 py-3.5 rounded-xl bg-primary/5 border border-primary/20">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 mt-0.5">
+                      <User size={13} className="text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white leading-snug mb-0.5">Music producer &amp; gear reviewer · 52K on Instagram</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">Keep your profile complete and up to date — MAVLIT uses your stats and story to generate the most accurate pitch possible.</p>
+                    </div>
+                  </div>
+                  <Link href="/profile" className="shrink-0 flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors whitespace-nowrap pt-0.5">
+                    Update profile <ArrowRight size={11} />
+                  </Link>
                 </div>
               </div>
 

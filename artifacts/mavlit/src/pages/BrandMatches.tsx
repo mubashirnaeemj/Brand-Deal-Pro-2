@@ -133,7 +133,7 @@ function BrandCard({ brand, index }: { brand: (typeof BRANDS)[0]; index: number 
       : "In-house partnerships team handles creator outreach directly.";
 
   const handlePitch = () => {
-    window.location.assign(`/pitch-deck?brand=${encodeURIComponent(brand.name)}`);
+    window.location.assign(`/pitch?brand=${encodeURIComponent(brand.name)}`);
   };
 
   return (

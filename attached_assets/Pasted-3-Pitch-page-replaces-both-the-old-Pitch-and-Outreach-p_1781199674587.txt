@@ -1,0 +1,51 @@
+3. Pitch page (replaces both the old Pitch and Outreach pages)
+Delete the old Pitch page and the old Outreach page. Replace them with a single page called Pitch.
+The page subtitle should read: "Build your outreach email to a brand. Keep it casual, personal, and story-driven. No rates. No deck."
+The page has three sections followed by a generate button:
+Section 1 — Which brand are you pitching?
+Two toggle buttons: "A brand MAVLIT matched me with" and "A brand I found myself."
+If they pick matched: show a grid of their matched brands as selectable cards.
+If they pick "found myself": show a single text input labeled "Brand name."
+Section 2 — Your creator profile
+Six fields in a two-column grid:
+
+Your name
+Creator handle
+Primary platform (dropdown: Instagram, TikTok, YouTube, Substack)
+Followers / subscribers
+Avg. engagement rate (%)
+Content niche (dropdown)
+
+Section 3 — Your story & social proof
+Three fields:
+
+Textarea: "Your authentic connection to [brand] — the story" with placeholder: "e.g. I've used [brand] gear since I was 16 learning in my bedroom studio. My audience of 18–34 producers knows I only mention what I actually use."
+Text input: "Past brand partnerships (optional)" with placeholder: "e.g. Focusrite, Splice, Roland — or leave blank if none yet"
+Text input: "Link to your most relevant content" with placeholder: "https://instagram.com/p/your-best-post"
+Below that input, add small grey helper text: "Link to content that shows your connection to this brand. Saves, comments, and DMs are data brands can't see publicly — link to content that shows real engagement."
+
+Generate button (full width, purple): "✦ Generate pitch email rough draft"
+When clicked, call the Anthropic API using the creator's inputs. The AI prompt must instruct the model to:
+
+Open with something specific and real about the brand
+Tell the creator's authentic story and connection to the brand
+Include social proof (followers, engagement, past deals)
+Keep it casual — no formal business language
+Where the creator needs to add a link, write literally: [Insert link to your most relevant content] or [Insert link to previous brand deal example if applicable]
+Close with exactly: "What else do you need from me to consider this? Happy to send more — I want to make your job easy."
+Do NOT mention rates anywhere
+Keep it under 180 words
+Include a personalized subject line at the top
+
+After the email generates, show it in a monospace dark box with a Copy button. Below the email, add a yellow warning box: "Before you send: Do not mention rates. Get in the door first. When they respond, head to the Deal Negotiator." — make "Deal Negotiator" a clickable link to the Negotiator page.
+Right sidebar — Pitch Tips panel (sticky, shown alongside the form):
+Six tips in a stacked list:
+
+Story beats stats
+No rates in the opener
+Make their job easy
+Email, not deck
+Wrong person = wasted pitch
+It's June — pitch for Q4
+
+At the bottom of the sidebar, add a purple-tinted callout box: "Got a response? Head to the Deal Negotiator for follow-ups, rate talks, and contract terms." with a link to Negotiator.

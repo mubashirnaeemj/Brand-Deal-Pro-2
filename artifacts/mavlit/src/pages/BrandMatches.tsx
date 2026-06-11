@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, SlidersHorizontal, Music, Headphones, Zap, Camera, ShoppingBag, Cpu, User, ArrowRight } from "lucide-react";
-import { Link } from "wouter";
+import { CheckCircle2, SlidersHorizontal, Music, Headphones, Zap, Camera, ShoppingBag, Cpu } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
@@ -253,34 +252,6 @@ export default function BrandMatches() {
               MAVLIT found <span className="text-white font-semibold">{BRANDS.length} high-fit brands</span> based
               on your audience data, content style, and engagement metrics.
             </p>
-          </motion.div>
-
-          {/* Profile callout */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.12 }}
-            className="mb-7"
-          >
-            <div className="flex items-start justify-between gap-4 px-4 py-4 rounded-2xl bg-card border border-border">
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0 mt-0.5">
-                  <User size={14} className="text-primary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-white leading-tight mb-0.5">Music producer &amp; gear reviewer · 52K on Instagram</p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Keep your profile complete and up to date — MAVLIT uses your stats, niche, and story to find the best matches and generate the most accurate pitches.
-                  </p>
-                </div>
-              </div>
-              <Link
-                href="/profile"
-                className="shrink-0 flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors whitespace-nowrap pt-0.5"
-              >
-                Update profile <ArrowRight size={12} />
-              </Link>
-            </div>
           </motion.div>
 
           <motion.div

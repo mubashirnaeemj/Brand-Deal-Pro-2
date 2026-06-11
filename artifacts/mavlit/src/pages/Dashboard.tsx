@@ -65,7 +65,7 @@ const ACTIVITY = [
     id: 1,
     icon: CheckCircle2,
     color: "#10b981",
-    text: "Fender pitch deck generated",
+    text: "Pitch email drafted for Fender",
     sub: "Ready to send",
     time: "Just now",
   },
@@ -119,10 +119,10 @@ const QUICK_ACTIONS = [
     testId: "action-brand-matches",
   },
   {
-    label: "Generate Pitch Deck",
-    description: "Build a pitch from your audience stats",
+    label: "Create a pitch",
+    description: "Write a casual, story-driven outreach email",
     icon: Zap,
-    href: "/pitch-deck",
+    href: "/pitch",
     color: "#0ea5e9",
     testId: "action-pitch-deck",
   },
@@ -130,7 +130,7 @@ const QUICK_ACTIONS = [
     label: "Draft Outreach Email",
     description: "Compose a personalized brand pitch email",
     icon: Mail,
-    href: "/outreach-email",
+    href: "/pitch",
     color: "#ec4899",
     testId: "action-outreach-email",
   },
@@ -407,7 +407,7 @@ export default function Dashboard() {
                 </p>
                 <button
                   data-testid="button-pitch-now"
-                  onClick={() => setLocation("/pitch-deck")}
+                  onClick={() => setLocation("/pitch")}
                   className="mt-3 flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors"
                 >
                   Pitch now <ArrowRight size={11} />

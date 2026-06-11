@@ -22,8 +22,6 @@ function Router() {
       <Route path="/brand-matches" component={BrandMatches} />
       <Route path="/brands/:slug" component={BrandDetail} />
       <Route path="/pitch" component={Pitch} />
-      <Route path="/pitch-deck" component={Pitch} />
-      <Route path="/outreach-email" component={Pitch} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/profile" component={ProfileSettings} />
       <Route path="/rate-calculator" component={Negotiator} />

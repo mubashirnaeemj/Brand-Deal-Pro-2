@@ -15,20 +15,23 @@ import {
   Dumbbell,
   ChefHat,
   TrendingUp,
+  Newspaper,
+  BarChart3,
 } from "lucide-react";
 import { SiTiktok, SiFacebook } from "react-icons/si";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 const NICHES = [
-  { value: "music",         label: "Music",           Icon: Music     },
-  { value: "podcast",       label: "Podcast / Audio", Icon: Mic2      },
-  { value: "photography",   label: "Photography",     Icon: Camera    },
-  { value: "gaming",        label: "Gaming",          Icon: Gamepad2  },
-  { value: "education",     label: "Education",       Icon: BookOpen  },
-  { value: "fitness",       label: "Fitness",         Icon: Dumbbell  },
-  { value: "food",          label: "Food & Cooking",  Icon: ChefHat   },
-  { value: "finance",       label: "Finance",         Icon: TrendingUp},
+  { value: "music",         label: "Music",                   Icon: Music      },
+  { value: "podcast",       label: "Podcast / Audio",         Icon: Mic2       },
+  { value: "photography",   label: "Photography",             Icon: Camera     },
+  { value: "gaming",        label: "Gaming",                  Icon: Gamepad2   },
+  { value: "education",     label: "Education",               Icon: BookOpen   },
+  { value: "fitness",       label: "Fitness",                 Icon: Dumbbell   },
+  { value: "food",          label: "Food & Cooking",          Icon: ChefHat    },
+  { value: "finance",       label: "Finance",                 Icon: TrendingUp },
+  { value: "newsletter",    label: "Substack / Newsletter",   Icon: Newspaper  },
 ];
 
 const PLATFORMS = [
@@ -38,6 +41,8 @@ const PLATFORMS = [
   { key: "facebook",  label: "Facebook",   Icon: SiFacebook,  color: "#1877f2", placeholder: "facebook.com/yourpage"     },
 ];
 
+type PlatformStat = { followers: string; engagement: string };
+
 type ProfileForm = {
   name: string;
   handle: string;
@@ -45,7 +50,17 @@ type ProfileForm = {
   niche: string;
   location: string;
   links: Record<string, string>;
+  stats: Record<string, PlatformStat>;
 };
+
+const STAT_PLATFORMS = [
+  { key: "instagram", label: "Instagram", Icon: Instagram,  color: "#e1306c" },
+  { key: "tiktok",    label: "TikTok",    Icon: SiTiktok,   color: "#ffffff"  },
+  { key: "youtube",   label: "YouTube",   Icon: Youtube,    color: "#ff0000"  },
+  { key: "substack",  label: "Substack",  Icon: Newspaper,  color: "#ff6719"  },
+];
+
+const EMPTY_STAT: PlatformStat = { followers: "", engagement: "" };
 
 const DEFAULT: ProfileForm = {
   name: "",
@@ -54,6 +69,7 @@ const DEFAULT: ProfileForm = {
   niche: "music",
   location: "",
   links: { instagram: "", tiktok: "", youtube: "", facebook: "" },
+  stats: { instagram: { ...EMPTY_STAT }, tiktok: { ...EMPTY_STAT }, youtube: { ...EMPTY_STAT }, substack: { ...EMPTY_STAT } },
 };
 
 function Field({
@@ -90,6 +106,9 @@ export default function ProfileSettings() {
 
   const setLink = (key: string, value: string) =>
     setForm((f) => ({ ...f, links: { ...f.links, [key]: value } }));
+
+  const setStat = (key: string, field: keyof PlatformStat, value: string) =>
+    setForm((f) => ({ ...f, stats: { ...f.stats, [key]: { ...f.stats[key], [field]: value } } }));
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,7 +200,7 @@ export default function ProfileSettings() {
                       value={form.bio}
                       onChange={(e) => set("bio", e.target.value.slice(0, 200))}
                       rows={3}
-                      placeholder="One or two sentences describing what you create and who you create it for. This appears in your pitch deck intro slide."
+                      placeholder="Describe what you create, who you create it for, and what makes your connection to your niche authentic. A brand reads this — make it specific, not generic."
                       className={`${inputCls} resize-none leading-relaxed`}
                     />
                   </Field>
@@ -259,11 +278,59 @@ export default function ProfileSettings() {
                 </div>
               </motion.div>
 
+              {/* Platform Stats */}
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.22 }}
+                className="bg-card border border-border rounded-2xl p-6"
+              >
+                <div className="flex items-center gap-2 mb-5">
+                  <BarChart3 size={14} className="text-primary" />
+                  <h2 className="text-sm font-bold text-white">Platform Stats</h2>
+                </div>
+                <div className="flex flex-col gap-5">
+                  {STAT_PLATFORMS.map(({ key, label, Icon, color }) => (
+                    <div key={key} className="flex items-start gap-3">
+                      <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                        style={{ background: `${color}18` }}
+                      >
+                        <Icon size={16} style={{ color }} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{label}</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <Field label="Followers / subscribers">
+                            <input
+                              type="text"
+                              value={form.stats[key]?.followers ?? ""}
+                              onChange={(e) => setStat(key, "followers", e.target.value)}
+                              placeholder="e.g. 52,000"
+                              className={inputCls}
+                            />
+                          </Field>
+                          <Field label="Avg. engagement rate (%)">
+                            <input
+                              type="text"
+                              value={form.stats[key]?.engagement ?? ""}
+                              onChange={(e) => setStat(key, "engagement", e.target.value)}
+                              placeholder="e.g. 5.8"
+                              className={inputCls}
+                            />
+                          </Field>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+
               {/* Save */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35, delay: 0.25 }}
+                transition={{ duration: 0.35, delay: 0.28 }}
                 className="flex items-center justify-between gap-4"
               >
                 <p className="text-xs text-muted-foreground">

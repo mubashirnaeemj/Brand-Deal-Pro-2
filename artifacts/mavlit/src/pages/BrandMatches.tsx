@@ -10,11 +10,13 @@ const BRANDS = [
   {
     id: 1,
     name: "Sennheiser",
+    slug: "sennheiser",
     category: "Audio",
     initials: "SE",
     color: "#7c3aed",
     matchScore: 97,
     icon: Headphones,
+    contact: "agency" as const,
     reasons: [
       "Your gear-focused content aligns perfectly with their pro audio audience — avg. 84% overlap with Sennheiser buyers.",
       "3 of your last 5 videos featured studio equipment, making native integration seamless and authentic.",
@@ -23,11 +25,13 @@ const BRANDS = [
   {
     id: 2,
     name: "Spotify for Artists",
+    slug: "spotify",
     category: "Streaming",
     initials: "SP",
     color: "#1db954",
     matchScore: 94,
     icon: Music,
+    contact: "in-house" as const,
     reasons: [
       "Your audience skews 18–34 and streams 4+ hours of music daily — Spotify's exact target demographic.",
       "Creator-to-platform partnership campaigns are active in Q3; your niche positions you as a top-tier candidate.",
@@ -36,11 +40,13 @@ const BRANDS = [
   {
     id: 3,
     name: "Native Instruments",
+    slug: "native-instruments",
     category: "Software",
     initials: "NI",
     color: "#f59e0b",
     matchScore: 91,
     icon: Cpu,
+    contact: "agency" as const,
     reasons: [
       "68% of your followers self-identify as producers or beatmakers — exactly who NI targets with Maschine and Komplete.",
       "Your tutorial-style content averages 9-min watch time, giving sponsored segments meaningful exposure.",
@@ -49,11 +55,13 @@ const BRANDS = [
   {
     id: 4,
     name: "GoPro",
+    slug: "gopro",
     category: "Lifestyle",
     initials: "GP",
     color: "#0ea5e9",
     matchScore: 88,
     icon: Camera,
+    contact: "in-house" as const,
     reasons: [
       "Live performance and behind-the-scenes content make up 40% of your catalog — prime territory for GoPro's POV narrative.",
       "Your engagement rate of 6.2% is 3× the platform average, ensuring sponsored content converts, not just reaches.",
@@ -62,11 +70,13 @@ const BRANDS = [
   {
     id: 5,
     name: "Sweetwater",
+    slug: "sweetwater",
     category: "Retail",
     initials: "SW",
     color: "#ec4899",
     matchScore: 85,
     icon: ShoppingBag,
+    contact: "in-house" as const,
     reasons: [
       "Sweetwater's affiliate conversion rate is highest among gear-review creators — your format mirrors their top earners.",
       "Your comment section regularly features gear questions, signaling purchase-intent audiences Sweetwater actively seeks.",
@@ -75,11 +85,13 @@ const BRANDS = [
   {
     id: 6,
     name: "Red Bull",
+    slug: "red-bull",
     category: "Beverage",
     initials: "RB",
     color: "#ef4444",
     matchScore: 81,
     icon: Zap,
+    contact: "in-house" as const,
     reasons: [
       "Red Bull Music sponsors 200+ creator campaigns yearly; your music-lifestyle blend fits their cultural content strategy.",
       "Audience affinity analysis shows 71% of your followers also follow Red Bull Music's official channels.",
@@ -114,6 +126,15 @@ function ScoreRing({ score }: { score: number }) {
 
 function BrandCard({ brand, index }: { brand: (typeof BRANDS)[0]; index: number }) {
   const Icon = brand.icon;
+
+  const contactText =
+    brand.contact === "agency"
+      ? "Campaigns managed via agency."
+      : "In-house partnerships team handles creator outreach directly.";
+
+  const handlePitch = () => {
+    window.location.assign(`/pitch-deck?brand=${encodeURIComponent(brand.name)}`);
+  };
 
   return (
     <motion.div
@@ -156,10 +177,14 @@ function BrandCard({ brand, index }: { brand: (typeof BRANDS)[0]; index: number 
           >
             {brand.category}
           </span>
+          {/* Timing badge */}
+          <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold">
+            🗓 Pitch now → Q4/Holiday campaigns
+          </div>
         </div>
       </div>
 
-      <div className="px-6 pb-6 flex flex-col gap-3 flex-1">
+      <div className="px-6 pb-4 flex flex-col gap-3 flex-1">
         <div className="h-px bg-border" />
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Why it's a match</p>
         <ul className="flex flex-col gap-3">
@@ -174,14 +199,21 @@ function BrandCard({ brand, index }: { brand: (typeof BRANDS)[0]; index: number 
             </li>
           ))}
         </ul>
+
+        {/* Contact info box */}
+        <div className="mt-1 px-3.5 py-3 rounded-xl bg-blue-950/50 border border-blue-800/30">
+          <span className="text-xs font-bold text-blue-300">Contact: </span>
+          <span className="text-xs text-blue-200/80">{contactText}</span>
+        </div>
       </div>
 
-      <div className="px-6 pb-5">
+      <div className="px-6 pb-5 pt-1">
         <button
           data-testid={`button-pitch-${brand.id}`}
+          onClick={handlePitch}
           className="w-full py-2.5 rounded-xl text-sm font-semibold border border-border text-white/70 hover:bg-primary hover:border-primary hover:text-white transition-all duration-200"
         >
-          Generate Pitch Deck
+          Create pitch email →
         </button>
       </div>
     </motion.div>

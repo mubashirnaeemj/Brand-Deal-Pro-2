@@ -288,7 +288,7 @@ function StatsForm({ onSubmit }: { onSubmit: (form: StatsForm) => void }) {
 
 // ── Pitch Deck Preview ───────────────────────────────────────────────────────
 
-function DeckPreview({ form, onBack }: { form: StatsForm; onBack: () => void }) {
+function DeckPreview({ form, onBack, brandName }: { form: StatsForm; onBack: () => void; brandName: string }) {
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -334,7 +334,7 @@ function DeckPreview({ form, onBack }: { form: StatsForm; onBack: () => void }) 
             <span className="text-xs font-semibold text-green-400 uppercase tracking-wider">Deck Ready</span>
           </div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">
-            Your Fender Pitch Deck
+            Your {brandName} Pitch Deck
           </h1>
           <p className="text-muted-foreground text-sm mt-1">5 slides · Generated just now</p>
         </div>
@@ -586,6 +586,12 @@ export default function PitchDeck() {
   const [step, setStep] = useState<"form" | "preview">(isDemo ? "preview" : "form");
   const [formData, setFormData] = useState<StatsForm>(isDemo ? DEMO_FORM : DEFAULT_FORM);
 
+  const brandName = (() => {
+    if (typeof window === "undefined") return "Fender";
+    const raw = new URLSearchParams(window.location.search).get("brand");
+    return raw ? decodeURIComponent(raw) : "Fender";
+  })();
+
   const handleFormSubmit = (data: StatsForm) => {
     setFormData(data);
     setStep("preview");
@@ -615,7 +621,11 @@ export default function PitchDeck() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.35 }}
             >
-              <DeckPreview form={formData} onBack={() => { setStep("form"); window.scrollTo({ top: 0 }); }} />
+              <DeckPreview
+                form={formData}
+                brandName={brandName}
+                onBack={() => { setStep("form"); window.scrollTo({ top: 0 }); }}
+              />
             </motion.div>
           )}
         </AnimatePresence>

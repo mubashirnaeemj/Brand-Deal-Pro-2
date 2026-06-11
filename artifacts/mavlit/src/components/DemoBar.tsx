@@ -23,16 +23,10 @@ const STEPS = [
     match: (p: string) => p.startsWith("/brands/"),
   },
   {
-    label: "Pitch Deck",
-    href: "/pitch-deck?demo=1",
-    desc: "Auto-generate a Fender pitch deck from your audience stats.",
-    match: (p: string) => p === "/pitch-deck",
-  },
-  {
-    label: "Outreach Email",
-    href: "/outreach-email",
-    desc: "Draft and customize a personalized outreach email — ready to send.",
-    match: (p: string) => p === "/outreach-email",
+    label: "Pitch",
+    href: "/pitch",
+    desc: "Build your outreach email — story-driven, no rates, no deck.",
+    match: (p: string) => p === "/pitch" || p === "/pitch-deck" || p === "/outreach-email",
   },
 ];
 
@@ -52,7 +46,6 @@ export default function DemoBar() {
   const [location, setLocation] = useLocation();
   const [active, setActive] = useState(false);
 
-  // Activate demo if landing with ?demo=1
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("demo") === "1") {
@@ -70,15 +63,15 @@ export default function DemoBar() {
   const handleExit = () => {
     deactivateDemo();
     setActive(false);
-    setLocation("/");
+    window.location.assign("/");
   };
 
   const handleNext = () => {
-    if (nextStep) setLocation(nextStep.href);
+    if (nextStep) window.location.assign(nextStep.href);
   };
 
   const handlePrev = () => {
-    if (prevStep) setLocation(prevStep.href);
+    if (prevStep) window.location.assign(prevStep.href);
   };
 
   return (
@@ -107,7 +100,7 @@ export default function DemoBar() {
                   <div key={step.label} className="flex items-center gap-1 shrink-0">
                     {i > 0 && <ChevronRight size={10} className="text-border" />}
                     <button
-                      onClick={() => setLocation(step.href)}
+                      onClick={() => window.location.assign(step.href)}
                       className={`px-2.5 py-0.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap ${
                         current
                           ? "bg-primary text-white"

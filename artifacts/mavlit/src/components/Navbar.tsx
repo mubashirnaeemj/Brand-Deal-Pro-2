@@ -6,7 +6,7 @@ import { LayoutDashboard, Users, Zap, Calculator, UserCircle, Briefcase } from "
 const NAV_LINKS = [
   { label: "Dashboard",  href: "/dashboard",      Icon: LayoutDashboard },
   { label: "Matches",    href: "/brand-matches",  Icon: Users           },
-  { label: "Pitch",      href: "/pitch-deck",     Icon: Zap             },
+  { label: "Pitch",      href: "/pitch",          Icon: Zap             },
   { label: "Deals",      href: "/deals",          Icon: Briefcase       },
   { label: "Negotiator", href: "/rate-calculator",Icon: Calculator      },
   { label: "Profile",    href: "/profile",        Icon: UserCircle      },

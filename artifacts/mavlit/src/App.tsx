@@ -7,8 +7,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import BrandMatches from "@/pages/BrandMatches";
 import BrandDetail from "@/pages/BrandDetail";
-import PitchDeck from "@/pages/PitchDeck";
-import OutreachEmail from "@/pages/OutreachEmail";
+import Pitch from "@/pages/Pitch";
 import Dashboard from "@/pages/Dashboard";
 import ProfileSettings from "@/pages/ProfileSettings";
 import RateCalculator from "@/pages/RateCalculator";
@@ -22,8 +21,9 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/brand-matches" component={BrandMatches} />
       <Route path="/brands/:slug" component={BrandDetail} />
-      <Route path="/pitch-deck" component={PitchDeck} />
-      <Route path="/outreach-email" component={OutreachEmail} />
+      <Route path="/pitch" component={Pitch} />
+      <Route path="/pitch-deck" component={Pitch} />
+      <Route path="/outreach-email" component={Pitch} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/profile" component={ProfileSettings} />
       <Route path="/rate-calculator" component={RateCalculator} />

@@ -1,16 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, Users, Zap, Mail, Calculator, UserCircle, Briefcase } from "lucide-react";
+import { LayoutDashboard, Users, Zap, Calculator, UserCircle } from "lucide-react";
 
 const NAV_LINKS = [
-  { label: "Dashboard", href: "/dashboard",      Icon: LayoutDashboard },
-  { label: "Matches",   href: "/brand-matches",  Icon: Users           },
-  { label: "Pitch",     href: "/pitch-deck",     Icon: Zap             },
-  { label: "Outreach",  href: "/outreach-email", Icon: Mail            },
-  { label: "Deals",     href: "/deals",          Icon: Briefcase       },
-  { label: "Rates",     href: "/rate-calculator",Icon: Calculator      },
-  { label: "Profile",   href: "/profile",        Icon: UserCircle      },
+  { label: "Dashboard",  href: "/dashboard",      Icon: LayoutDashboard },
+  { label: "Matches",    href: "/brand-matches",  Icon: Users           },
+  { label: "Pitch",      href: "/pitch-deck",     Icon: Zap             },
+  { label: "Negotiator", href: "/rate-calculator",Icon: Calculator      },
+  { label: "Profile",    href: "/profile",        Icon: UserCircle      },
 ];
 
 export default function Navbar() {

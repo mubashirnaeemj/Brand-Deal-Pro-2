@@ -127,12 +127,12 @@ const QUICK_ACTIONS = [
     testId: "action-pitch-deck",
   },
   {
-    label: "Draft Outreach Email",
-    description: "Compose a personalized brand pitch email",
-    icon: Mail,
-    href: "/pitch",
+    label: "Negotiator",
+    description: "Negotiate the finances and terms of your brand deal.",
+    icon: TrendingUp,
+    href: "/rate-calculator",
     color: "#ec4899",
-    testId: "action-outreach-email",
+    testId: "action-negotiator",
   },
 ];
 

@@ -1,0 +1,49 @@
+4. Negotiator page (replaces Rate Calculator)
+Delete the Rate Calculator page entirely. Create a new page called Negotiator.
+Page subtitle: "Rate intelligence, negotiation guidance, and contract checklist. Use this when a brand responds — or to prep before any rate conversation."
+Section 1 — Market rate intelligence
+At the top, before anything else, add a yellow warning box: "Important: Rates in creator deals are not formulaic. The same deliverable can vary 5–10x based on your vertical, audience quality, and exclusivity terms. Use these ranges as a starting point — not a ceiling and not a guarantee."
+Two dropdowns side by side:
+
+Niche (Music, Lifestyle, etc.)
+Deal type (Instagram Reel / Instagram Reel + 2 Stories / Single Story 3 frames / TikTok Video)
+
+When both are selected, show three metric cards side by side:
+
+Observed range (e.g. $400–$2,000)
+Median (e.g. $900)
+Top quartile (e.g. $1,600+)
+
+Below the cards, show: "Based on [X] recent deals reported. Source: [publication name and year]" in small grey text.
+Below the source line, show a list of checkmark factors under the heading "Factors that push your rate higher:":
+
+High save rate (brands value saves as purchase-intent signals)
+Prior brand partnerships — proven track record
+Audience skews 25–44 with higher purchasing power
+High engagement rate relative to follower count
+Niche audience with documented purchase behavior
+
+Below the factor list, add this line in small grey text: "Pro tip: If every brand you pitch says yes to your rate, raise it. You're leaving money on the table."
+Section 2 — AI negotiation advisor
+Two inputs side by side: Brand name, Your follower count.
+Below those, a large textarea: "Their response — paste it here (or describe the situation)"
+Full-width button: "✦ Get negotiation advice"
+When clicked, call the Anthropic API. The AI should give tactical advice on: how to respond to what the brand said, what rate to anchor to and why, key contract terms to push for especially usage rights, and what not to do. Under 200 words.
+Show the AI response in a monospace dark box below the button.
+Section 3 — Before you sign: contract checklist
+Subheading: "Where independent creators most commonly get burned. Know what to ask your lawyer about — this is not legal advice."
+Five items in cards:
+
+⚠️ Usage rights — Perpetuity clauses let brands use your content forever including in paid ads and billboards. Always limit to a defined term and charge more for extended use.
+🔒 Exclusivity — Category exclusivity means you can't work with competitors for a set period. Make sure the duration and category are clearly defined.
+📡 Whitelisting / paid amplification — If a brand wants to boost your post as a paid ad, that's a separate right. It should cost more.
+📝 Content ownership — Who owns the content post-campaign? By default you do — but contracts can transfer this. Never sign away ownership without additional compensation.
+💰 Kill fee — If a brand cancels after you've started creating, ask for 50% of the agreed rate if cancelled within 14 days of delivery.
+
+Right sidebar (sticky): Five negotiation principles in a stacked list:
+
+Never lead with your rate
+Rates are not formulaic
+Usage rights cost extra
+If everyone says yes, raise it
+Budget ceiling ≠ your value

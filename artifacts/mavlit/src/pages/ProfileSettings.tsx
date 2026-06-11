@@ -54,10 +54,11 @@ type ProfileForm = {
 };
 
 const STAT_PLATFORMS = [
-  { key: "instagram", label: "Instagram", Icon: Instagram,   color: "#e1306c" },
-  { key: "tiktok",    label: "TikTok",    Icon: SiTiktok,    color: "#ffffff"  },
-  { key: "youtube",   label: "YouTube",   Icon: Youtube,     color: "#ff0000"  },
-  { key: "facebook",  label: "Facebook",  Icon: SiFacebook,  color: "#1877f2"  },
+  { key: "instagram", label: "Instagram", Icon: Instagram,   color: "#e1306c", subscribersOnly: false },
+  { key: "tiktok",    label: "TikTok",    Icon: SiTiktok,    color: "#ffffff",  subscribersOnly: false },
+  { key: "youtube",   label: "YouTube",   Icon: Youtube,     color: "#ff0000",  subscribersOnly: false },
+  { key: "facebook",  label: "Facebook",  Icon: SiFacebook,  color: "#1877f2",  subscribersOnly: false },
+  { key: "substack",  label: "Substack",  Icon: Newspaper,   color: "#ff6719",  subscribersOnly: true  },
 ];
 
 const DEMO_STAT: PlatformStat = { followers: "45,000", engagement: "4.2", watchTime: "2:35", avgViews: "8,200" };
@@ -74,6 +75,7 @@ const DEFAULT: ProfileForm = {
     tiktok:    { ...DEMO_STAT },
     youtube:   { ...DEMO_STAT },
     facebook:  { ...DEMO_STAT },
+    substack:  { followers: "12,000", engagement: "", watchTime: "", avgViews: "" },
   },
 };
 
@@ -295,7 +297,7 @@ export default function ProfileSettings() {
                   <h2 className="text-sm font-bold text-white">Platform Stats</h2>
                 </div>
                 <div className="flex flex-col gap-6">
-                  {STAT_PLATFORMS.map(({ key, label, Icon, color }) => (
+                  {STAT_PLATFORMS.map(({ key, label, Icon, color, subscribersOnly }, idx) => (
                     <div key={key}>
                       <div className="flex items-center gap-2 mb-3">
                         <div
@@ -306,45 +308,59 @@ export default function ProfileSettings() {
                         </div>
                         <p className="text-xs font-bold uppercase tracking-wider text-white/70">{label}</p>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Field label="Followers / Subscribers">
-                          <input
-                            type="text"
-                            value={form.stats[key]?.followers ?? ""}
-                            onChange={(e) => setStat(key, "followers", e.target.value)}
-                            placeholder="e.g. 45,000"
-                            className={inputCls}
-                          />
-                        </Field>
-                        <Field label="Engagement Rate (%)">
-                          <input
-                            type="text"
-                            value={form.stats[key]?.engagement ?? ""}
-                            onChange={(e) => setStat(key, "engagement", e.target.value)}
-                            placeholder="e.g. 4.2"
-                            className={inputCls}
-                          />
-                        </Field>
-                        <Field label="Avg. Video Watch Time">
-                          <input
-                            type="text"
-                            value={form.stats[key]?.watchTime ?? ""}
-                            onChange={(e) => setStat(key, "watchTime", e.target.value)}
-                            placeholder="e.g. 2:35 or 155s"
-                            className={inputCls}
-                          />
-                        </Field>
-                        <Field label="Avg. Views per Post">
-                          <input
-                            type="text"
-                            value={form.stats[key]?.avgViews ?? ""}
-                            onChange={(e) => setStat(key, "avgViews", e.target.value)}
-                            placeholder="e.g. 8,200"
-                            className={inputCls}
-                          />
-                        </Field>
-                      </div>
-                      {key !== "facebook" && <div className="mt-5 h-px bg-border/50" />}
+                      {subscribersOnly ? (
+                        <div className="max-w-[calc(50%-6px)]">
+                          <Field label="Subscribers">
+                            <input
+                              type="text"
+                              value={form.stats[key]?.followers ?? ""}
+                              onChange={(e) => setStat(key, "followers", e.target.value)}
+                              placeholder="e.g. 12,000"
+                              className={inputCls}
+                            />
+                          </Field>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3">
+                          <Field label="Followers / Subscribers">
+                            <input
+                              type="text"
+                              value={form.stats[key]?.followers ?? ""}
+                              onChange={(e) => setStat(key, "followers", e.target.value)}
+                              placeholder="e.g. 45,000"
+                              className={inputCls}
+                            />
+                          </Field>
+                          <Field label="Engagement Rate (%)">
+                            <input
+                              type="text"
+                              value={form.stats[key]?.engagement ?? ""}
+                              onChange={(e) => setStat(key, "engagement", e.target.value)}
+                              placeholder="e.g. 4.2"
+                              className={inputCls}
+                            />
+                          </Field>
+                          <Field label="Avg. Video Watch Time">
+                            <input
+                              type="text"
+                              value={form.stats[key]?.watchTime ?? ""}
+                              onChange={(e) => setStat(key, "watchTime", e.target.value)}
+                              placeholder="e.g. 2:35 or 155s"
+                              className={inputCls}
+                            />
+                          </Field>
+                          <Field label="Avg. Views per Post">
+                            <input
+                              type="text"
+                              value={form.stats[key]?.avgViews ?? ""}
+                              onChange={(e) => setStat(key, "avgViews", e.target.value)}
+                              placeholder="e.g. 8,200"
+                              className={inputCls}
+                            />
+                          </Field>
+                        </div>
+                      )}
+                      {idx < STAT_PLATFORMS.length - 1 && <div className="mt-5 h-px bg-border/50" />}
                     </div>
                   ))}
                 </div>

@@ -41,7 +41,7 @@ const PLATFORMS = [
   { key: "facebook",  label: "Facebook",   Icon: SiFacebook,  color: "#1877f2", placeholder: "facebook.com/yourpage"     },
 ];
 
-type PlatformStat = { followers: string; engagement: string };
+type PlatformStat = { followers: string; engagement: string; watchTime: string; avgViews: string };
 
 type ProfileForm = {
   name: string;
@@ -54,13 +54,13 @@ type ProfileForm = {
 };
 
 const STAT_PLATFORMS = [
-  { key: "instagram", label: "Instagram", Icon: Instagram,  color: "#e1306c" },
-  { key: "tiktok",    label: "TikTok",    Icon: SiTiktok,   color: "#ffffff"  },
-  { key: "youtube",   label: "YouTube",   Icon: Youtube,    color: "#ff0000"  },
-  { key: "substack",  label: "Substack",  Icon: Newspaper,  color: "#ff6719"  },
+  { key: "instagram", label: "Instagram", Icon: Instagram,   color: "#e1306c" },
+  { key: "tiktok",    label: "TikTok",    Icon: SiTiktok,    color: "#ffffff"  },
+  { key: "youtube",   label: "YouTube",   Icon: Youtube,     color: "#ff0000"  },
+  { key: "facebook",  label: "Facebook",  Icon: SiFacebook,  color: "#1877f2"  },
 ];
 
-const EMPTY_STAT: PlatformStat = { followers: "", engagement: "" };
+const DEMO_STAT: PlatformStat = { followers: "45,000", engagement: "4.2", watchTime: "2:35", avgViews: "8,200" };
 
 const DEFAULT: ProfileForm = {
   name: "",
@@ -69,7 +69,12 @@ const DEFAULT: ProfileForm = {
   niche: "music",
   location: "",
   links: { instagram: "", tiktok: "", youtube: "", facebook: "" },
-  stats: { instagram: { ...EMPTY_STAT }, tiktok: { ...EMPTY_STAT }, youtube: { ...EMPTY_STAT }, substack: { ...EMPTY_STAT } },
+  stats: {
+    instagram: { ...DEMO_STAT },
+    tiktok:    { ...DEMO_STAT },
+    youtube:   { ...DEMO_STAT },
+    facebook:  { ...DEMO_STAT },
+  },
 };
 
 function Field({
@@ -289,38 +294,57 @@ export default function ProfileSettings() {
                   <BarChart3 size={14} className="text-primary" />
                   <h2 className="text-sm font-bold text-white">Platform Stats</h2>
                 </div>
-                <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-6">
                   {STAT_PLATFORMS.map(({ key, label, Icon, color }) => (
-                    <div key={key} className="flex items-start gap-3">
-                      <div
-                        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-                        style={{ background: `${color}18` }}
-                      >
-                        <Icon size={16} style={{ color }} />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{label}</p>
-                        <div className="grid grid-cols-2 gap-3">
-                          <Field label="Followers / subscribers">
-                            <input
-                              type="text"
-                              value={form.stats[key]?.followers ?? ""}
-                              onChange={(e) => setStat(key, "followers", e.target.value)}
-                              placeholder="e.g. 52,000"
-                              className={inputCls}
-                            />
-                          </Field>
-                          <Field label="Avg. engagement rate (%)">
-                            <input
-                              type="text"
-                              value={form.stats[key]?.engagement ?? ""}
-                              onChange={(e) => setStat(key, "engagement", e.target.value)}
-                              placeholder="e.g. 5.8"
-                              className={inputCls}
-                            />
-                          </Field>
+                    <div key={key}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ background: `${color}18` }}
+                        >
+                          <Icon size={14} style={{ color }} />
                         </div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-white/70">{label}</p>
                       </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="Followers / Subscribers">
+                          <input
+                            type="text"
+                            value={form.stats[key]?.followers ?? ""}
+                            onChange={(e) => setStat(key, "followers", e.target.value)}
+                            placeholder="e.g. 45,000"
+                            className={inputCls}
+                          />
+                        </Field>
+                        <Field label="Engagement Rate (%)">
+                          <input
+                            type="text"
+                            value={form.stats[key]?.engagement ?? ""}
+                            onChange={(e) => setStat(key, "engagement", e.target.value)}
+                            placeholder="e.g. 4.2"
+                            className={inputCls}
+                          />
+                        </Field>
+                        <Field label="Avg. Video Watch Time">
+                          <input
+                            type="text"
+                            value={form.stats[key]?.watchTime ?? ""}
+                            onChange={(e) => setStat(key, "watchTime", e.target.value)}
+                            placeholder="e.g. 2:35 or 155s"
+                            className={inputCls}
+                          />
+                        </Field>
+                        <Field label="Avg. Views per Post">
+                          <input
+                            type="text"
+                            value={form.stats[key]?.avgViews ?? ""}
+                            onChange={(e) => setStat(key, "avgViews", e.target.value)}
+                            placeholder="e.g. 8,200"
+                            className={inputCls}
+                          />
+                        </Field>
+                      </div>
+                      {key !== "facebook" && <div className="mt-5 h-px bg-border/50" />}
                     </div>
                   ))}
                 </div>

@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, SlidersHorizontal, Music, Headphones, Zap, Camera, ShoppingBag, Cpu } from "lucide-react";
+import { CheckCircle2, SlidersHorizontal, Music, Headphones, Zap, Camera, ShoppingBag, Cpu, Copy, Check, Linkedin, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 const CATEGORIES = ["All", "Audio", "Streaming", "Lifestyle", "Software", "Retail", "Beverage"];
+
+const TIMING_COPY =
+  "Brand campaign calendars are planned 60–90 days out. Pitching in June means you're pitching for Q4/Holiday. Brands casting now won't be visible until those campaigns go live — which is why early outreach is a competitive advantage.";
 
 const BRANDS = [
   {
@@ -16,7 +19,15 @@ const BRANDS = [
     color: "#7c3aed",
     matchScore: 97,
     icon: Headphones,
-    contact: "agency" as const,
+    contact: {
+      name: "Sarah Chen",
+      title: "Director of Influencer Marketing",
+      company: "Edelman",
+      linkedin: "https://linkedin.com/in/sarah-chen-example",
+      email: "sarah.chen@edelman.com",
+      note: "Handles creator partnerships for Sennheiser's North America campaigns.",
+    },
+    hashtag: "SennheiserPartner",
     reasons: [
       "Your gear-focused content aligns perfectly with their pro audio audience — avg. 84% overlap with Sennheiser buyers.",
       "3 of your last 5 videos featured studio equipment, making native integration seamless and authentic.",
@@ -31,7 +42,15 @@ const BRANDS = [
     color: "#1db954",
     matchScore: 94,
     icon: Music,
-    contact: "in-house" as const,
+    contact: {
+      name: "Marcus Williams",
+      title: "Creator Partnerships Manager",
+      company: "Spotify (in-house)",
+      linkedin: "https://linkedin.com/in/marcus-williams-example",
+      email: "m.williams@spotify.com",
+      note: "Manages creator campaigns directly from Spotify's internal partnerships team.",
+    },
+    hashtag: "SpotifyPartner",
     reasons: [
       "Your audience skews 18–34 and streams 4+ hours of music daily — Spotify's exact target demographic.",
       "Creator-to-platform partnership campaigns are active in Q3; your niche positions you as a top-tier candidate.",
@@ -46,7 +65,15 @@ const BRANDS = [
     color: "#f59e0b",
     matchScore: 91,
     icon: Cpu,
-    contact: "agency" as const,
+    contact: {
+      name: "Priya Sharma",
+      title: "Account Supervisor",
+      company: "Fleischman Hillard",
+      linkedin: "https://linkedin.com/in/priya-sharma-example",
+      email: "p.sharma@fleishman.com",
+      note: "Oversees influencer and creator strategy for Native Instruments' global campaigns.",
+    },
+    hashtag: "NativeInstrumentsPartner",
     reasons: [
       "68% of your followers self-identify as producers or beatmakers — exactly who NI targets with Maschine and Komplete.",
       "Your tutorial-style content averages 9-min watch time, giving sponsored segments meaningful exposure.",
@@ -61,7 +88,15 @@ const BRANDS = [
     color: "#0ea5e9",
     matchScore: 88,
     icon: Camera,
-    contact: "in-house" as const,
+    contact: {
+      name: "Jake Torres",
+      title: "Influencer Marketing Manager",
+      company: "GoPro (in-house)",
+      linkedin: "https://linkedin.com/in/jake-torres-example",
+      email: "j.torres@gopro.com",
+      note: "Runs GoPro's creator program and reviews inbound partnership pitches directly.",
+    },
+    hashtag: "GoPro",
     reasons: [
       "Live performance and behind-the-scenes content make up 40% of your catalog — prime territory for GoPro's POV narrative.",
       "Your engagement rate of 6.2% is 3× the platform average, ensuring sponsored content converts, not just reaches.",
@@ -76,7 +111,15 @@ const BRANDS = [
     color: "#ec4899",
     matchScore: 85,
     icon: ShoppingBag,
-    contact: "in-house" as const,
+    contact: {
+      name: "Dana Kim",
+      title: "Brand Partnerships Lead",
+      company: "Sweetwater (in-house)",
+      linkedin: "https://linkedin.com/in/dana-kim-example",
+      email: "d.kim@sweetwater.com",
+      note: "Leads Sweetwater's affiliate and creator partnership initiatives from their Fort Wayne HQ.",
+    },
+    hashtag: "SweetwaterPartner",
     reasons: [
       "Sweetwater's affiliate conversion rate is highest among gear-review creators — your format mirrors their top earners.",
       "Your comment section regularly features gear questions, signaling purchase-intent audiences Sweetwater actively seeks.",
@@ -91,7 +134,15 @@ const BRANDS = [
     color: "#ef4444",
     matchScore: 81,
     icon: Zap,
-    contact: "in-house" as const,
+    contact: {
+      name: "Alex Rivera",
+      title: "Account Manager",
+      company: "Edelman",
+      linkedin: "https://linkedin.com/in/alex-rivera-example",
+      email: "a.rivera@edelman.com",
+      note: "Manages Red Bull Music creator campaigns across North America and Latin America.",
+    },
+    hashtag: "RedBullMusicPartner",
     reasons: [
       "Red Bull Music sponsors 200+ creator campaigns yearly; your music-lifestyle blend fits their cultural content strategy.",
       "Audience affinity analysis shows 71% of your followers also follow Red Bull Music's official channels.",
@@ -124,13 +175,30 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
+function CopyEmailButton({ email }: { email: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(email).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border text-muted-foreground hover:text-white hover:border-white/30 transition-all duration-200"
+    >
+      {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+      {copied ? "Copied!" : "Copy email"}
+    </button>
+  );
+}
+
 function BrandCard({ brand, index }: { brand: (typeof BRANDS)[0]; index: number }) {
   const Icon = brand.icon;
-
-  const contactText =
-    brand.contact === "agency"
-      ? "Campaigns managed via agency."
-      : "In-house partnerships team handles creator outreach directly.";
+  const [timingOpen, setTimingOpen] = useState(false);
 
   const handlePitch = () => {
     window.location.assign(`/pitch?brand=${encodeURIComponent(brand.name)}`);
@@ -177,10 +245,30 @@ function BrandCard({ brand, index }: { brand: (typeof BRANDS)[0]; index: number 
           >
             {brand.category}
           </span>
-          {/* Timing badge */}
-          <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold">
-            🗓 Pitch now → Q4/Holiday campaigns
-          </div>
+
+          {/* Timing badge — expandable */}
+          <button
+            onClick={() => setTimingOpen((o) => !o)}
+            className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/15 transition-colors duration-200 cursor-pointer"
+          >
+            <Clock size={11} />
+            Pitch now → Q4/Holiday campaigns
+            {timingOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+          </button>
+
+          <AnimatePresence>
+            {timingOpen && (
+              <motion.p
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: "auto", marginTop: 8 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                transition={{ duration: 0.25 }}
+                className="text-xs text-muted-foreground leading-relaxed overflow-hidden"
+              >
+                {TIMING_COPY}
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
@@ -200,11 +288,33 @@ function BrandCard({ brand, index }: { brand: (typeof BRANDS)[0]; index: number 
           ))}
         </ul>
 
-        {/* Contact info box */}
-        <div className="mt-1 px-3.5 py-3 rounded-xl bg-blue-950/50 border border-blue-800/30">
-          <span className="text-xs font-bold text-blue-300">Contact: </span>
-          <span className="text-xs text-blue-200/80">{contactText}</span>
+        {/* Contact card */}
+        <div className="mt-1 px-4 py-3.5 rounded-xl bg-[hsl(240_10%_8%)] border border-border flex flex-col gap-2.5">
+          <div>
+            <p className="text-sm font-bold text-white leading-snug">{brand.contact.name}</p>
+            <p className="text-xs text-muted-foreground">{brand.contact.title} · {brand.contact.company}</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <a
+              href={brand.contact.linkedin}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-white hover:bg-primary/85 transition-colors duration-200"
+            >
+              <Linkedin size={12} />
+              View on LinkedIn
+            </a>
+            <CopyEmailButton email={brand.contact.email} />
+          </div>
+          <p className="text-xs text-muted-foreground leading-relaxed">{brand.contact.note}</p>
         </div>
+
+        {/* Hashtag research tip */}
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          <span className="font-semibold text-white/50">Research tip:</span> Search{" "}
+          <span className="font-mono text-white/60">#{brand.hashtag}Partner</span> or{" "}
+          <span className="font-mono text-white/60">#{brand.hashtag}Ad</span> on Instagram to see the volume and style of their past creator campaigns before you pitch.
+        </p>
       </div>
 
       <div className="px-6 pb-5 pt-1">
@@ -236,7 +346,7 @@ export default function BrandMatches() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="mb-10"
+            className="mb-6"
           >
             <div className="flex items-center gap-2 mb-3">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/30">
@@ -254,10 +364,23 @@ export default function BrandMatches() {
             </p>
           </motion.div>
 
+          {/* Quick-turn callout */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="mb-7 px-4 py-3 rounded-xl bg-emerald-950/60 border border-emerald-800/40 flex items-start gap-3"
+          >
+            <span className="text-emerald-400 text-base mt-px shrink-0">⚡</span>
+            <p className="text-xs text-emerald-300/90 leading-relaxed">
+              Brands sometimes need creators on short notice when a campaign spot opens up. Having your pitch materials ready in MAVLIT means you can respond within hours — a real competitive advantage.
+            </p>
+          </motion.div>
+
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.15 }}
+            transition={{ duration: 0.4, delay: 0.18 }}
             className="flex items-center gap-3 mb-8 flex-wrap"
           >
             <div className="flex items-center gap-1.5 text-muted-foreground mr-1">

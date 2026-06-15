@@ -317,33 +317,6 @@ export default function BrandDetail() {
                 <ActivityGauge score={BRAND.activityScore} />
               </motion.div>
 
-              {/* Deal range */}
-              <motion.div
-                initial={{ opacity: 0, x: 16 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.45, delay: 0.12 }}
-                className="bg-card border border-border rounded-2xl p-6"
-                data-testid="card-deal-range"
-              >
-                <div className="flex items-center gap-2 mb-5">
-                  <TrendingUp size={15} className="text-primary" />
-                  <h3 className="text-sm font-bold text-white">Estimated Deal Range</h3>
-                </div>
-                <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-3xl font-extrabold text-white">
-                    ${BRAND.dealMin.toLocaleString()}
-                  </span>
-                  <span className="text-muted-foreground font-semibold">–</span>
-                  <span className="text-3xl font-extrabold text-white">
-                    ${BRAND.dealMax.toLocaleString()}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground mb-4">{BRAND.dealNote}</p>
-                <div className="relative h-1.5 bg-secondary rounded-full overflow-hidden">
-                  <div className="absolute inset-y-0 left-0 right-0 rounded-full bg-gradient-to-r from-primary/40 via-primary to-primary/40" />
-                </div>
-              </motion.div>
-
               {/* Contact bundle */}
               <motion.div
                 initial={{ opacity: 0, x: 16 }}

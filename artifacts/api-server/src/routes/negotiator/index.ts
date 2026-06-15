@@ -9,6 +9,7 @@ const NegotiatorInputSchema = z.object({
   followerCount: z.string().min(1),
   brandResponse: z.string().min(1),
   contactSeniority: z.string().optional(),
+  noResponse: z.boolean().optional(),
 });
 
 router.post("/negotiator/advise", async (req, res) => {
@@ -18,13 +19,24 @@ router.post("/negotiator/advise", async (req, res) => {
     return;
   }
 
-  const { brandName, followerCount, brandResponse, contactSeniority } = parsed.data;
+  const { brandName, followerCount, brandResponse, contactSeniority, noResponse } = parsed.data;
 
   const seniorityLine = contactSeniority && contactSeniority !== "Unknown"
     ? `Contact seniority: ${contactSeniority}`
     : "";
 
-  const prompt = `You are a seasoned creator deal advisor. A content creator needs tactical negotiation advice.
+  const prompt = noResponse
+    ? `You are a seasoned creator deal advisor. A content creator has pitched a brand and has not received a response yet.
+
+Brand pitched: ${brandName}
+Creator follower count: ${followerCount}
+${seniorityLine}
+Timing / situation: ${brandResponse}
+
+The creator has not received a response yet. Give advice on whether and how to follow up. Standard guidance: one follow-up email only, sent 5–7 days after the first, then stop. Write a short suggested follow-up message they can adapt — keep it under 60 words, warm but not desperate, and end with a single clear question. Remind them that brand deals are a long game — no reply does not mean no interest. Brands are busy and inboxes are noisy. Persistence beyond one follow-up hurts more than it helps.
+
+Be direct and practical. Write like a seasoned industry insider talking to a creator friend. Use short paragraphs.`
+    : `You are a seasoned creator deal advisor. A content creator needs tactical negotiation advice.
 
 Brand: ${brandName}
 Creator follower count: ${followerCount}

@@ -175,6 +175,7 @@ export default function Negotiator() {
   const [brandName, setBrandName] = useState("");
   const [followerCount, setFollowerCount] = useState("");
   const [contactSeniority, setContactSeniority] = useState("");
+  const [noResponse, setNoResponse] = useState(false);
   const [brandResponse, setBrandResponse] = useState("");
   const [advising, setAdvising] = useState(false);
   const [advice, setAdvice] = useState<string | null>(null);
@@ -195,7 +196,7 @@ export default function Negotiator() {
       const res = await fetch("/api/negotiator/advise", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandName, followerCount, brandResponse, contactSeniority }),
+        body: JSON.stringify({ brandName, followerCount, brandResponse, contactSeniority, noResponse }),
       });
 
       if (!res.ok) throw new Error("Server error");
@@ -362,13 +363,36 @@ export default function Negotiator() {
                   />
                 </div>
 
+                {/* No-response toggle */}
+                <label className="flex items-center gap-2.5 cursor-pointer w-fit">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={noResponse}
+                      onChange={e => {
+                        setNoResponse(e.target.checked);
+                        setBrandResponse("");
+                      }}
+                      className="sr-only"
+                    />
+                    <div className={`w-9 h-5 rounded-full transition-colors duration-200 ${noResponse ? "bg-primary" : "bg-white/15"}`} />
+                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${noResponse ? "translate-x-4" : "translate-x-0"}`} />
+                  </div>
+                  <span className="text-sm font-semibold text-white/80">I haven't heard back yet.</span>
+                </label>
+
                 <div>
-                  <label className="block text-sm font-semibold text-white/80 mb-1.5">Their response — paste it here (or describe the situation)</label>
+                  <label className="block text-sm font-semibold text-white/80 mb-1.5">
+                    {noResponse ? "How long ago did you send your pitch?" : "Their response — paste it here (or describe the situation)"}
+                  </label>
                   <textarea
                     value={brandResponse}
                     onChange={e => setBrandResponse(e.target.value)}
                     rows={5}
-                    placeholder="e.g. 'Hi, thanks for reaching out! We love your content. Our budget for this campaign is $500 for an Instagram Reel. Let us know if that works for you.'"
+                    placeholder={noResponse
+                      ? "e.g. Sent 6 days ago, no reply yet."
+                      : "e.g. 'Hi, thanks for reaching out! We love your content. Our budget for this campaign is $500 for an Instagram Reel. Let us know if that works for you.'"
+                    }
                     className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all resize-none"
                   />
                 </div>
@@ -385,10 +409,10 @@ export default function Negotiator() {
                         transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
                         className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
                       />
-                      Getting advice…
+                      {noResponse ? "Getting follow-up advice…" : "Getting advice…"}
                     </>
                   ) : (
-                    <><Sparkles size={15} /> ✦ Get negotiation advice</>
+                    <><Sparkles size={15} /> {noResponse ? "✦ Get follow-up advice" : "✦ Get negotiation advice"}</>
                   )}
                 </button>
 

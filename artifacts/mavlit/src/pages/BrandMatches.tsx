@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   CheckCircle2, SlidersHorizontal, Music, Headphones, Zap, Camera,
@@ -359,6 +360,7 @@ function ContactPanel({ brand, onClose }: { brand: Brand; onClose: () => void })
 function BrandCard({ brand, index, onOpen }: { brand: Brand; index: number; onOpen: () => void }) {
   const Icon = brand.icon;
   const [timingOpen, setTimingOpen] = useState(false);
+  const [, setLocation] = useLocation();
 
   return (
     <motion.div
@@ -368,7 +370,7 @@ function BrandCard({ brand, index, onOpen }: { brand: Brand; index: number; onOp
       transition={{ duration: 0.35, delay: index * 0.06, ease: "easeOut" }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
       data-testid={`card-brand-${brand.id}`}
-      onClick={onOpen}
+      onClick={() => setLocation(`/brands/${brand.slug}`)}
       className="group relative flex flex-col bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/50 transition-colors duration-300 cursor-pointer"
     >
       <div

@@ -142,7 +142,6 @@ function CopyButton({ value }: { value: string }) {
 
 export default function BrandDetail() {
   const [, setLocation] = useLocation();
-  const handleDraftEmail = () => setLocation("/outreach-email");
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -233,25 +232,16 @@ export default function BrandDetail() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.1 }}
-                className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+                className="flex"
               >
                 <button
                   data-testid="button-generate-pitch"
                   onClick={() => setLocation("/pitch")}
-                  className="flex items-center justify-center gap-2.5 py-4 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-sm shadow-lg shadow-primary/30 transition-all hover:shadow-primary/50 hover:-translate-y-0.5 active:translate-y-0"
+                  className="flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-sm shadow-lg shadow-primary/30 transition-all hover:shadow-primary/50 hover:-translate-y-0.5 active:translate-y-0"
                 >
                   <Zap size={16} />
                   Create Pitch Email
-                  <ChevronRight size={14} className="ml-auto opacity-60" />
-                </button>
-                <button
-                  data-testid="button-draft-email"
-                  onClick={handleDraftEmail}
-                  className="flex items-center justify-center gap-2.5 py-4 rounded-xl border border-border hover:border-primary/50 bg-card hover:bg-secondary text-white font-bold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0"
-                >
-                  <Mail size={16} />
-                  Draft Outreach Email
-                  <ChevronRight size={14} className="ml-auto opacity-60" />
+                  <ChevronRight size={14} className="ml-1 opacity-60" />
                 </button>
               </motion.div>
 

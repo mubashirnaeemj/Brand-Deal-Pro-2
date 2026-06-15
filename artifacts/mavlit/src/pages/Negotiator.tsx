@@ -174,6 +174,7 @@ export default function Negotiator() {
 
   const [brandName, setBrandName] = useState("");
   const [followerCount, setFollowerCount] = useState("");
+  const [contactSeniority, setContactSeniority] = useState("");
   const [brandResponse, setBrandResponse] = useState("");
   const [advising, setAdvising] = useState(false);
   const [advice, setAdvice] = useState<string | null>(null);
@@ -194,7 +195,7 @@ export default function Negotiator() {
       const res = await fetch("/api/negotiator/advise", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandName, followerCount, brandResponse }),
+        body: JSON.stringify({ brandName, followerCount, brandResponse, contactSeniority }),
       });
 
       if (!res.ok) throw new Error("Server error");
@@ -342,6 +343,23 @@ export default function Negotiator() {
                       className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-white/80 mb-1.5">Who are you negotiating with?</label>
+                  <SelectField
+                    value={contactSeniority}
+                    onChange={setContactSeniority}
+                    options={[
+                      "Account Manager (agency)",
+                      "Account Supervisor (agency)",
+                      "Director of Influencer Marketing (agency)",
+                      "In-house Brand Manager",
+                      "In-house Marketing Director",
+                      "Unknown",
+                    ]}
+                    placeholder="Select contact seniority"
+                  />
                 </div>
 
                 <div>

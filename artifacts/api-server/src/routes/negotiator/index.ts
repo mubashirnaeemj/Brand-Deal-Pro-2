@@ -8,6 +8,7 @@ const NegotiatorInputSchema = z.object({
   brandName: z.string().min(1),
   followerCount: z.string().min(1),
   brandResponse: z.string().min(1),
+  contactSeniority: z.string().optional(),
 });
 
 router.post("/negotiator/advise", async (req, res) => {
@@ -17,13 +18,20 @@ router.post("/negotiator/advise", async (req, res) => {
     return;
   }
 
-  const { brandName, followerCount, brandResponse } = parsed.data;
+  const { brandName, followerCount, brandResponse, contactSeniority } = parsed.data;
+
+  const seniorityLine = contactSeniority && contactSeniority !== "Unknown"
+    ? `Contact seniority: ${contactSeniority}`
+    : "";
 
   const prompt = `You are a seasoned creator deal advisor. A content creator needs tactical negotiation advice.
 
 Brand: ${brandName}
 Creator follower count: ${followerCount}
+${seniorityLine}
 Brand's response / situation: ${brandResponse}
+
+Factor in the seniority and decision-making authority of the contact when giving negotiation advice. An Account Manager at an agency has limited budget authority and likely needs internal approval before committing to a rate — so push them to escalate or loop in their supervisor rather than accepting their first number. A Director or in-house Brand Manager has more direct control over budget and can often approve on the spot, so anchor higher and negotiate more assertively.
 
 Give tactical advice in under 200 words covering:
 1. How to respond to what the brand said (specific language suggestions)

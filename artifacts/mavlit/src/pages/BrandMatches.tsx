@@ -364,19 +364,6 @@ export default function BrandMatches() {
             </p>
           </motion.div>
 
-          {/* Quick-turn callout */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-            className="mb-7 px-4 py-3 rounded-xl bg-emerald-950/60 border border-emerald-800/40 flex items-start gap-3"
-          >
-            <span className="text-emerald-400 text-base mt-px shrink-0">⚡</span>
-            <p className="text-xs text-emerald-300/90 leading-relaxed">
-              Brands sometimes need creators on short notice when a campaign spot opens up. Having your pitch materials ready in MAVLIT means you can respond within hours — a real competitive advantage.
-            </p>
-          </motion.div>
-
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}

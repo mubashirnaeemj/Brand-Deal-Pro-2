@@ -191,7 +191,14 @@ function CopyButton({ text }: { text: string }) {
 }
 
 export default function Pitch() {
-  const [form, setForm] = useState<FormState>(EMPTY);
+  const [form, setForm] = useState<FormState>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const brand = params.get("brand");
+    if (brand && MATCHED_BRANDS.some(b => b.name === brand)) {
+      return { ...EMPTY, brandSource: "matched", selectedBrand: brand };
+    }
+    return EMPTY;
+  });
   const [generating, setGenerating] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);

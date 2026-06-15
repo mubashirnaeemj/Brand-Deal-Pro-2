@@ -456,7 +456,7 @@ function BrandCard({ brand, index, onOpen }: { brand: Brand; index: number; onOp
       <div className="px-6 pb-5 pt-1">
         <button
           data-testid={`button-pitch-${brand.id}`}
-          onClick={(e) => { e.stopPropagation(); onOpen(); }}
+          onClick={(e) => { e.stopPropagation(); setLocation(`/pitch?brand=${encodeURIComponent(brand.name)}`); }}
           className="w-full py-2.5 rounded-xl text-sm font-semibold border border-border text-white/70 hover:bg-primary hover:border-primary hover:text-white transition-all duration-200"
         >
           Create pitch email →

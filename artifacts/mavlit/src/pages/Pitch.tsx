@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import {
   Sparkles, Copy, Check, ChevronDown, AlertTriangle, Lightbulb,
-  Headphones, Music, Cpu, Camera, ShoppingBag, Zap, User, ArrowRight
+  Headphones, Music, Cpu, Camera, ShoppingBag, Zap, User, ArrowRight,
+  Building2, Users, Mail,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -16,6 +17,61 @@ const MATCHED_BRANDS = [
   { id: 5, name: "Sweetwater",          icon: ShoppingBag,color: "#ec4899", category: "Retail"     },
   { id: 6, name: "Red Bull",            icon: Zap,        color: "#ef4444", category: "Beverage"   },
 ];
+
+type ContactType = "agency" | "in-house";
+
+interface BrandContact {
+  name: string;
+  title: string;
+  company: string;
+  type: ContactType;
+  email: string;
+}
+
+const BRAND_CONTACTS: Record<string, BrandContact> = {
+  "Sennheiser": {
+    name: "Sarah Chen",
+    title: "Director of Influencer Marketing",
+    company: "Edelman",
+    type: "agency",
+    email: "sarah.chen@edelman.com",
+  },
+  "Spotify for Artists": {
+    name: "Marcus Williams",
+    title: "Creator Partnerships Manager",
+    company: "Spotify",
+    type: "in-house",
+    email: "m.williams@spotify.com",
+  },
+  "Native Instruments": {
+    name: "Priya Sharma",
+    title: "Account Supervisor",
+    company: "Fleischman Hillard",
+    type: "agency",
+    email: "p.sharma@fleishman.com",
+  },
+  "GoPro": {
+    name: "Jake Torres",
+    title: "Influencer Marketing Manager",
+    company: "GoPro",
+    type: "in-house",
+    email: "j.torres@gopro.com",
+  },
+  "Sweetwater": {
+    name: "Dana Kim",
+    title: "Brand Partnerships Lead",
+    company: "Sweetwater",
+    type: "in-house",
+    email: "d.kim@sweetwater.com",
+  },
+  "Red Bull": {
+    name: "Alex Rivera",
+    title: "Account Manager",
+    company: "Edelman",
+    type: "agency",
+    email: "a.rivera@edelman.com",
+  },
+};
 
 const NICHES = [
   "Music Production", "Music Performance", "Audio Engineering", "Gear Reviews",
@@ -98,6 +154,42 @@ function Select({ value, onChange, options }: {
   );
 }
 
+function ContactTypeBadge({ type }: { type: ContactType }) {
+  if (type === "agency") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/30">
+        <Building2 size={10} />
+        Agency-side
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+      <Users size={10} />
+      In-house
+    </span>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handle = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button
+      onClick={handle}
+      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border border-border text-muted-foreground hover:text-white hover:border-white/30 transition-all duration-200"
+    >
+      {copied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+      {copied ? "Copied!" : "Copy"}
+    </button>
+  );
+}
+
 export default function Pitch() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [generating, setGenerating] = useState(false);
@@ -111,6 +203,11 @@ export default function Pitch() {
 
   const brandName =
     form.brandSource === "matched" ? form.selectedBrand : form.customBrand;
+
+  const activeContact: BrandContact | null =
+    form.brandSource === "matched" && form.selectedBrand
+      ? (BRAND_CONTACTS[form.selectedBrand] ?? null)
+      : null;
 
   const canGenerate =
     brandName.trim() &&
@@ -141,6 +238,8 @@ export default function Pitch() {
           story: form.story,
           pastDeals: form.pastDeals,
           contentLink: form.contentLink,
+          contactName: activeContact?.name ?? undefined,
+          contactEmail: activeContact?.email ?? undefined,
         }),
       });
 
@@ -176,7 +275,7 @@ export default function Pitch() {
       }
 
       setTimeout(() => emailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    } catch (err) {
+    } catch {
       setError("Something went wrong generating your email. Please try again.");
     } finally {
       setGenerating(false);
@@ -398,6 +497,18 @@ export default function Pitch() {
                     transition={{ duration: 0.4 }}
                     className="space-y-4"
                   >
+                    {/* To: header when contact is known */}
+                    {activeContact && (
+                      <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card border border-border">
+                        <Mail size={13} className="text-muted-foreground shrink-0" />
+                        <span className="text-xs text-muted-foreground font-semibold mr-1">To:</span>
+                        <span className="text-xs text-white font-mono flex-1 truncate">
+                          {activeContact.name} &lt;{activeContact.email}&gt;
+                        </span>
+                        <CopyButton text={`${activeContact.name} <${activeContact.email}>`} />
+                      </div>
+                    )}
+
                     <div className="relative bg-black/60 border border-border rounded-2xl p-5">
                       <pre className="font-mono text-sm text-white/90 whitespace-pre-wrap leading-relaxed">{email}</pre>
                       <button
@@ -424,13 +535,49 @@ export default function Pitch() {
               </AnimatePresence>
             </motion.div>
 
-            {/* Right: Pitch Tips sidebar */}
+            {/* Right: Sidebar */}
             <motion.aside
               initial={{ opacity: 0, x: 16 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.45, delay: 0.2 }}
               className="lg:sticky lg:top-24 space-y-4"
             >
+              {/* Sending to — shown when a matched brand with known contact is selected */}
+              <AnimatePresence>
+                {activeContact && (
+                  <motion.div
+                    key="sending-to"
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.25 }}
+                    className="bg-card border border-border rounded-2xl p-5 space-y-3"
+                  >
+                    <p className="text-xs font-bold text-white uppercase tracking-wider">Sending to</p>
+
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-white leading-snug">{activeContact.name}</p>
+                      <p className="text-xs text-muted-foreground">{activeContact.title}</p>
+                      <p className="text-xs text-muted-foreground">{activeContact.company}</p>
+                    </div>
+
+                    <ContactTypeBadge type={activeContact.type} />
+
+                    <div className="h-px bg-border" />
+
+                    {/* To: field */}
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground mb-1.5">To:</p>
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border border-border">
+                        <span className="text-xs text-white/80 font-mono flex-1 truncate">{activeContact.name} &lt;{activeContact.email}&gt;</span>
+                        <CopyButton text={`${activeContact.name} <${activeContact.email}>`} />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Pitch Tips */}
               <div className="bg-card border border-border rounded-2xl p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <Lightbulb size={15} className="text-primary" />

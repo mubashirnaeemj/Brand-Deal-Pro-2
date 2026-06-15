@@ -15,6 +15,8 @@ const PitchEmailInputSchema = z.object({
   story: z.string().min(1),
   pastDeals: z.string().optional(),
   contentLink: z.string().optional(),
+  contactName: z.string().optional(),
+  contactEmail: z.string().optional(),
 });
 
 router.post("/pitch/generate", async (req, res) => {
@@ -24,7 +26,10 @@ router.post("/pitch/generate", async (req, res) => {
     return;
   }
 
-  const { brandName, creatorName, handle, platform, followers, engagementRate, niche, story, pastDeals, contentLink } = parsed.data;
+  const {
+    brandName, creatorName, handle, platform, followers, engagementRate,
+    niche, story, pastDeals, contentLink, contactName, contactEmail,
+  } = parsed.data;
 
   const pastDealsLine = pastDeals?.trim()
     ? `Past brand partnerships: ${pastDeals}`
@@ -32,6 +37,16 @@ router.post("/pitch/generate", async (req, res) => {
 
   const contentLinkLine = contentLink?.trim()
     ? `Most relevant content: ${contentLink}`
+    : "";
+
+  const contactFirstName = contactName ? contactName.split(" ")[0] : null;
+
+  const openerInstruction = contactFirstName
+    ? `Opens with "Hi ${contactFirstName}," — address them by first name directly`
+    : `Opens with a personalized greeting to the brand's partnerships team`;
+
+  const toLine = contactName && contactEmail
+    ? `Contact being addressed: ${contactName} <${contactEmail}>`
     : "";
 
   const prompt = `You are a creator outreach expert writing a pitch email on behalf of a content creator.
@@ -47,20 +62,22 @@ ${pastDealsLine}
 ${contentLinkLine}
 
 Brand being pitched: ${brandName}
+${toLine}
 
 Their authentic connection/story: ${story}
 
 Write a pitch email that:
-1. Opens with something specific and real about ${brandName} — show genuine knowledge of the brand
-2. Tells the creator's authentic story and connection to ${brandName}
-3. Includes social proof (${followers} followers on ${platform}, ${engagementRate}% engagement rate${pastDeals ? `, past deals: ${pastDeals}` : ""})
-4. Keeps it casual — no formal business language, write like a real person
-5. Where the creator should include their best content link, write literally: [Insert link to your most relevant content]
-6. If they have past brand deal examples to share, write literally: [Insert link to previous brand deal example if applicable]
-7. Closes with EXACTLY this sentence: "What else do you need from me to consider this? Happy to send more — I want to make your job easy."
-8. Does NOT mention rates, fees, or pricing anywhere
-9. Is under 180 words total (not counting the subject line)
-10. Starts with a personalized subject line on the first line in the format: Subject: [subject here]
+1. ${openerInstruction}
+2. Opens the body with something specific and real about ${brandName} — show genuine knowledge of the brand
+3. Tells the creator's authentic story and connection to ${brandName}
+4. Includes social proof (${followers} followers on ${platform}, ${engagementRate}% engagement rate${pastDeals ? `, past deals: ${pastDeals}` : ""})
+5. Keeps it casual — no formal business language, write like a real person
+6. Where the creator should include their best content link, write literally: [Insert link to your most relevant content]
+7. If they have past brand deal examples to share, write literally: [Insert link to previous brand deal example if applicable]
+8. Closes with EXACTLY this sentence: "What else do you need from me to consider this? Happy to send more — I want to make your job easy."
+9. Does NOT mention rates, fees, or pricing anywhere
+10. Is under 180 words total (not counting the subject line)
+11. Starts with a subject line on the first line in the format: Subject: [subject here] — write a subject line that references something specific and real about ${brandName} or their recent creator campaigns. Do not use a generic format like "Creator Partnership Inquiry" or "[Name] x [Brand]."
 
 Only output the subject line and email body. No preamble, no explanation, no sign-off instructions.`;
 

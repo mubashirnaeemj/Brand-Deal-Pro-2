@@ -222,6 +222,9 @@ export default function BrandDetail() {
                       <span className="text-sm text-muted-foreground">{h}</span>
                     </div>
                   ))}
+                  <p className="text-xs text-muted-foreground/60 mt-1 leading-relaxed">
+                    These are general guidelines and campaign signals — not every point applies to every deal. Use them as context when crafting your pitch, not as requirements.
+                  </p>
                 </div>
               </motion.div>
 
@@ -234,11 +237,11 @@ export default function BrandDetail() {
               >
                 <button
                   data-testid="button-generate-pitch"
-                  onClick={() => setLocation("/pitch-deck")}
+                  onClick={() => setLocation("/pitch")}
                   className="flex items-center justify-center gap-2.5 py-4 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-sm shadow-lg shadow-primary/30 transition-all hover:shadow-primary/50 hover:-translate-y-0.5 active:translate-y-0"
                 >
                   <Zap size={16} />
-                  Generate Pitch Deck
+                  Create Pitch Email
                   <ChevronRight size={14} className="ml-auto opacity-60" />
                 </button>
                 <button

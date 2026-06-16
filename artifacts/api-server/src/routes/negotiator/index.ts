@@ -1,20 +1,29 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
+import { aiRateLimiter } from "../../middleware/rateLimiter";
 
 const router: IRouter = Router();
 
 // ── Negotiation advice ────────────────────────────────────────────────────────
 
+const MAX_SHORT = 200;
+const MAX_LONG = 2000;
+
 const NegotiatorInputSchema = z.object({
-  brandName: z.string().min(1),
-  followerCount: z.string().min(1),
-  brandResponse: z.string().min(1),
-  contactSeniority: z.string().optional(),
+  brandName: z.string().min(1).max(MAX_SHORT),
+  followerCount: z.string().min(1).max(MAX_SHORT),
+  brandResponse: z.string().min(1).max(MAX_LONG),
+  contactSeniority: z.string().max(MAX_SHORT).optional(),
   noResponse: z.boolean().optional(),
 });
 
-router.post("/negotiator/advise", async (req, res) => {
+router.post("/negotiator/advise", aiRateLimiter, async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
   const parsed = NegotiatorInputSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
@@ -59,12 +68,18 @@ Be direct, specific, and practical. Write like a seasoned industry insider talki
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
+  const controller = new AbortController();
+  req.on("close", () => controller.abort());
+
   try {
-    const stream = anthropic.messages.stream({
-      model: "claude-sonnet-4-6",
-      max_tokens: 8192,
-      messages: [{ role: "user", content: prompt }],
-    });
+    const stream = anthropic.messages.stream(
+      {
+        model: "claude-sonnet-4-6",
+        max_tokens: 1024,
+        messages: [{ role: "user", content: prompt }],
+      },
+      { signal: controller.signal },
+    );
 
     for await (const event of stream) {
       if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
@@ -74,7 +89,11 @@ Be direct, specific, and practical. Write like a seasoned industry insider talki
 
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
     res.end();
-  } catch (err) {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === "AbortError") {
+      res.end();
+      return;
+    }
     req.log.error({ err }, "Negotiator advice generation failed");
     res.write(`data: ${JSON.stringify({ error: "Generation failed" })}\n\n`);
     res.end();

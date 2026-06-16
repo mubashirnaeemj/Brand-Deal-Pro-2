@@ -1,27 +1,36 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
+import { aiRateLimiter } from "../../middleware/rateLimiter";
 
 const router: IRouter = Router();
 
 // ── Outbound pitch ─────────────────────────────────────────────────────────────
 
+const MAX_SHORT = 200;
+const MAX_LONG = 2000;
+
 const PitchEmailInputSchema = z.object({
-  brandName: z.string().min(1),
-  creatorName: z.string().min(1),
-  handle: z.string().min(1),
-  platform: z.string().min(1),
-  followers: z.string().min(1),
-  engagementRate: z.string().min(1),
-  niche: z.string().min(1),
-  story: z.string().min(1),
-  pastDeals: z.string().optional(),
-  contentLink: z.string().optional(),
-  contactName: z.string().optional(),
-  contactEmail: z.string().optional(),
+  brandName: z.string().min(1).max(MAX_SHORT),
+  creatorName: z.string().min(1).max(MAX_SHORT),
+  handle: z.string().min(1).max(MAX_SHORT),
+  platform: z.string().min(1).max(MAX_SHORT),
+  followers: z.string().min(1).max(MAX_SHORT),
+  engagementRate: z.string().min(1).max(MAX_SHORT),
+  niche: z.string().min(1).max(MAX_SHORT),
+  story: z.string().min(1).max(MAX_LONG),
+  pastDeals: z.string().max(MAX_LONG).optional(),
+  contentLink: z.string().max(MAX_SHORT).optional(),
+  contactName: z.string().max(MAX_SHORT).optional(),
+  contactEmail: z.string().max(MAX_SHORT).optional(),
 });
 
-router.post("/pitch/generate", async (req, res) => {
+router.post("/pitch/generate", aiRateLimiter, async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
   const parsed = PitchEmailInputSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
@@ -77,12 +86,18 @@ Only output the subject line and email body. No preamble, no explanation, no sig
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
+  const controller = new AbortController();
+  req.on("close", () => controller.abort());
+
   try {
-    const stream = anthropic.messages.stream({
-      model: "claude-sonnet-4-6",
-      max_tokens: 8192,
-      messages: [{ role: "user", content: prompt }],
-    });
+    const stream = anthropic.messages.stream(
+      {
+        model: "claude-sonnet-4-6",
+        max_tokens: 512,
+        messages: [{ role: "user", content: prompt }],
+      },
+      { signal: controller.signal },
+    );
 
     for await (const event of stream) {
       if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
@@ -92,7 +107,11 @@ Only output the subject line and email body. No preamble, no explanation, no sig
 
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
     res.end();
-  } catch (err) {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === "AbortError") {
+      res.end();
+      return;
+    }
     req.log.error({ err }, "Pitch generation failed");
     res.write(`data: ${JSON.stringify({ error: "Generation failed" })}\n\n`);
     res.end();

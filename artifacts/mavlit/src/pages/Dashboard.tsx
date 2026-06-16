@@ -36,6 +36,7 @@ interface Deal {
   actionLabel: string;
   actionType: DealAction;
   actionHref?: string;
+  pipelineExpand?: string;
 }
 
 const DEALS: Deal[] = [
@@ -50,9 +51,10 @@ const DEALS: Deal[] = [
     stageBg: "bg-violet-500/15",
     stageText: "text-violet-400",
     time: "6 days ago",
-    actionLabel: "Generate follow-up →",
+    actionLabel: "Open deal →",
     actionType: "navigate",
-    actionHref: "/pitch?mode=followup&brand=Sennheiser",
+    actionHref: "/deals",
+    pipelineExpand: "sennheiser",
   },
   {
     id: 2,
@@ -210,6 +212,9 @@ export default function Dashboard() {
                       onClick={() => {
                         if (deal.actionType === "modal") {
                           setReplyDeal(deal);
+                        } else if (deal.pipelineExpand) {
+                          sessionStorage.setItem("mavlit_expand_deal", deal.pipelineExpand);
+                          setLocation(deal.actionHref!);
                         } else if (deal.actionHref) {
                           setLocation(deal.actionHref);
                         }

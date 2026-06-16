@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useLocation } from "wouter";
 import {
   Headphones, Music, Cpu, Camera, Zap,
   CheckCircle2, Check, Copy, ChevronDown, AlertTriangle,
@@ -103,7 +102,7 @@ function CopyBtn({ text }: { text: string }) {
   );
 }
 async function readStream(endpoint: string, body: Record<string, unknown>, onChunk: (t: string) => void) {
-  const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const res = await fetch(endpoint, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!res.ok) throw new Error("Server error");
   const reader = res.body?.getReader();
   if (!reader) throw new Error("No stream");
@@ -151,10 +150,10 @@ function StageTimeline({ deal }: { deal: Deal }) {
 
 // ── Conversation Log ───────────────────────────────────────────────────────────
 
-function ConversationLog({ deal }: { deal: Deal }) {
+function ConversationLog({ deal, extraNotes = [] }: { deal: Deal; extraNotes?: Array<{ date: string; text: string }> }) {
   const [note, setNote] = useState("");
   const [notes, setNotes] = useState<Array<{ date: string; text: string }>>([]);
-  const entries = [...(DEAL_LOGS[deal.id] ?? []), ...notes];
+  const entries = [...(DEAL_LOGS[deal.id] ?? []), ...notes, ...extraNotes];
   return (
     <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-4 h-full">
       <p className="text-xs font-bold text-white uppercase tracking-wider">Conversation log</p>
@@ -176,6 +175,105 @@ function ConversationLog({ deal }: { deal: Deal }) {
           className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary border border-border text-white hover:border-primary/40 disabled:opacity-40 transition-all">
           Add note
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Follow-up Generator ───────────────────────────────────────────────────────
+
+function FollowUpGenerator({ deal, onFollowUpSent }: { deal: Deal; onFollowUpSent: () => void }) {
+  const [generating, setGenerating] = useState(false);
+  const [email, setEmail]           = useState<string | null>(null);
+  const [error, setError]           = useState<string | null>(null);
+  const [sent, setSent]             = useState(false);
+  const outputRef = useRef<HTMLDivElement>(null);
+
+  const generate = async () => {
+    setGenerating(true); setEmail(null); setError(null);
+    try {
+      let full = "";
+      await readStream("/api/pitch/followup", { brandName: deal.brand, daysSince: deal.daysSince },
+        chunk => { full += chunk; setEmail(full); });
+      setTimeout(() => outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    } catch { setError("Something went wrong. Please try again."); }
+    finally { setGenerating(false); }
+  };
+
+  const markSent = () => { setSent(true); onFollowUpSent(); };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Sparkles size={13} className="text-primary" />
+          <p className="text-xs font-bold text-white uppercase tracking-wider">Follow-up Generator</p>
+        </div>
+
+        <div>
+          <Label>Pitch sent</Label>
+          <div className="px-3 py-2 rounded-xl bg-black/40 border border-border text-muted-foreground text-xs">{deal.timeLabel} ({deal.daysSince} days ago)</div>
+        </div>
+
+        <div className="flex items-start gap-2.5 px-3 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+          <AlertTriangle size={12} className="text-amber-400 mt-0.5 shrink-0" />
+          <p className="text-xs text-amber-200/90 leading-relaxed">
+            <span className="font-bold text-amber-300">Send one follow-up only.</span> Keep it short, add one new piece of value. Do not mention rates.
+          </p>
+        </div>
+
+        <button onClick={generate} disabled={generating || sent}
+          className="w-full py-3 rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 text-white transition-all flex items-center justify-center gap-2">
+          {generating
+            ? <><motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full" />Generating…</>
+            : <><Sparkles size={13} />✦ Generate follow-up email</>}
+        </button>
+
+        {error && <p className="text-xs text-red-400">{error}</p>}
+
+        <AnimatePresence>
+          {email && !sent && (
+            <motion.div ref={outputRef} key="fu-out" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
+              <div className="relative bg-black/60 border border-border rounded-xl p-4">
+                <pre className="font-mono text-xs text-white/90 whitespace-pre-wrap leading-relaxed">{email}</pre>
+                <div className="absolute top-3 right-3"><CopyBtn text={email} /></div>
+              </div>
+              <button onClick={markSent}
+                className="w-full py-2.5 rounded-xl text-xs font-bold border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/15 transition-all flex items-center justify-center gap-2">
+                <CheckCircle2 size={13} />Mark follow-up as sent
+              </button>
+            </motion.div>
+          )}
+          {sent && (
+            <motion.div key="fu-sent" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="flex items-center gap-2.5 px-3 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+              <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+              <p className="text-xs text-emerald-300 leading-relaxed">Follow-up sent. Note added to your conversation log.</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+function FollowUpWindowClosed({ daysLeft }: { daysLeft: number }) {
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6 flex flex-col items-center text-center gap-4">
+      <div className="flex items-center gap-2 self-start">
+        <Sparkles size={13} className="text-primary" />
+        <p className="text-xs font-bold text-white uppercase tracking-wider">Follow-up Generator</p>
+      </div>
+      <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
+        <AlertTriangle size={20} className="text-amber-400" />
+      </div>
+      <div className="space-y-2">
+        <p className="text-sm font-semibold text-white">
+          Follow-up window opens in <span className="text-amber-400">{daysLeft} {daysLeft === 1 ? "day" : "days"}</span>.
+        </p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Sending too soon can hurt your chances — give them time to respond.
+        </p>
       </div>
     </div>
   );
@@ -342,7 +440,31 @@ function ContractChecklist() {
 // ── Deal Workspace ─────────────────────────────────────────────────────────────
 
 function DealWorkspace({ deal, prefillOffer, onClose }: { deal: Deal; prefillOffer: string; onClose: () => void }) {
-  const showContractChecklist = deal.stage === "contract" && !prefillOffer;
+  const [extraNotes, setExtraNotes] = useState<Array<{ date: string; text: string }>>([]);
+
+  const isSent          = deal.stage === "sent";
+  const followUpReady   = isSent && deal.daysSince >= 5;
+  const daysUntilOpen   = isSent && !followUpReady ? 5 - deal.daysSince : 0;
+  const isContract      = deal.stage === "contract" && !prefillOffer;
+
+  let RightPanel: React.ReactNode;
+  if (isSent) {
+    RightPanel = followUpReady
+      ? <FollowUpGenerator deal={deal} onFollowUpSent={() => setExtraNotes(n => [...n, { date: "Today", text: "Follow-up sent." }])} />
+      : <FollowUpWindowClosed daysLeft={daysUntilOpen} />;
+  } else if (isContract) {
+    RightPanel = <ContractChecklist />;
+  } else {
+    RightPanel = <NegotiatingTools deal={deal} prefillOffer={prefillOffer} />;
+  }
+
+  const stageBadgeClass =
+    deal.stage === "sent"        ? "bg-violet-500/15 text-violet-400" :
+    deal.stage === "replied"     ? "bg-sky-500/15 text-sky-400" :
+    deal.stage === "negotiating" ? "bg-amber-500/15 text-amber-400" :
+    deal.stage === "contract"    ? "bg-orange-500/15 text-orange-400" :
+                                   "bg-emerald-500/15 text-emerald-400";
+
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
       <button onClick={onClose} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-white transition-colors mb-6 group">
@@ -358,9 +480,7 @@ function DealWorkspace({ deal, prefillOffer, onClose }: { deal: Deal; prefillOff
           <p className="text-sm text-muted-foreground">{deal.contact.name} · {deal.contact.title} · {deal.contact.company}</p>
         </div>
         <div className="ml-auto">
-          <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${
-            deal.stage === "negotiating" ? "bg-amber-500/15 text-amber-400" : "bg-orange-500/15 text-orange-400"
-          }`}>
+          <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${stageBadgeClass}`}>
             {deal.stage.charAt(0).toUpperCase() + deal.stage.slice(1)}
           </span>
         </div>
@@ -369,10 +489,8 @@ function DealWorkspace({ deal, prefillOffer, onClose }: { deal: Deal; prefillOff
       <StageTimeline deal={deal} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ConversationLog deal={deal} />
-        <div>
-          {showContractChecklist ? <ContractChecklist /> : <NegotiatingTools deal={deal} prefillOffer={prefillOffer} />}
-        </div>
+        <ConversationLog deal={deal} extraNotes={extraNotes} />
+        <div>{RightPanel}</div>
       </div>
     </motion.div>
   );
@@ -381,8 +499,6 @@ function DealWorkspace({ deal, prefillOffer, onClose }: { deal: Deal; prefillOff
 // ── Deal Card ──────────────────────────────────────────────────────────────────
 
 function DealCard({ deal, onExpand, onReply }: { deal: Deal; onExpand: () => void; onReply: () => void }) {
-  const [, setLocation] = useLocation();
-
   const stageBadge = {
     sent:        { bg: "bg-violet-500/15",  text: "text-violet-400"  },
     replied:     { bg: "bg-sky-500/15",     text: "text-sky-400"     },
@@ -397,9 +513,7 @@ function DealCard({ deal, onExpand, onReply }: { deal: Deal; onExpand: () => voi
 
   let ActionBtn: React.ReactNode;
   if (deal.stage === "sent") {
-    ActionBtn = deal.daysSince < 5
-      ? <button disabled className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border text-muted-foreground/50 cursor-not-allowed whitespace-nowrap">Follow-up opens in {5 - deal.daysSince}d</button>
-      : <button onClick={() => setLocation(`/pitch?mode=followup&brand=${encodeURIComponent(deal.brand)}`)} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border border-primary/50 text-primary hover:bg-primary hover:text-white transition-all whitespace-nowrap">Generate follow-up →</button>;
+    ActionBtn = <button onClick={onExpand} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border border-primary/50 text-primary hover:bg-primary hover:text-white transition-all whitespace-nowrap">Open deal →</button>;
   } else if (deal.stage === "replied") {
     ActionBtn = <button onClick={onReply} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border border-sky-500/50 text-sky-400 hover:bg-sky-500/20 transition-all whitespace-nowrap">Log reply →</button>;
   } else if (deal.stage === "negotiating") {

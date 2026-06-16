@@ -33,7 +33,6 @@ const BRAND_CONTACTS: Record<string, { name: string; title: string; company: str
 const NICHES    = ["Music Production","Music Performance","Audio Engineering","Gear Reviews","Lifestyle & Music","Electronic Music","Hip-Hop / Beats","Singer-Songwriter","Studio Vlogging","DJ / Live Sets","Music Education","Other"];
 const PLATFORMS = ["Instagram","TikTok","YouTube","Substack"];
 const CONTACT_METHODS = ["Email","Instagram DM","TikTok DM","LinkedIn","Other"];
-const SENT_DEALS = [{ name: "Sennheiser", daysSince: 6 }];
 
 const TIPS = [
   { title: "Story beats stats",           body: "Brands get hundreds of pitches with follower counts. A real story about why you use their product cuts through."       },
@@ -46,7 +45,7 @@ const TIPS = [
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type Mode = "outbound" | "inbound" | "followup";
+type Mode = "outbound" | "inbound";
 
 interface OutboundForm {
   brandSource: "matched" | "found";
@@ -631,100 +630,25 @@ function InboundMode() {
   );
 }
 
-// ── Follow-up Mode ─────────────────────────────────────────────────────────────
-
-function FollowUpMode() {
-  const search = useSearch();
-  const [selectedDeal, setSelectedDeal] = useState(() => {
-    const brand = new URLSearchParams(search).get("brand") ?? "";
-    return SENT_DEALS.find(d => d.name === brand) ?? SENT_DEALS[0];
-  });
-  const [generating, setGenerating] = useState(false);
-  const [email, setEmail] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const outputRef = useRef<HTMLDivElement>(null);
-
-  const generate = async () => {
-    setGenerating(true); setEmail(null); setError(null);
-    try {
-      let full = "";
-      await readStream("/api/pitch/followup", { brandName: selectedDeal.name, daysSince: selectedDeal.daysSince },
-        chunk => { full += chunk; setEmail(full); });
-      setTimeout(() => outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    } catch { setError("Something went wrong. Please try again."); }
-    finally { setGenerating(false); }
-  };
-
-  return (
-    <motion.div key="followup" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }}
-      className="max-w-2xl mx-auto space-y-6">
-
-      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-        <div>
-          <Label>Which brand are you following up with?</Label>
-          <SelectPlaceholder value={selectedDeal.name} onChange={v => setSelectedDeal(SENT_DEALS.find(d => d.name === v) ?? SENT_DEALS[0])}
-            options={SENT_DEALS.map(d => d.name)} placeholder="Select a brand…" />
-        </div>
-        <div>
-          <Label>Pitch sent</Label>
-          <Input value={`${selectedDeal.daysSince} days ago`} readOnly />
-        </div>
-      </div>
-
-      {/* Yellow tip */}
-      <div className="flex items-start gap-3 px-4 py-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
-        <AlertTriangle size={15} className="text-amber-400 mt-0.5 shrink-0" />
-        <p className="text-sm text-amber-200/90 leading-relaxed">
-          <span className="font-bold text-amber-300">Send one follow-up only.</span> Keep it short. Add one new piece of value. Do not mention rates.
-        </p>
-      </div>
-
-      <button onClick={generate} disabled={generating}
-        className="w-full py-4 rounded-2xl text-base font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-lg shadow-primary/30 transition-all flex items-center justify-center gap-2">
-        {generating ? (<><motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />Generating follow-up…</>) : (<><Sparkles size={16} />✦ Generate follow-up email</>)}
-      </button>
-
-      {error && <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
-
-      <AnimatePresence>
-        {email && (
-          <motion.div ref={outputRef} key="followup-output" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className="space-y-4">
-            <div className="relative bg-black/60 border border-border rounded-2xl p-5">
-              <pre className="font-mono text-sm text-white/90 whitespace-pre-wrap leading-relaxed">{email}</pre>
-              <div className="absolute top-4 right-4"><CopyButton text={email} /></div>
-            </div>
-            <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-secondary border border-border">
-              <Lightbulb size={15} className="text-primary mt-0.5 shrink-0" />
-              <p className="text-sm text-muted-foreground leading-relaxed">After sending, give it <span className="text-white font-semibold">2 more weeks</span>. If no reply, move this brand to your long-term pipeline and revisit next quarter.</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
-
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 const MODE_LABELS: { id: Mode; label: string }[] = [
   { id: "outbound", label: "Outbound" },
   { id: "inbound",  label: "Inbound"  },
-  { id: "followup", label: "Follow-up" },
 ];
 
 export default function Pitch() {
   const search = useSearch();
+  const { isLoading, isAuthenticated, login } = useAuth();
   const [mode, setMode] = useState<Mode>(() => {
     const m = new URLSearchParams(search).get("mode");
-    if (m === "inbound")  return "inbound";
-    if (m === "followup") return "followup";
+    if (m === "inbound") return "inbound";
     return "outbound";
   });
 
   const subtitles: Record<Mode, string> = {
     outbound: "Build your outreach email to a brand. Keep it casual, personal, and story-driven. No rates. No deck.",
     inbound:  "A brand reached out to you. Paste their message below and MAVLIT will help you respond — without giving away your rate.",
-    followup: "Send a short, value-adding follow-up to a brand you already pitched.",
   };
 
   if (!isLoading && !isAuthenticated) {
@@ -775,7 +699,6 @@ export default function Pitch() {
           <AnimatePresence mode="wait">
             {mode === "outbound" && <OutboundMode key="outbound" />}
             {mode === "inbound"  && <InboundMode  key="inbound"  />}
-            {mode === "followup" && <FollowUpMode  key="followup" />}
           </AnimatePresence>
 
         </div>

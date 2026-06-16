@@ -218,6 +218,7 @@ function ContactBadge({ type }: { type: ContactType }) {
 /* ─── Contact Intel Panel (slide-out) ───────────────────── */
 function ContactPanel({ brand, onClose }: { brand: Brand; onClose: () => void }) {
   const Icon = brand.icon;
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -226,7 +227,8 @@ function ContactPanel({ brand, onClose }: { brand: Brand; onClose: () => void })
   }, [onClose]);
 
   const handlePitch = () => {
-    window.location.assign(`/pitch?brand=${encodeURIComponent(brand.name)}`);
+    onClose();
+    setLocation(`/pitch?brand=${encodeURIComponent(brand.name)}`);
   };
 
   return (

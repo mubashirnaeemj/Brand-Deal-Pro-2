@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import {
   Sparkles, Copy, Check, ChevronDown, ChevronUp, AlertTriangle, Lightbulb,
   Headphones, Music, Cpu, Camera, ShoppingBag, Zap, User, ArrowRight,
@@ -171,11 +171,12 @@ async function readStream(endpoint: string, body: Record<string, unknown>, onChu
 
 function OutboundMode() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
+  // Capture prefill brand once on mount (useState initializer runs once)
+  const [prefillBrand] = useState(() => new URLSearchParams(search).get("brand") ?? "");
   const [form, setFormState] = useState<OutboundForm>(() => {
-    const params = new URLSearchParams(window.location.search);
-    const brand = params.get("brand");
-    if (brand && MATCHED_BRANDS.some(b => b.name === brand)) {
-      return { ...EMPTY_OUTBOUND, brandSource: "matched", selectedBrand: brand };
+    if (prefillBrand && MATCHED_BRANDS.some(b => b.name === prefillBrand)) {
+      return { ...EMPTY_OUTBOUND, brandSource: "matched", selectedBrand: prefillBrand };
     }
     return EMPTY_OUTBOUND;
   });
@@ -241,6 +242,12 @@ function OutboundMode() {
           <AnimatePresence mode="wait">
             {form.brandSource === "matched" ? (
               <motion.div key="matched" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+                {prefillBrand && form.selectedBrand === prefillBrand && (
+                  <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-primary/10 border border-primary/25 text-xs font-semibold text-primary">
+                    <CheckCircle2 size={12} />
+                    Pre-filled from your matches — just add your story below
+                  </div>
+                )}
                 <Label>Select a matched brand</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
                   {MATCHED_BRANDS.map(b => {
@@ -626,9 +633,9 @@ function InboundMode() {
 // ── Follow-up Mode ─────────────────────────────────────────────────────────────
 
 function FollowUpMode() {
+  const search = useSearch();
   const [selectedDeal, setSelectedDeal] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const brand = params.get("brand");
+    const brand = new URLSearchParams(search).get("brand") ?? "";
     return SENT_DEALS.find(d => d.name === brand) ?? SENT_DEALS[0];
   });
   const [generating, setGenerating] = useState(false);
@@ -705,9 +712,9 @@ const MODE_LABELS: { id: Mode; label: string }[] = [
 ];
 
 export default function Pitch() {
+  const search = useSearch();
   const [mode, setMode] = useState<Mode>(() => {
-    const params = new URLSearchParams(window.location.search);
-    const m = params.get("mode");
+    const m = new URLSearchParams(search).get("mode");
     if (m === "inbound")  return "inbound";
     if (m === "followup") return "followup";
     return "outbound";

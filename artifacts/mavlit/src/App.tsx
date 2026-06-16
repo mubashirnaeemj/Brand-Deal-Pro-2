@@ -11,7 +11,7 @@ import Pitch from "@/pages/Pitch";
 import Dashboard from "@/pages/Dashboard";
 import ProfileSettings from "@/pages/ProfileSettings";
 import Negotiator from "@/pages/Negotiator";
-import DealsTracker from "@/pages/DealsTracker";
+import Pipeline from "@/pages/Pipeline";
 
 const queryClient = new QueryClient();
 
@@ -25,7 +25,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/profile" component={ProfileSettings} />
       <Route path="/rate-calculator" component={Negotiator} />
-      <Route path="/deals" component={DealsTracker} />
+      <Route path="/deals" component={Pipeline} />
       <Route component={NotFound} />
     </Switch>
   );

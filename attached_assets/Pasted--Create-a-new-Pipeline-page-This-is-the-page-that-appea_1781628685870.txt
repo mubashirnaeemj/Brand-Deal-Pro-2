@@ -1,0 +1,26 @@
+"Create a new Pipeline page. This is the page that appears when the user clicks Pipeline in the nav or 'View all →' from the Dashboard My Deals panel.
+Page header: Title 'Pipeline', subtitle 'Every deal in one place — outbound pitches, inbound inquiries, and everything in between.'
+Stage filter tabs at the top below the header: All, Sent, Replied, Negotiating, Contract, Closed. Clicking a tab filters the deal cards to show only deals in that stage. Default to All.
+Deal cards. Show the following five hardcoded demo deals as cards:
+Deal 1: Sennheiser, Sarah Chen · Director of Influencer Marketing · Edelman, Outbound badge in grey, Sent stage in purple, sent 6 days ago.
+Deal 2: Spotify for Artists, Marcus Williams · Creator Partnerships Manager · in-house, Outbound badge, Replied stage in blue, 2 days ago.
+Deal 3: Native Instruments, Priya Sharma · Account Supervisor · Fleischman Hillard, Outbound badge, Negotiating stage in yellow, 1 day ago.
+Deal 4: Red Bull, Alex Rivera · Account Manager · Edelman, Inbound badge in teal, Replied stage in blue, today.
+Deal 5: GoPro, Jake Torres · Influencer Marketing Manager · in-house, Outbound badge, Sent stage in purple, sent 1 day ago.
+Each deal card shows: brand logo emoji, brand name in bold, contact name and title in smaller grey text, Inbound or Outbound badge, stage badge, time since last activity, and one action button on the right.
+Action button logic per stage:
+Sent less than 5 days: disabled grey button showing 'Follow-up opens in X days'
+Sent 5 or more days: purple button 'Generate follow-up →' navigates to Pitch follow-up mode with that brand pre-selected
+Replied: blue button 'Log reply →' opens the reply logger modal
+Negotiating: yellow button 'Open deal workspace →' expands the deal into a full workspace view
+Contract: orange button 'Review contract →' expands deal into workspace at contract checklist stage
+Closed: green button 'View summary →' opens deal summary
+Deal workspace. When a creator clicks into a Negotiating or Contract stage deal, expand the card into a full workspace that takes up the full page width. The workspace has three sections:
+Left section — Stage timeline. A horizontal row of five steps: Pitch Sent, Replied, Negotiating, Contract, Closed. The current stage is highlighted in purple. Completed stages show a green checkmark. For inbound deals the first step reads 'Brand contacted me' instead of 'Pitch Sent.'
+Middle section — Conversation log. Shows the deal history as a simple feed: date, what happened (e.g. 'Pitch sent to Sarah Chen', 'Follow-up sent', 'Brand replied'). For demo purposes hardcode 2-3 log entries per deal. Below the log show a textarea: 'Log an update' with a small 'Add note' button.
+Right section — Tools panel. This is where all negotiation tools live, shown contextually based on stage.
+For Negotiating stage show these tools stacked vertically:
+Tool 1 — Rate intelligence. Two dropdowns: Niche and Deal Type. When both selected show the three rate cards: Observed Range, Median, Top Quartile with deal count and source citation below. Below the rate cards show the honest disclaimer in a yellow box: 'Rates are not formulaic. The same deliverable can vary 5-10x based on vertical, audience quality, and exclusivity terms.'
+Tool 2 — Counter-offer generator. Three fields: read-only field showing 'Their offer' (hardcode $500 for Native Instruments demo), input field 'Your counter', dropdown 'Tone' with options Firm, Flexible, Relationship-first. Button: '✦ Generate counter-offer response'. Calls the Anthropic API with the context of the deal, their offer, the creator's counter, and the selected tone. Instructs the model to write a counter-offer response under 120 words that is professional, non-confrontational, frames the counter around deliverable value and usage terms rather than personal worth, and leaves the door open for scope adjustments if budget is fixed. Show the result in the monospace dark box with a Copy button.
+Tool 3 — Deal terms checklist. Three yes/no toggles: Usage rights defined, Exclusivity defined, Whitelisting addressed. These feed context into the counter-offer generator prompt automatically.
+For Contract stage replace the tools panel with the contract checklist. Six checkboxes: Usage rights term confirmed, Exclusivity category and duration confirmed, Whitelisting rights addressed, Content ownership confirmed, Kill fee included, Payment terms and timeline confirmed. Each checkbox has a tooltip showing the same tip text from the existing contract checklist. When all six are checked show a green confirmation box: 'You have reviewed the key contract terms. Consult a lawyer before signing — this is not legal advice.' Below it show a button: 'Mark deal as closed →' which updates the deal stage to Closed and shows a green success message: 'Deal closed. Your rate has been logged to your deal history.'"

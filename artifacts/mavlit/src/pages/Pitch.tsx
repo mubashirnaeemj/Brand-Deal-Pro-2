@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { useAuth } from "@workspace/replit-auth-web";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -639,7 +638,6 @@ const MODE_LABELS: { id: Mode; label: string }[] = [
 
 export default function Pitch() {
   const search = useSearch();
-  const { isLoading, isAuthenticated, login } = useAuth();
   const [mode, setMode] = useState<Mode>(() => {
     const m = new URLSearchParams(search).get("mode");
     if (m === "inbound") return "inbound";
@@ -650,26 +648,6 @@ export default function Pitch() {
     outbound: "Build your outreach email to a brand. Keep it casual, personal, and story-driven. No rates. No deck.",
     inbound:  "A brand reached out to you. Paste their message below and MAVLIT will help you respond — without giving away your rate.",
   };
-
-  if (!isLoading && !isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-        <Navbar />
-        <main className="pt-28 pb-24 px-4 flex items-center justify-center">
-          <div className="text-center space-y-4 max-w-sm">
-            <h2 className="text-2xl font-bold text-white">Sign in to use Pitch</h2>
-            <p className="text-muted-foreground text-sm">You need to be signed in to generate pitch emails.</p>
-            <button
-              onClick={login}
-              className="w-full px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition"
-            >
-              Log in
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">

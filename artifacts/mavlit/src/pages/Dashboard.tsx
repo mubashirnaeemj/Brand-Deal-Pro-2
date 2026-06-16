@@ -2,9 +2,9 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import {
-  Zap, Mail, TrendingUp, Users, DollarSign, BarChart3, ArrowRight,
+  Zap, Mail, TrendingUp, Users, BarChart3, ArrowRight,
   CheckCircle2, Clock, Sparkles, ChevronRight, Activity, Headphones,
-  Music, ShieldCheck, Info, Cpu, Camera, ShoppingBag,
+  Music, ShieldCheck, Cpu, Camera, ShoppingBag,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -85,7 +85,6 @@ const QUICK_ACTIONS = [
   { label: "Negotiator",           description: "Negotiate the finances and terms of your deal.", icon: TrendingUp, href: "/rate-calculator",  color: "#ec4899", testId: "action-negotiator"    },
 ];
 
-const DEAL_VALUE_TOOLTIP = "Estimated based on median rates for your niche and deal type. Actual deal value varies significantly by brand, vertical, and negotiation.";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -113,36 +112,6 @@ function StatCard({ stat, index }: { stat: (typeof STATS)[0]; index: number }) {
   );
 }
 
-function DealValueTooltip() {
-  const [open, setOpen] = useState(false);
-  return (
-    <span className="relative inline-flex items-center">
-      <button
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        onClick={() => setOpen(o => !o)}
-        className="ml-1 text-muted-foreground hover:text-white transition-colors"
-        aria-label="Deal value info"
-      >
-        <Info size={12} />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 4, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4, scale: 0.97 }}
-            transition={{ duration: 0.15 }}
-            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 z-50 px-3 py-2.5 rounded-xl bg-[hsl(240_10%_10%)] border border-border text-xs text-muted-foreground leading-relaxed shadow-xl pointer-events-none"
-          >
-            {DEAL_VALUE_TOOLTIP}
-            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-border" />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </span>
-  );
-}
 
 const STATUS_CONFIG: Record<PitchStatus, { label: string; dot: string; text: string }> = {
   draft:   { label: "Draft",   dot: "bg-white/30",     text: "text-white/50"     },
@@ -172,14 +141,10 @@ function PitchTrackerPanel() {
       transition={{ duration: 0.4, delay: 0.22 }}
       className="bg-card border border-border rounded-2xl p-6"
     >
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-bold text-white">Pitch Status Tracker</h2>
         <span className="text-xs text-muted-foreground">{PITCHES_INIT.length} brands</span>
       </div>
-      <p className="text-xs text-muted-foreground mb-4">
-        Est. pipeline value: <span className="text-white font-semibold">$3,400</span>
-        <DealValueTooltip />
-      </p>
 
       <div className="space-y-2">
         {PITCHES_INIT.map((pitch, i) => {

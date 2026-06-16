@@ -2,16 +2,15 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Headphones, Music, Cpu, Camera, Zap,
-  CheckCircle2, Check, Copy, ChevronDown, AlertTriangle,
-  Sparkles, ArrowLeft, Info, Lightbulb,
+  CheckCircle2, Check, Copy, ChevronDown,
+  Sparkles, ArrowLeft, X, FileText,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import ReplyLoggerModal from "@/components/ReplyLoggerModal";
 
 // ── Types & Constants ─────────────────────────────────────────────────────────
 
-type StageKey = "all" | "sent" | "replied" | "negotiating" | "contract" | "closed";
+type StageKey = "all" | "sent" | "replied" | "negotiating" | "closed";
 type Direction = "outbound" | "inbound";
 
 interface Deal {
@@ -24,18 +23,26 @@ interface Deal {
   stage: Exclude<StageKey, "all">;
   daysSince: number;
   timeLabel: string;
+  niche: string;
+  pitchDate: string;
+}
+
+interface ClosedInfo {
+  outcome: "signed" | "nodeal";
+  finalRate?: string;
+  revisit?: boolean;
 }
 
 const DEALS: Deal[] = [
-  { id: "sennheiser",         brand: "Sennheiser",          Icon: Headphones, color: "#7c3aed", direction: "outbound", stage: "sent",        daysSince: 6, timeLabel: "6 days ago",
+  { id: "sennheiser",         brand: "Sennheiser",          Icon: Headphones, color: "#7c3aed", direction: "outbound", stage: "sent",        daysSince: 6, timeLabel: "Jun 10", niche: "Audio Gear Reviews",  pitchDate: "Jun 10",
     contact: { name: "Sarah Chen",      title: "Director of Influencer Marketing", company: "Edelman",            type: "agency"   } },
-  { id: "spotify",            brand: "Spotify for Artists", Icon: Music,      color: "#1db954", direction: "outbound", stage: "replied",     daysSince: 2, timeLabel: "2 days ago",
+  { id: "spotify",            brand: "Spotify for Artists", Icon: Music,      color: "#1db954", direction: "outbound", stage: "replied",     daysSince: 2, timeLabel: "Jun 12", niche: "Music Production",    pitchDate: "Jun 12",
     contact: { name: "Marcus Williams", title: "Creator Partnerships Manager",    company: "In-house",            type: "in-house" } },
-  { id: "native-instruments", brand: "Native Instruments",  Icon: Cpu,        color: "#f59e0b", direction: "outbound", stage: "negotiating", daysSince: 1, timeLabel: "1 day ago",
+  { id: "native-instruments", brand: "Native Instruments",  Icon: Cpu,        color: "#f59e0b", direction: "outbound", stage: "negotiating", daysSince: 1, timeLabel: "Jun 5",  niche: "Music Production",    pitchDate: "Jun 5",
     contact: { name: "Priya Sharma",    title: "Account Supervisor",               company: "Fleischman Hillard", type: "agency"   } },
-  { id: "red-bull",           brand: "Red Bull",            Icon: Zap,        color: "#ef4444", direction: "inbound",  stage: "replied",     daysSince: 0, timeLabel: "Today",
+  { id: "red-bull",           brand: "Red Bull",            Icon: Zap,        color: "#ef4444", direction: "inbound",  stage: "replied",     daysSince: 0, timeLabel: "Today",  niche: "Lifestyle & Music",   pitchDate: "",
     contact: { name: "Alex Rivera",     title: "Account Manager",                  company: "Edelman",            type: "agency"   } },
-  { id: "gopro",              brand: "GoPro",               Icon: Camera,     color: "#0ea5e9", direction: "outbound", stage: "sent",        daysSince: 1, timeLabel: "1 day ago",
+  { id: "gopro",              brand: "GoPro",               Icon: Camera,     color: "#0ea5e9", direction: "outbound", stage: "sent",        daysSince: 1, timeLabel: "Jun 15", niche: "Studio Vlogging",     pitchDate: "Jun 15",
     contact: { name: "Jake Torres",     title: "Influencer Marketing Manager",     company: "In-house",           type: "in-house" } },
 ];
 
@@ -47,51 +54,25 @@ const DEAL_LOGS: Record<string, Array<{ date: string; text: string }>> = {
   "gopro":              [{ date: "Jun 15", text: "Pitch sent to Jake Torres" }],
 };
 
-const NICHES     = ["Music Production","Gear Reviews","Lifestyle & Music","Electronic Music","Hip-Hop / Beats","Singer-Songwriter","Studio Vlogging","DJ / Live Sets"];
-const DEAL_TYPES = ["Instagram Reel","Instagram Story","YouTube Integration","TikTok Video","YouTube Dedicated"];
-const TONES      = ["Firm", "Flexible", "Relationship-first"];
-
-const RATE_DATA: Record<string, { range: string; median: string; topQ: string; count: number }> = {
-  "Instagram Reel":      { range: "$350–$1,500",   median: "$680",   topQ: "$1,200", count: 47 },
-  "Instagram Story":     { range: "$150–$600",     median: "$280",   topQ: "$500",   count: 63 },
-  "YouTube Integration": { range: "$600–$3,500",   median: "$1,400", topQ: "$2,800", count: 29 },
-  "TikTok Video":        { range: "$300–$1,200",   median: "$550",   topQ: "$1,000", count: 41 },
-  "YouTube Dedicated":   { range: "$1,200–$6,000", median: "$2,500", topQ: "$4,500", count: 18 },
-};
-
-const CONTRACT_ITEMS = [
-  { label: "Usage rights term confirmed",                tip: "How long can the brand use your content? Define the term (e.g. 6 months, 1 year). Unlimited usage without a defined term significantly increases the value — price accordingly." },
-  { label: "Exclusivity category and duration confirmed", tip: "Exclusivity means you can't work with competitors. Insist on a defined category (e.g. only headphone brands) and a hard end date. Open-ended exclusivity is a red flag." },
-  { label: "Whitelisting rights addressed",              tip: "Whitelisting lets the brand run paid ads using your content. This is a separate, higher-value right. If it's in the contract, it should cost more." },
-  { label: "Content ownership confirmed",                tip: "You created it — you should keep it. The default should be you own the content and grant the brand a license. Never sign away full ownership unless the rate reflects it." },
-  { label: "Kill fee included",                          tip: "A kill fee protects you if the brand cancels after you've done the work. Standard is 50% of the total fee if cancelled within 14 days of delivery." },
-  { label: "Payment terms and timeline confirmed",       tip: "Get NET 30 or better. Push for a deposit (25–50%) upfront before you start work. NET 60 / NET 90 is standard for brands but brutal for creators." },
-];
-
-const STAGE_STEPS = ["Pitch Sent", "Replied", "Negotiating", "Contract", "Closed"];
-const STAGE_ORDER: Record<Exclude<StageKey, "all">, number> = { sent: 0, replied: 1, negotiating: 2, contract: 3, closed: 4 };
+const STAGE_STEPS = ["Pitch Sent", "Replied", "Negotiating", "Closed"];
+const STAGE_ORDER: Record<Exclude<StageKey, "all">, number> = { sent: 0, replied: 1, negotiating: 2, closed: 3 };
 const STAGE_FILTERS: { id: StageKey; label: string }[] = [
   { id: "all", label: "All" }, { id: "sent", label: "Sent" }, { id: "replied", label: "Replied" },
-  { id: "negotiating", label: "Negotiating" }, { id: "contract", label: "Contract" }, { id: "closed", label: "Closed" },
+  { id: "negotiating", label: "Negotiating" }, { id: "closed", label: "Closed" },
 ];
+
+const CREATOR_PROFILE = {
+  name: "Alex Morgan", handle: "alexmorganmusic", platform: "YouTube",
+  followers: "82K", engagementRate: "5.2",
+  niche: "Music Production & Gear Reviews", pastPartnerships: "AudioTechnica, Ableton, Sweetwater",
+};
 
 // ── Shared UI ──────────────────────────────────────────────────────────────────
 
 function Label({ children }: { children: React.ReactNode }) {
   return <label className="block text-xs font-semibold text-white/70 mb-1.5">{children}</label>;
 }
-function Sel({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
-  return (
-    <div className="relative">
-      <select value={value} onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-white text-xs appearance-none focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all pr-8">
-        <option value="" disabled>Select…</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-      <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-    </div>
-  );
-}
+
 function CopyBtn({ text }: { text: string }) {
   const [c, setC] = useState(false);
   return (
@@ -101,6 +82,20 @@ function CopyBtn({ text }: { text: string }) {
     </button>
   );
 }
+
+function Spin() {
+  return <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full shrink-0" />;
+}
+
+function OutputBox({ text }: { text: string }) {
+  return (
+    <div className="relative bg-black/60 border border-border rounded-xl p-4">
+      <pre className="font-mono text-xs text-white/90 whitespace-pre-wrap leading-relaxed pr-16">{text}</pre>
+      <div className="absolute top-3 right-3"><CopyBtn text={text} /></div>
+    </div>
+  );
+}
+
 async function readStream(endpoint: string, body: Record<string, unknown>, onChunk: (t: string) => void) {
   const res = await fetch(endpoint, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!res.ok) throw new Error("Server error");
@@ -125,7 +120,7 @@ async function readStream(endpoint: string, body: Record<string, unknown>, onChu
 
 function StageTimeline({ deal }: { deal: Deal }) {
   const steps = deal.direction === "inbound"
-    ? ["Brand contacted me", "Replied", "Negotiating", "Contract", "Closed"]
+    ? ["Brand contacted me", "Replied", "Negotiating", "Closed"]
     : STAGE_STEPS;
   const currentIdx = STAGE_ORDER[deal.stage];
   return (
@@ -180,256 +175,43 @@ function ConversationLog({ deal, extraNotes = [] }: { deal: Deal; extraNotes?: A
   );
 }
 
-// ── Follow-up Generator ───────────────────────────────────────────────────────
+// ── Media Kit Footer ───────────────────────────────────────────────────────────
 
-function FollowUpGenerator({ deal, onFollowUpSent }: { deal: Deal; onFollowUpSent: () => void }) {
-  const [generating, setGenerating] = useState(false);
-  const [email, setEmail]           = useState<string | null>(null);
-  const [error, setError]           = useState<string | null>(null);
-  const [sent, setSent]             = useState(false);
-  const outputRef = useRef<HTMLDivElement>(null);
+function MediaKitFooter() {
+  const [open, setOpen]         = useState(false);
+  const [generating, setGen]    = useState(false);
+  const [kit, setKit]           = useState<string | null>(null);
+  const [error, setError]       = useState<string | null>(null);
 
   const generate = async () => {
-    setGenerating(true); setEmail(null); setError(null);
+    setOpen(true);
+    if (kit) return;
+    setGen(true); setError(null);
     try {
       let full = "";
-      await readStream("/api/pitch/followup", { brandName: deal.brand, daysSince: deal.daysSince },
-        chunk => { full += chunk; setEmail(full); });
-      setTimeout(() => outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      await readStream("/api/pipeline/media-kit", { ...CREATOR_PROFILE }, chunk => { full += chunk; setKit(full); });
     } catch { setError("Something went wrong. Please try again."); }
-    finally { setGenerating(false); }
-  };
-
-  const markSent = () => { setSent(true); onFollowUpSent(); };
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <Sparkles size={13} className="text-primary" />
-          <p className="text-xs font-bold text-white uppercase tracking-wider">Follow-up Generator</p>
-        </div>
-
-        <div>
-          <Label>Pitch sent</Label>
-          <div className="px-3 py-2 rounded-xl bg-black/40 border border-border text-muted-foreground text-xs">{deal.timeLabel} ({deal.daysSince} days ago)</div>
-        </div>
-
-        <div className="flex items-start gap-2.5 px-3 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
-          <AlertTriangle size={12} className="text-amber-400 mt-0.5 shrink-0" />
-          <p className="text-xs text-amber-200/90 leading-relaxed">
-            <span className="font-bold text-amber-300">Send one follow-up only.</span> Keep it short, add one new piece of value. Do not mention rates.
-          </p>
-        </div>
-
-        <button onClick={generate} disabled={generating || sent}
-          className="w-full py-3 rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 text-white transition-all flex items-center justify-center gap-2">
-          {generating
-            ? <><motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full" />Generating…</>
-            : <><Sparkles size={13} />✦ Generate follow-up email</>}
-        </button>
-
-        {error && <p className="text-xs text-red-400">{error}</p>}
-
-        <AnimatePresence>
-          {email && !sent && (
-            <motion.div ref={outputRef} key="fu-out" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
-              <div className="relative bg-black/60 border border-border rounded-xl p-4">
-                <pre className="font-mono text-xs text-white/90 whitespace-pre-wrap leading-relaxed">{email}</pre>
-                <div className="absolute top-3 right-3"><CopyBtn text={email} /></div>
-              </div>
-              <button onClick={markSent}
-                className="w-full py-2.5 rounded-xl text-xs font-bold border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/15 transition-all flex items-center justify-center gap-2">
-                <CheckCircle2 size={13} />Mark follow-up as sent
-              </button>
-            </motion.div>
-          )}
-          {sent && (
-            <motion.div key="fu-sent" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="flex items-center gap-2.5 px-3 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-              <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
-              <p className="text-xs text-emerald-300 leading-relaxed">Follow-up sent. Note added to your conversation log.</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
-  );
-}
-
-function FollowUpWindowClosed({ daysLeft }: { daysLeft: number }) {
-  return (
-    <div className="bg-card border border-border rounded-2xl p-6 flex flex-col items-center text-center gap-4">
-      <div className="flex items-center gap-2 self-start">
-        <Sparkles size={13} className="text-primary" />
-        <p className="text-xs font-bold text-white uppercase tracking-wider">Follow-up Generator</p>
-      </div>
-      <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
-        <AlertTriangle size={20} className="text-amber-400" />
-      </div>
-      <div className="space-y-2">
-        <p className="text-sm font-semibold text-white">
-          Follow-up window opens in <span className="text-amber-400">{daysLeft} {daysLeft === 1 ? "day" : "days"}</span>.
-        </p>
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          Sending too soon can hurt your chances — give them time to respond.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ── Negotiating Tools ─────────────────────────────────────────────────────────
-
-function NegotiatingTools({ deal, prefillOffer = "" }: { deal: Deal; prefillOffer?: string }) {
-  const [rateNiche, setRateNiche]       = useState("");
-  const [rateDT, setRateDT]             = useState("");
-  const [myCounter, setMyCounter]       = useState("");
-  const [tone, setTone]                 = useState("Flexible");
-  const [usage, setUsage]               = useState(false);
-  const [excl, setExcl]                 = useState(false);
-  const [white, setWhite]               = useState(false);
-  const [generating, setGenerating]     = useState(false);
-  const [counterText, setCounterText]   = useState<string | null>(null);
-  const [counterError, setCounterError] = useState<string | null>(null);
-
-  const theirOffer = prefillOffer || (deal.id === "native-instruments" ? "$500" : "");
-  const rateInfo   = rateNiche && rateDT ? RATE_DATA[rateDT] ?? null : null;
-
-  const generate = async () => {
-    if (!myCounter.trim() || !theirOffer) return;
-    setGenerating(true); setCounterText(null); setCounterError(null);
-    try {
-      let full = "";
-      await readStream("/api/negotiator/counter", {
-        brandName: deal.brand, theirOffer, myCounter, tone, usageRights: usage, exclusivity: excl, whitelisting: white,
-      }, chunk => { full += chunk; setCounterText(full); });
-    } catch { setCounterError("Something went wrong. Please try again."); }
-    finally { setGenerating(false); }
+    finally { setGen(false); }
   };
 
   return (
-    <div className="space-y-5 overflow-y-auto">
-      {/* Rate intelligence */}
-      <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <Lightbulb size={13} className="text-primary" />
-          <p className="text-xs font-bold text-white uppercase tracking-wider">Rate intelligence</p>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div><Label>Niche</Label><Sel value={rateNiche} onChange={setRateNiche} options={NICHES} /></div>
-          <div><Label>Deal type</Label><Sel value={rateDT} onChange={setRateDT} options={DEAL_TYPES} /></div>
-        </div>
-        <AnimatePresence>
-          {rateInfo && (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
-              <div className="grid grid-cols-3 gap-2">
-                {[{ label: "Observed range", val: rateInfo.range }, { label: "Median", val: rateInfo.median }, { label: "Top quartile", val: rateInfo.topQ }].map(c => (
-                  <div key={c.label} className="bg-secondary/60 border border-border rounded-xl p-3 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">{c.label}</p>
-                    <p className="text-sm font-extrabold text-white">{c.val}</p>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground text-center">Based on {rateInfo.count} reported deals · MAVLIT Rate Index</p>
-              <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                <AlertTriangle size={12} className="text-amber-400 mt-0.5 shrink-0" />
-                <p className="text-xs text-amber-200/90 leading-relaxed">Rates are not formulaic. The same deliverable can vary 5–10× based on vertical, audience quality, and exclusivity terms.</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Counter-offer generator */}
-      <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <Sparkles size={13} className="text-primary" />
-          <p className="text-xs font-bold text-white uppercase tracking-wider">Counter-offer generator</p>
-        </div>
-        <div>
-          <Label>Their offer</Label>
-          <input value={theirOffer || "—"} readOnly
-            className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-muted-foreground text-xs opacity-60 cursor-default" />
-        </div>
-        <div>
-          <Label>Your counter</Label>
-          <input value={myCounter} onChange={e => setMyCounter(e.target.value)} placeholder="e.g. $1,200"
-            className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-white text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all" />
-        </div>
-        <div><Label>Tone</Label><Sel value={tone} onChange={setTone} options={TONES} /></div>
-
-        <div className="border-t border-border pt-3 space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground mb-2">Deal terms context</p>
-          {[{ label: "Usage rights defined", val: usage, set: setUsage }, { label: "Exclusivity defined", val: excl, set: setExcl }, { label: "Whitelisting addressed", val: white, set: setWhite }].map(t => (
-            <button key={t.label} onClick={() => t.set((v: boolean) => !v)}
-              className="flex items-center gap-2.5 w-full text-left p-2 rounded-lg hover:bg-secondary/40 transition-colors">
-              <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${t.val ? "bg-primary border-primary" : "border-border"}`}>
-                {t.val && <Check size={10} className="text-white" />}
-              </div>
-              <span className="text-xs text-white/80">{t.label}</span>
-            </button>
-          ))}
-        </div>
-
-        <button onClick={generate} disabled={!myCounter.trim() || generating}
-          className="w-full py-3 rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 text-white transition-all flex items-center justify-center gap-2">
-          {generating ? (<><motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full" />Generating…</>) : (<><Sparkles size={13} />✦ Generate counter-offer response</>)}
-        </button>
-        {counterError && <p className="text-xs text-red-400">{counterError}</p>}
-        <AnimatePresence>
-          {counterText && (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="relative bg-black/60 border border-border rounded-xl p-4">
-              <pre className="font-mono text-xs text-white/90 whitespace-pre-wrap leading-relaxed">{counterText}</pre>
-              <div className="absolute top-3 right-3"><CopyBtn text={counterText} /></div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
-  );
-}
-
-// ── Contract Checklist ─────────────────────────────────────────────────────────
-
-function ContractChecklist() {
-  const [checks, setChecks] = useState<boolean[]>(new Array(CONTRACT_ITEMS.length).fill(false));
-  const [tooltip, setTooltip] = useState<number | null>(null);
-  const allDone = checks.every(Boolean);
-  return (
-    <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-      <p className="text-xs font-bold text-white uppercase tracking-wider">Contract checklist</p>
-      <div className="space-y-2">
-        {CONTRACT_ITEMS.map((item, i) => (
-          <div key={i} className="relative">
-            <button onClick={() => setChecks(c => c.map((v, j) => j === i ? !v : v))}
-              className="flex items-start gap-2.5 w-full text-left p-2.5 rounded-xl hover:bg-secondary/40 transition-colors">
-              <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 mt-0.5 transition-all ${checks[i] ? "bg-emerald-500 border-emerald-500" : "border-border"}`}>
-                {checks[i] && <Check size={10} className="text-white" />}
-              </div>
-              <span className={`text-xs leading-relaxed transition-colors ${checks[i] ? "text-white/50 line-through" : "text-white/80"}`}>{item.label}</span>
-              <button onClick={e => { e.stopPropagation(); setTooltip(tooltip === i ? null : i); }}
-                className="ml-auto shrink-0 text-muted-foreground hover:text-white transition-colors mt-0.5">
-                <Info size={12} />
-              </button>
-            </button>
-            <AnimatePresence>
-              {tooltip === i && (
-                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  className="absolute z-10 left-0 right-0 mt-1 px-3 py-2.5 rounded-xl bg-black border border-primary/30 text-xs text-white/80 leading-relaxed shadow-xl">
-                  {item.tip}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        ))}
-      </div>
+    <div className="mt-5 pt-4 border-t border-border">
+      <button onClick={generate} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-white transition-colors">
+        <FileText size={11} />
+        <span className="underline underline-offset-2">Generate a quick media kit →</span>
+      </button>
       <AnimatePresence>
-        {allDone && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="flex items-start gap-2 px-3 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-            <CheckCircle2 size={14} className="text-emerald-400 mt-0.5 shrink-0" />
-            <p className="text-xs text-emerald-300 leading-relaxed">You have reviewed the key contract terms. Consult a lawyer before signing.</p>
+        {open && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+            <div className="mt-3 space-y-2">
+              {generating && !kit && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground px-1 py-2">
+                  <Spin />Generating media kit…
+                </div>
+              )}
+              {kit && <OutputBox text={kit} />}
+              {error && <p className="text-xs text-red-400">{error}</p>}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -437,32 +219,412 @@ function ContractChecklist() {
   );
 }
 
-// ── Deal Workspace ─────────────────────────────────────────────────────────────
+// ── Sent Panel ────────────────────────────────────────────────────────────────
 
-function DealWorkspace({ deal, prefillOffer, onClose }: { deal: Deal; prefillOffer: string; onClose: () => void }) {
-  const [extraNotes, setExtraNotes] = useState<Array<{ date: string; text: string }>>([]);
+const SENT_OPTIONS = [
+  { id: "nudge" as const,  label: "Send a follow-up nudge",  desc: "A short, warm check-in. Nothing new added."      },
+  { id: "new"   as const,  label: "Add something new",        desc: "Share a recent post, stat, or campaign angle."   },
+  { id: "angle" as const,  label: "Try a different angle",    desc: "Reframe your pitch from a fresh perspective."    },
+];
+type SentOption = "nudge" | "new" | "angle";
 
-  const isSent          = deal.stage === "sent";
-  const followUpReady   = isSent && deal.daysSince >= 5;
-  const daysUntilOpen   = isSent && !followUpReady ? 5 - deal.daysSince : 0;
-  const isContract      = deal.stage === "contract" && !prefillOffer;
+function SentPanel({ deal, onFollowUpSent }: { deal: Deal; onFollowUpSent: () => void }) {
+  const isReady  = deal.daysSince >= 5;
+  const daysLeft = 5 - deal.daysSince;
 
-  let RightPanel: React.ReactNode;
-  if (isSent) {
-    RightPanel = followUpReady
-      ? <FollowUpGenerator deal={deal} onFollowUpSent={() => setExtraNotes(n => [...n, { date: "Today", text: "Follow-up sent." }])} />
-      : <FollowUpWindowClosed daysLeft={daysUntilOpen} />;
-  } else if (isContract) {
-    RightPanel = <ContractChecklist />;
-  } else {
-    RightPanel = <NegotiatingTools deal={deal} prefillOffer={prefillOffer} />;
+  const [selected, setSelected]   = useState<SentOption | null>(null);
+  const [generating, setGen]      = useState(false);
+  const [output, setOutput]       = useState<string | null>(null);
+  const [error, setError]         = useState<string | null>(null);
+  const [sent, setSent]           = useState(false);
+  const outRef = useRef<HTMLDivElement>(null);
+
+  if (!isReady) {
+    return (
+      <div className="space-y-5">
+        <div className="px-5 py-5 rounded-2xl bg-card border border-border">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Waiting for reply. Follow-up window opens in{" "}
+            <span className="text-white font-semibold">{daysLeft} {daysLeft === 1 ? "day" : "days"}</span>.
+            {" "}Sending too soon hurts your chances.
+          </p>
+        </div>
+        <MediaKitFooter />
+      </div>
+    );
   }
 
+  const generate = async () => {
+    if (!selected) return;
+    setGen(true); setOutput(null); setError(null);
+    try {
+      let full = "";
+      await readStream("/api/pipeline/followup", {
+        brandName: deal.brand, contactFirstName: deal.contact.name.split(" ")[0],
+        daysSince: deal.daysSince, pitchDate: deal.pitchDate, niche: deal.niche, option: selected,
+      }, chunk => { full += chunk; setOutput(full); });
+      setTimeout(() => outRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 100);
+    } catch { setError("Something went wrong. Please try again."); }
+    finally { setGen(false); }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+        <p className="text-xs font-bold text-white uppercase tracking-wider">What do you want to do?</p>
+
+        <div className="space-y-2">
+          {SENT_OPTIONS.map(opt => (
+            <button key={opt.id} onClick={() => { setSelected(opt.id); setOutput(null); setSent(false); }}
+              className={`w-full text-left p-3.5 rounded-xl border transition-all ${selected === opt.id ? "border-primary/60 bg-primary/10" : "border-border hover:border-primary/30 hover:bg-secondary/40"}`}>
+              <p className={`text-xs font-bold ${selected === opt.id ? "text-primary" : "text-white"}`}>{opt.label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+            </button>
+          ))}
+        </div>
+
+        <button onClick={generate} disabled={!selected || generating || sent}
+          className="w-full py-3 rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 text-white transition-all flex items-center justify-center gap-2">
+          {generating ? <><Spin />Writing…</> : <><Sparkles size={13} />✦ Write this message</>}
+        </button>
+
+        {error && <p className="text-xs text-red-400">{error}</p>}
+
+        <AnimatePresence>
+          {output && !sent && (
+            <motion.div ref={outRef} key="sent-out" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
+              <OutputBox text={output} />
+              <button onClick={() => { setSent(true); onFollowUpSent(); }}
+                className="w-full py-2.5 rounded-xl text-xs font-bold border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/15 transition-all flex items-center justify-center gap-2">
+                <CheckCircle2 size={13} />Mark as sent
+              </button>
+            </motion.div>
+          )}
+          {sent && (
+            <motion.div key="sent-done" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="flex items-center gap-2.5 px-3 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+              <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+              <p className="text-xs text-emerald-300">Sent. Note added to your conversation log.</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+      <MediaKitFooter />
+    </div>
+  );
+}
+
+// ── Replied Panel ─────────────────────────────────────────────────────────────
+
+type ReplyCategory = "interested" | "offered_number" | "asked_call" | "declined";
+
+const OPTION_SETS: Record<ReplyCategory, string[]> = {
+  interested:     ["Respond with more info", "Propose next steps", "Share my media kit"],
+  offered_number: ["Counter this offer",     "Accept and confirm", "Ask for time to consider"],
+  asked_call:     ["Confirm a call and ask about budget", "Decline the call and ask for details by email", "Suggest a briefer async option"],
+  declined:       ["Thank them gracefully",  "Ask for feedback",   "Suggest future collaboration"],
+};
+
+function RepliedPanel({ deal, onAddNote }: { deal: Deal; onAddNote: (note: string) => void }) {
+  const [message, setMessage]   = useState("");
+  const [reading, setReading]   = useState(false);
+  const [category, setCategory] = useState<ReplyCategory | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [generating, setGen]    = useState(false);
+  const [output, setOutput]     = useState<string | null>(null);
+  const [error, setError]       = useState<string | null>(null);
+  const outRef = useRef<HTMLDivElement>(null);
+
+  const readMessage = async () => {
+    if (!message.trim()) return;
+    setReading(true);
+    try {
+      const res = await fetch("/api/pitch/analyze-reply", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, brandName: deal.brand }),
+      });
+      const data = res.ok ? await res.json() as { category?: ReplyCategory } : {};
+      setCategory(data.category ?? "interested");
+      onAddNote(`${deal.brand} replied — message logged`);
+    } catch { setCategory("interested"); }
+    finally { setReading(false); }
+  };
+
+  const generate = async () => {
+    if (!selected) return;
+    setGen(true); setOutput(null); setError(null);
+    try {
+      let full = "";
+      await readStream("/api/pipeline/replied", {
+        brandName: deal.brand, contactFirstName: deal.contact.name.split(" ")[0],
+        brandMessage: message, option: selected, niche: deal.niche,
+      }, chunk => { full += chunk; setOutput(full); });
+      setTimeout(() => outRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 100);
+    } catch { setError("Something went wrong. Please try again."); }
+    finally { setGen(false); }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+        {!category ? (
+          <>
+            <Label>Paste their message here</Label>
+            <textarea value={message} onChange={e => setMessage(e.target.value)} rows={5}
+              placeholder={`Paste ${deal.brand}'s reply…`}
+              className="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-border text-white text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 resize-none transition-all" />
+            <button onClick={readMessage} disabled={!message.trim() || reading}
+              className="w-full py-3 rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 text-white transition-all flex items-center justify-center gap-2">
+              {reading ? <><Spin />Reading…</> : "Read their message"}
+            </button>
+          </>
+        ) : (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <div className="px-3 py-2.5 rounded-xl bg-secondary/60 border border-border">
+              <p className="text-xs text-muted-foreground mb-1">Their message</p>
+              <p className="text-xs text-white/80 leading-relaxed line-clamp-3">{message}</p>
+            </div>
+
+            <p className="text-xs font-bold text-white uppercase tracking-wider">What do you want to do?</p>
+
+            <div className="space-y-2">
+              {(OPTION_SETS[category] ?? OPTION_SETS.interested).map(opt => (
+                <button key={opt} onClick={() => { setSelected(opt); setOutput(null); }}
+                  className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all ${selected === opt ? "border-primary/60 bg-primary/10" : "border-border hover:border-primary/30 hover:bg-secondary/40"}`}>
+                  <p className={`text-xs font-semibold ${selected === opt ? "text-primary" : "text-white"}`}>{opt}</p>
+                </button>
+              ))}
+            </div>
+
+            <button onClick={generate} disabled={!selected || generating}
+              className="w-full py-3 rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 text-white transition-all flex items-center justify-center gap-2">
+              {generating ? <><Spin />Writing…</> : <><Sparkles size={13} />✦ Write this message</>}
+            </button>
+
+            {error && <p className="text-xs text-red-400">{error}</p>}
+
+            <AnimatePresence>
+              {output && (
+                <motion.div ref={outRef} key="replied-out" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                  <OutputBox text={output} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </div>
+      <MediaKitFooter />
+    </div>
+  );
+}
+
+// ── Negotiating Panel ─────────────────────────────────────────────────────────
+
+const NEGOTIATE_OPTIONS = [
+  { id: "counter"      as const, label: "They offered a number and I want to counter", needsInput: true  },
+  { id: "deliverables" as const, label: "We are discussing deliverables",               needsInput: false },
+  { id: "rate-range"   as const, label: "I want to send a rate range",                 needsInput: false },
+  { id: "close"        as const, label: "I want to close the deal",                    needsInput: false },
+];
+type NegotiateOption = "counter" | "deliverables" | "rate-range" | "close";
+
+function NegotiatingPanel({ deal }: { deal: Deal }) {
+  const [selected, setSelected] = useState<NegotiateOption | null>(null);
+  const [theirOffer, setOffer]  = useState(deal.id === "native-instruments" ? "$500" : "");
+  const [generating, setGen]    = useState(false);
+  const [output, setOutput]     = useState<string | null>(null);
+  const [error, setError]       = useState<string | null>(null);
+  const outRef = useRef<HTMLDivElement>(null);
+
+  const needsInput = NEGOTIATE_OPTIONS.find(o => o.id === selected)?.needsInput ?? false;
+  const canGenerate = selected !== null && (!needsInput || theirOffer.trim().length > 0);
+
+  const generate = async () => {
+    if (!canGenerate) return;
+    setGen(true); setOutput(null); setError(null);
+    try {
+      let full = "";
+      await readStream("/api/pipeline/negotiate", {
+        brandName: deal.brand, contactFirstName: deal.contact.name.split(" ")[0],
+        option: selected, theirOffer: needsInput ? theirOffer : undefined, niche: deal.niche,
+      }, chunk => { full += chunk; setOutput(full); });
+      setTimeout(() => outRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 100);
+    } catch { setError("Something went wrong. Please try again."); }
+    finally { setGen(false); }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+        <p className="text-xs font-bold text-white uppercase tracking-wider">Where are you?</p>
+
+        <div className="space-y-2">
+          {NEGOTIATE_OPTIONS.map(opt => (
+            <button key={opt.id} onClick={() => { setSelected(opt.id); setOutput(null); }}
+              className={`w-full text-left px-3.5 py-3.5 rounded-xl border transition-all ${selected === opt.id ? "border-primary/60 bg-primary/10" : "border-border hover:border-primary/30 hover:bg-secondary/40"}`}>
+              <p className={`text-xs font-semibold ${selected === opt.id ? "text-primary" : "text-white"}`}>{opt.label}</p>
+            </button>
+          ))}
+        </div>
+
+        <AnimatePresence>
+          {selected === "counter" && (
+            <motion.div key="counter-in" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+              <Label>What did they offer?</Label>
+              <input value={theirOffer} onChange={e => setOffer(e.target.value)} placeholder="e.g. $500"
+                className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-white text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 transition-all" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <button onClick={generate} disabled={!canGenerate || generating}
+          className="w-full py-3 rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 text-white transition-all flex items-center justify-center gap-2">
+          {generating ? <><Spin />Writing…</> : <><Sparkles size={13} />✦ Write this message</>}
+        </button>
+
+        {error && <p className="text-xs text-red-400">{error}</p>}
+
+        <AnimatePresence>
+          {output && (
+            <motion.div ref={outRef} key="neg-out" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              <OutputBox text={output} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+      <MediaKitFooter />
+    </div>
+  );
+}
+
+// ── Closed Panel ──────────────────────────────────────────────────────────────
+
+function ClosedPanel({ deal, info }: { deal: Deal; info: ClosedInfo }) {
+  const rows = [
+    { label: "Brand",    val: deal.brand },
+    { label: "Contact",  val: `${deal.contact.name} · ${deal.contact.title}` },
+    { label: "Outcome",  val: info.outcome === "signed" ? "Deal signed ✓" : "No deal" },
+    ...(info.finalRate   ? [{ label: "Final rate", val: info.finalRate }] : []),
+    { label: "Closed",   val: "Today" },
+  ];
+  return (
+    <div className="space-y-5">
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-5">
+        <p className="text-xs font-bold text-white uppercase tracking-wider">Deal Summary</p>
+        <div className="space-y-3">
+          {rows.map(row => (
+            <div key={row.label} className="flex justify-between items-start gap-4">
+              <span className="text-xs text-muted-foreground shrink-0">{row.label}</span>
+              <span className="text-xs text-white text-right leading-relaxed">{row.val}</span>
+            </div>
+          ))}
+        </div>
+        <div className={`px-3 py-2.5 rounded-xl text-xs leading-relaxed ${info.outcome === "signed" ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-300" : "bg-secondary/60 border border-border text-muted-foreground"}`}>
+          {info.outcome === "signed"
+            ? "This brand has been added to your past partnerships."
+            : info.revisit
+              ? "Added to your revisit list for next quarter."
+              : "No action needed — on to the next one."}
+        </div>
+      </div>
+      <MediaKitFooter />
+    </div>
+  );
+}
+
+// ── Mark as Closed Modal ──────────────────────────────────────────────────────
+
+function MarkClosedModal({ deal, onClose, onConfirm }: {
+  deal: Deal;
+  onClose: () => void;
+  onConfirm: (info: ClosedInfo) => void;
+}) {
+  const [step, setStep]         = useState<"pick" | "signed" | "nodeal">("pick");
+  const [finalRate, setFinalRate] = useState("");
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <motion.div initial={{ scale: 0.95, opacity: 0, y: 12 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 12 }}
+        className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+
+        <div className="flex items-start justify-between mb-1">
+          <p className="text-sm font-bold text-white">How did it go?</p>
+          <button onClick={onClose} className="text-muted-foreground hover:text-white transition-colors -mt-0.5"><X size={16} /></button>
+        </div>
+        <p className="text-xs text-muted-foreground mb-5">{deal.brand} · {deal.contact.name}</p>
+
+        {step === "pick" && (
+          <div className="space-y-2">
+            {[
+              { id: "signed",   label: "Deal signed",    icon: "🎉", next: "signed"  },
+              { id: "nodeal",   label: "No deal",         icon: "🚫", next: "nodeal"  },
+              { id: "deciding", label: "Still deciding",  icon: "⏳", next: null       },
+            ].map(opt => (
+              <button key={opt.id}
+                onClick={() => opt.next ? setStep(opt.next as "signed" | "nodeal") : onClose()}
+                className="w-full text-left px-4 py-3.5 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/10 transition-all flex items-center gap-3">
+                <span className="text-base">{opt.icon}</span>
+                <span className="text-sm font-semibold text-white">{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {step === "signed" && (
+          <div className="space-y-4">
+            <div>
+              <Label>Final rate agreed (optional)</Label>
+              <input value={finalRate} onChange={e => setFinalRate(e.target.value)} placeholder="e.g. $1,200"
+                className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-white text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 transition-all" />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setStep("pick")} className="flex-1 py-2.5 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:text-white transition-all">Back</button>
+              <button onClick={() => onConfirm({ outcome: "signed", finalRate: finalRate.trim() || undefined })}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all">Confirm</button>
+            </div>
+          </div>
+        )}
+
+        {step === "nodeal" && (
+          <div className="space-y-4">
+            <p className="text-sm font-semibold text-white">Re-pitch next quarter?</p>
+            <div className="flex gap-2">
+              <button onClick={() => onConfirm({ outcome: "nodeal", revisit: false })}
+                className="flex-1 py-2.5 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:text-white transition-all">No</button>
+              <button onClick={() => onConfirm({ outcome: "nodeal", revisit: true })}
+                className="flex-1 py-2.5 rounded-xl bg-secondary border border-border text-white text-xs font-bold hover:border-primary/40 transition-all">Yes</button>
+            </div>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ── Deal Workspace ─────────────────────────────────────────────────────────────
+
+function DealWorkspace({ deal, closedInfo, onMarkClosed, onClose }: {
+  deal: Deal;
+  closedInfo?: ClosedInfo;
+  onMarkClosed: () => void;
+  onClose: () => void;
+}) {
+  const [extraNotes, setExtraNotes] = useState<Array<{ date: string; text: string }>>([]);
+  const addNote = (text: string) => setExtraNotes(n => [...n, { date: "Today", text }]);
+
+  let RightPanel: React.ReactNode;
+  if      (deal.stage === "closed")      RightPanel = <ClosedPanel deal={deal} info={closedInfo ?? { outcome: "nodeal" }} />;
+  else if (deal.stage === "sent")        RightPanel = <SentPanel deal={deal} onFollowUpSent={() => addNote("Follow-up sent.")} />;
+  else if (deal.stage === "replied")     RightPanel = <RepliedPanel deal={deal} onAddNote={addNote} />;
+  else                                   RightPanel = <NegotiatingPanel deal={deal} />;
+
   const stageBadgeClass =
-    deal.stage === "sent"        ? "bg-violet-500/15 text-violet-400" :
-    deal.stage === "replied"     ? "bg-sky-500/15 text-sky-400" :
-    deal.stage === "negotiating" ? "bg-amber-500/15 text-amber-400" :
-    deal.stage === "contract"    ? "bg-orange-500/15 text-orange-400" :
+    deal.stage === "sent"        ? "bg-violet-500/15 text-violet-400"  :
+    deal.stage === "replied"     ? "bg-sky-500/15 text-sky-400"        :
+    deal.stage === "negotiating" ? "bg-amber-500/15 text-amber-400"    :
                                    "bg-emerald-500/15 text-emerald-400";
 
   return (
@@ -472,17 +634,23 @@ function DealWorkspace({ deal, prefillOffer, onClose }: { deal: Deal; prefillOff
       </button>
 
       <div className="flex items-center gap-4 mb-8 pb-6 border-b border-border">
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `${deal.color}25` }}>
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ background: `${deal.color}25` }}>
           <deal.Icon size={22} style={{ color: deal.color }} />
         </div>
-        <div>
+        <div className="min-w-0">
           <h2 className="text-xl font-extrabold text-white">{deal.brand}</h2>
-          <p className="text-sm text-muted-foreground">{deal.contact.name} · {deal.contact.title} · {deal.contact.company}</p>
+          <p className="text-sm text-muted-foreground truncate">{deal.contact.name} · {deal.contact.title} · {deal.contact.company}</p>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-3 shrink-0">
           <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${stageBadgeClass}`}>
             {deal.stage.charAt(0).toUpperCase() + deal.stage.slice(1)}
           </span>
+          {deal.stage !== "closed" && (
+            <button onClick={onMarkClosed}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-border text-muted-foreground hover:text-white hover:border-white/30 transition-all whitespace-nowrap">
+              Mark as closed
+            </button>
+          )}
         </div>
       </div>
 
@@ -498,31 +666,22 @@ function DealWorkspace({ deal, prefillOffer, onClose }: { deal: Deal; prefillOff
 
 // ── Deal Card ──────────────────────────────────────────────────────────────────
 
-function DealCard({ deal, onExpand, onReply }: { deal: Deal; onExpand: () => void; onReply: () => void }) {
-  const stageBadge = {
-    sent:        { bg: "bg-violet-500/15",  text: "text-violet-400"  },
-    replied:     { bg: "bg-sky-500/15",     text: "text-sky-400"     },
-    negotiating: { bg: "bg-amber-500/15",   text: "text-amber-400"   },
-    contract:    { bg: "bg-orange-500/15",  text: "text-orange-400"  },
-    closed:      { bg: "bg-emerald-500/15", text: "text-emerald-400" },
-  }[deal.stage];
+function DealCard({ deal, onExpand }: { deal: Deal; onExpand: () => void }) {
+  const stageBadge = (
+    { sent: { bg: "bg-violet-500/15", text: "text-violet-400" },
+      replied: { bg: "bg-sky-500/15", text: "text-sky-400" },
+      negotiating: { bg: "bg-amber-500/15", text: "text-amber-400" },
+      closed: { bg: "bg-emerald-500/15", text: "text-emerald-400" } } as Record<string, { bg: string; text: string }>
+  )[deal.stage] ?? { bg: "bg-zinc-500/15", text: "text-zinc-400" };
 
   const dirBadge = deal.direction === "inbound"
     ? { bg: "bg-teal-500/15", text: "text-teal-400", label: "Inbound"  }
     : { bg: "bg-zinc-500/15", text: "text-zinc-400",  label: "Outbound" };
 
-  let ActionBtn: React.ReactNode;
-  if (deal.stage === "sent") {
-    ActionBtn = <button onClick={onExpand} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border border-primary/50 text-primary hover:bg-primary hover:text-white transition-all whitespace-nowrap">Open deal →</button>;
-  } else if (deal.stage === "replied") {
-    ActionBtn = <button onClick={onReply} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border border-sky-500/50 text-sky-400 hover:bg-sky-500/20 transition-all whitespace-nowrap">Log reply →</button>;
-  } else if (deal.stage === "negotiating") {
-    ActionBtn = <button onClick={onExpand} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border border-amber-500/50 text-amber-400 hover:bg-amber-500/15 transition-all whitespace-nowrap">Open deal workspace →</button>;
-  } else if (deal.stage === "contract") {
-    ActionBtn = <button onClick={onExpand} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border border-orange-500/50 text-orange-400 hover:bg-orange-500/15 transition-all whitespace-nowrap">Review contract →</button>;
-  } else {
-    ActionBtn = <button className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/15 transition-all whitespace-nowrap">View summary →</button>;
-  }
+  const btnCls = "shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all whitespace-nowrap";
+  const ActionBtn = deal.stage === "closed"
+    ? <button onClick={onExpand} className={`${btnCls} border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/15`}>View summary →</button>
+    : <button onClick={onExpand} className={`${btnCls} border-primary/50 text-primary hover:bg-primary hover:text-white`}>Open deal →</button>;
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
@@ -551,22 +710,20 @@ export default function Pipeline() {
     if (id) sessionStorage.removeItem("mavlit_expand_deal");
     return id;
   });
-  const [prefillOffer, setPrefillOffer] = useState<string>(() => {
-    const offer = sessionStorage.getItem("mavlit_prefill_offer");
-    if (offer) sessionStorage.removeItem("mavlit_prefill_offer");
-    return offer ?? "";
-  });
-  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
-  const [replyDeal, setReplyDeal]       = useState<Deal | null>(null);
+  const [stageOverrides, setStageOverrides] = useState<Record<string, Exclude<StageKey, "all">>>({});
+  const [closedInfoMap,  setClosedInfoMap]  = useState<Record<string, ClosedInfo>>({});
+  const [markingClosed,  setMarkingClosed]  = useState<string | null>(null);
 
-  const expandedDeal = DEALS.find(d => d.id === expandedId) ?? null;
-  const visible  = DEALS.filter(d => !dismissedIds.includes(d.id));
-  const filtered = filter === "all" ? visible : visible.filter(d => d.stage === filter);
+  const effectiveDeals  = DEALS.map(d => stageOverrides[d.id] ? { ...d, stage: stageOverrides[d.id] as Deal["stage"] } : d);
+  const filtered        = filter === "all" ? effectiveDeals : effectiveDeals.filter(d => d.stage === filter);
+  const expandedDeal    = effectiveDeals.find(d => d.id === expandedId) ?? null;
+  const markingDeal     = markingClosed ? effectiveDeals.find(d => d.id === markingClosed) : null;
 
-  const handleOpenCounterOffer = (dealId: string, offer: string) => {
-    setPrefillOffer(offer);
-    setExpandedId(dealId);
-    setReplyDeal(null);
+  const handleClosed = (info: ClosedInfo) => {
+    if (!markingClosed) return;
+    setStageOverrides(p => ({ ...p, [markingClosed]: "closed" }));
+    setClosedInfoMap(p  => ({ ...p, [markingClosed]: info }));
+    setMarkingClosed(null);
   };
 
   return (
@@ -579,8 +736,9 @@ export default function Pipeline() {
           {expandedDeal ? (
             <DealWorkspace
               deal={expandedDeal}
-              prefillOffer={prefillOffer}
-              onClose={() => { setExpandedId(null); setPrefillOffer(""); }}
+              closedInfo={closedInfoMap[expandedDeal.id]}
+              onMarkClosed={() => setMarkingClosed(expandedDeal.id)}
+              onClose={() => setExpandedId(null)}
             />
           ) : (
             <>
@@ -598,7 +756,7 @@ export default function Pipeline() {
                     className={`px-4 py-1.5 rounded-xl text-sm font-bold transition-all ${filter === id ? "bg-primary text-white shadow-md shadow-primary/30" : "text-muted-foreground hover:text-white"}`}>
                     {label}
                     <span className="ml-1.5 text-xs opacity-60">
-                      {id === "all" ? visible.length : visible.filter(d => d.stage === id).length}
+                      {id === "all" ? effectiveDeals.length : effectiveDeals.filter(d => d.stage === id).length}
                     </span>
                   </button>
                 ))}
@@ -607,12 +765,7 @@ export default function Pipeline() {
               <div className="flex flex-col gap-3">
                 <AnimatePresence>
                   {filtered.map(deal => (
-                    <DealCard
-                      key={deal.id}
-                      deal={deal}
-                      onExpand={() => setExpandedId(deal.id)}
-                      onReply={() => setReplyDeal(deal)}
-                    />
+                    <DealCard key={deal.id} deal={deal} onExpand={() => setExpandedId(deal.id)} />
                   ))}
                 </AnimatePresence>
                 {filtered.length === 0 && (
@@ -621,20 +774,17 @@ export default function Pipeline() {
               </div>
             </>
           )}
-
         </div>
       </main>
 
       <Footer />
 
       <AnimatePresence>
-        {replyDeal && (
-          <ReplyLoggerModal
-            brandName={replyDeal.brand}
-            dealId={replyDeal.id}
-            onClose={() => setReplyDeal(null)}
-            onDismiss={() => setDismissedIds(ids => [...ids, replyDeal.id])}
-            onOpenCounterOffer={handleOpenCounterOffer}
+        {markingDeal && (
+          <MarkClosedModal
+            deal={markingDeal}
+            onClose={() => setMarkingClosed(null)}
+            onConfirm={handleClosed}
           />
         )}
       </AnimatePresence>

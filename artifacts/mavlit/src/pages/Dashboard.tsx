@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import {
   Users, Zap, TrendingUp, ShieldCheck,
-  Headphones, Music, Cpu, ChevronRight, X, Check,
+  Headphones, Music, Cpu, ChevronRight,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import ReplyLoggerModal from "@/components/ReplyLoggerModal";
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,7 @@ type DealAction = "navigate" | "modal";
 interface Deal {
   id: number;
   brand: string;
+  pipelineId?: string;
   Icon: React.ElementType;
   color: string;
   contact: string;
@@ -40,6 +42,7 @@ const DEALS: Deal[] = [
   {
     id: 1,
     brand: "Sennheiser",
+    pipelineId: "sennheiser",
     Icon: Headphones,
     color: "#7c3aed",
     contact: "Sarah Chen",
@@ -54,6 +57,7 @@ const DEALS: Deal[] = [
   {
     id: 2,
     brand: "Spotify for Artists",
+    pipelineId: "spotify",
     Icon: Music,
     color: "#1db954",
     contact: "Marcus Williams",
@@ -67,6 +71,7 @@ const DEALS: Deal[] = [
   {
     id: 3,
     brand: "Native Instruments",
+    pipelineId: "native-instruments",
     Icon: Cpu,
     color: "#f59e0b",
     contact: "Priya Sharma",
@@ -80,65 +85,7 @@ const DEALS: Deal[] = [
   },
 ];
 
-// ── Reply Logger Modal ────────────────────────────────────────────────────────
-
-function ReplyModal({ deal, onClose }: { deal: Deal; onClose: () => void }) {
-  const [reply, setReply] = useState("");
-  const [saved, setSaved] = useState(false);
-
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(onClose, 1200);
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        transition={{ duration: 0.2 }}
-        onClick={e => e.stopPropagation()}
-        className="relative w-full max-w-md bg-card border border-border rounded-2xl p-6 shadow-2xl"
-      >
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="text-base font-bold text-white">Log reply from {deal.brand}</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">{deal.contact}</p>
-          </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-white transition-colors p-1">
-            <X size={16} />
-          </button>
-        </div>
-
-        <textarea
-          value={reply}
-          onChange={e => setReply(e.target.value)}
-          rows={5}
-          placeholder="Paste or summarise what they said…"
-          className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all resize-none mb-4"
-        />
-
-        <button
-          onClick={handleSave}
-          disabled={!reply.trim() || saved}
-          className="w-full py-3 rounded-xl text-sm font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-all flex items-center justify-center gap-2"
-        >
-          {saved ? <><Check size={14} /> Logged</> : "Save reply"}
-        </button>
-      </motion.div>
-    </motion.div>
-  );
-}
-
-// ── Page ─────────────────────────────────────────────────────────────────────
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -187,11 +134,8 @@ export default function Dashboard() {
           >
             <h2 className="text-sm font-bold text-white mb-4">Quick Actions</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-
-              <button
-                onClick={() => setLocation("/brand-matches")}
-                className="group flex flex-col items-start gap-3 p-4 rounded-xl border border-border hover:border-primary/40 bg-secondary/40 hover:bg-secondary transition-all text-left"
-              >
+              <button onClick={() => setLocation("/brand-matches")}
+                className="group flex flex-col items-start gap-3 p-4 rounded-xl border border-border hover:border-primary/40 bg-secondary/40 hover:bg-secondary transition-all text-left">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "#7c3aed20" }}>
                   <Users size={16} style={{ color: "#7c3aed" }} />
                 </div>
@@ -201,10 +145,8 @@ export default function Dashboard() {
                 </div>
               </button>
 
-              <button
-                onClick={() => setLocation("/pitch")}
-                className="group flex flex-col items-start gap-3 p-4 rounded-xl border border-border hover:border-primary/40 bg-secondary/40 hover:bg-secondary transition-all text-left"
-              >
+              <button onClick={() => setLocation("/pitch")}
+                className="group flex flex-col items-start gap-3 p-4 rounded-xl border border-border hover:border-primary/40 bg-secondary/40 hover:bg-secondary transition-all text-left">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "#0ea5e920" }}>
                   <Zap size={16} style={{ color: "#0ea5e9" }} />
                 </div>
@@ -214,10 +156,8 @@ export default function Dashboard() {
                 </div>
               </button>
 
-              <button
-                onClick={() => setLocation("/pitch?mode=inbound")}
-                className="group flex flex-col items-start gap-3 p-4 rounded-xl border border-border hover:border-primary/40 bg-secondary/40 hover:bg-secondary transition-all text-left"
-              >
+              <button onClick={() => setLocation("/pitch?mode=inbound")}
+                className="group flex flex-col items-start gap-3 p-4 rounded-xl border border-border hover:border-primary/40 bg-secondary/40 hover:bg-secondary transition-all text-left">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "#10b98120" }}>
                   <TrendingUp size={16} style={{ color: "#10b981" }} />
                 </div>
@@ -226,7 +166,6 @@ export default function Dashboard() {
                   <p className="text-xs text-muted-foreground mt-1 leading-snug">A brand reached out — figure out how to respond</p>
                 </div>
               </button>
-
             </div>
           </motion.div>
 
@@ -239,10 +178,8 @@ export default function Dashboard() {
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-bold text-white">My Deals</h2>
-              <button
-                onClick={() => setLocation("/deals")}
-                className="text-xs text-primary hover:text-primary/80 font-semibold flex items-center gap-1 transition-colors"
-              >
+              <button onClick={() => setLocation("/deals")}
+                className="text-xs text-primary hover:text-primary/80 font-semibold flex items-center gap-1 transition-colors">
                 View all <ChevronRight size={12} />
               </button>
             </div>
@@ -258,29 +195,17 @@ export default function Dashboard() {
                     transition={{ duration: 0.3, delay: 0.28 + i * 0.06 }}
                     className="flex items-center gap-3 p-3.5 rounded-xl bg-secondary/40 border border-border"
                   >
-                    {/* Brand icon */}
-                    <div
-                      className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                      style={{ background: `${deal.color}25` }}
-                    >
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${deal.color}25` }}>
                       <Icon size={15} style={{ color: deal.color }} />
                     </div>
-
-                    {/* Brand + contact */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-bold text-white leading-tight truncate">{deal.brand}</p>
                       <p className="text-xs text-muted-foreground truncate">{deal.contact}</p>
                     </div>
-
-                    {/* Stage badge */}
                     <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold ${deal.stageBg} ${deal.stageText}`}>
                       {deal.stage}
                     </span>
-
-                    {/* Time */}
                     <span className="shrink-0 text-xs text-muted-foreground hidden sm:block">{deal.time}</span>
-
-                    {/* Action */}
                     <button
                       onClick={() => {
                         if (deal.actionType === "modal") {
@@ -304,9 +229,14 @@ export default function Dashboard() {
 
       <Footer />
 
-      {/* Reply logger modal */}
       <AnimatePresence>
-        {replyDeal && <ReplyModal deal={replyDeal} onClose={() => setReplyDeal(null)} />}
+        {replyDeal && (
+          <ReplyLoggerModal
+            brandName={replyDeal.brand}
+            dealId={replyDeal.pipelineId}
+            onClose={() => setReplyDeal(null)}
+          />
+        )}
       </AnimatePresence>
     </div>
   );

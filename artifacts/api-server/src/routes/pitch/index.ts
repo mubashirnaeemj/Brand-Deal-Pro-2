@@ -222,4 +222,67 @@ Rules:
   }
 });
 
+// ── Analyze brand reply ────────────────────────────────────────────────────────
+
+const AnalyzeReplySchema = z.object({
+  message: z.string().min(1),
+  brandName: z.string().optional(),
+});
+
+router.post("/pitch/analyze-reply", async (req, res) => {
+  const parsed = AnalyzeReplySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
+    return;
+  }
+
+  const { message, brandName } = parsed.data;
+
+  const prompt = `You are a creator deal advisor. A brand has replied to a content creator's pitch.
+${brandName ? `\nBrand: ${brandName}` : ""}
+Their message:
+"${message}"
+
+Analyze this message and respond with ONLY valid JSON — no other text, no markdown fences:
+{
+  "category": "interested",
+  "recommendation": "...",
+  "offeredAmount": "$500"
+}
+
+Category must be exactly one of:
+- "interested" — Brand expressed interest or wants more info, but has NOT made a specific dollar offer
+- "offered_number" — Brand explicitly mentioned a specific dollar amount or budget
+- "asked_call" — Brand's primary ask is a phone/video call or meeting before proceeding
+- "declined" — Brand said no, passed, or politely declined
+
+recommendation: One specific, practical next action in plain language. Under 80 words. Direct advice like a seasoned industry insider. No preamble.
+
+Only include "offeredAmount" if category is "offered_number" — extract the exact dollar amount or range from their message. Otherwise omit the field entirely.`;
+
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 512,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const text = response.content[0].type === "text" ? response.content[0].text.trim() : "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON in model response");
+
+    const data = JSON.parse(jsonMatch[0]) as {
+      category: string;
+      recommendation: string;
+      offeredAmount?: string;
+    };
+
+    res.json(data);
+  } catch (err) {
+    req.log.error({ err }, "Reply analysis failed");
+    res.status(500).json({ error: "Analysis failed" });
+  }
+});
+
 export default router;
+

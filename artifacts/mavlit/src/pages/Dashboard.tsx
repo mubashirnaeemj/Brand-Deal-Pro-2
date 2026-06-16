@@ -428,50 +428,6 @@ export default function Dashboard() {
                 </div>
               </motion.div>
 
-              {/* Pro tip */}
-              <motion.div
-                initial={{ opacity: 0, x: 16 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.4, delay: 0.2 }}
-                className="rounded-2xl p-5 border border-primary/25"
-                style={{ background: "linear-gradient(135deg, hsl(262 83% 10%), hsl(262 83% 6%))" }}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles size={13} className="text-primary" />
-                  <span className="text-xs font-bold text-primary uppercase tracking-wider">Pro Tip</span>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Creators who pitch within <span className="text-white font-semibold">48 hours</span> of a brand match are{" "}
-                  <span className="text-white font-semibold">3.2× more likely</span> to get a response. You have 4 matches waiting.
-                </p>
-                <button
-                  data-testid="button-pitch-now"
-                  onClick={() => setLocation("/pitch")}
-                  className="mt-3 flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors"
-                >
-                  Pitch now <ArrowRight size={11} />
-                </button>
-              </motion.div>
-
-              {/* DollarSign / Deal value summary */}
-              <motion.div
-                initial={{ opacity: 0, x: 16 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.4, delay: 0.28 }}
-                className="bg-card border border-border rounded-2xl p-5"
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "#f59e0b20" }}>
-                    <DollarSign size={13} style={{ color: "#f59e0b" }} />
-                  </div>
-                  <span className="text-xs font-bold text-white uppercase tracking-wider">Est. Deal Value</span>
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-extrabold text-white">$3,400</span>
-                  <DealValueTooltip />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Across open pitches</p>
-              </motion.div>
 
             </div>
           </div>

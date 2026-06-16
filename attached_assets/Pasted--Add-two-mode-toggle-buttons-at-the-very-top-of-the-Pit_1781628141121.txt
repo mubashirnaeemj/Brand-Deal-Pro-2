@@ -1,0 +1,25 @@
+"Add two mode toggle buttons at the very top of the Pitch page: 'Outbound' and 'Inbound'. The currently selected mode should be highlighted in purple. Default to Outbound.
+Outbound mode is the existing Pitch page flow with no changes except: after the creator copies their generated email, show a button below the email box: 'Mark pitch as sent →'. When clicked this shows a small green confirmation message: 'Pitch logged. We'll remind you when your follow-up window opens in 5 days.' Then navigate them to the Pipeline page.
+Inbound mode replaces the entire page content with the following:
+Page subtitle: 'A brand reached out to you. Paste their message below and MAVLIT will help you respond — without giving away your rate.'
+Show a purple tip box at the top: 'When a brand contacts you first, you have leverage. They already want to work with you. Do not give your rate in your first reply. Ask what they have in mind before you name a number.'
+Section 1 — About the brand:
+Text input: 'Brand name' with placeholder 'e.g. Red Bull'
+Dropdown: 'How did they contact you?' with options: Email, Instagram DM, TikTok DM, LinkedIn, Other
+Section 2 — Their message:
+Textarea labeled 'Paste their message here' with placeholder 'Paste exactly what they sent you.'
+Section 3 — Your profile (collapsed by default, expandable):
+Same name, handle, followers, engagement, platform, niche fields as the outbound flow
+Generate button (full width purple): '✦ Analyze message and generate response'
+When clicked, call the Anthropic API with a prompt that instructs the model to: first identify what the brand is asking for (collaboration inquiry, specific deliverable request, gifting offer, affiliate offer), whether they mentioned a budget, and any red flags like requests for free content or vague compensation. Then write a warm, professional response under 150 words that: thanks them for reaching out, expresses genuine interest, asks one qualifying question about deliverables and timeline, does not mention the creator's rate, does not ask for a call, and closes with Johanna's soft close: 'Happy to share more — just let me know what else would be helpful.'
+Show the AI analysis first as a small summary card with: what they're asking for, whether budget was mentioned (yes/no/vague), and any red flags flagged in orange.
+Below the analysis card show the generated response in the monospace dark box with a Copy button.
+Below the email box show a button: 'Mark as replied and add to pipeline →'. When clicked show a green confirmation: 'Deal added to your Pipeline. Track it from your Dashboard.' Then navigate to the Pipeline page."
+Add a third mode: Follow-up. Add 'Follow-up' as a third toggle option next to Outbound and Inbound.
+Follow-up mode shows:
+Dropdown: 'Which brand are you following up with?' populated with hardcoded sent deals: Sennheiser
+Read-only field showing: 'Pitch sent 6 days ago'
+Yellow tip box: 'Send one follow-up only. Keep it short. Add one new piece of value. Do not mention rates.'
+Generate button: '✦ Generate follow-up email'
+The AI prompt for the follow-up should instruct the model to: write a follow-up email under 80 words, briefly reference that they reached out previously without summarizing the original pitch, add one new piece of value such as a recent post or relevant metric, do not mention rates, close with 'Happy to send more if helpful — just let me know.'
+Show the generated follow-up in the monospace dark box with Copy button. Below it show: 'After sending, give it 2 more weeks. If no reply, move this brand to your long-term pipeline and revisit next quarter.'"

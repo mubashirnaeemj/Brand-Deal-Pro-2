@@ -18,8 +18,8 @@ const STEPS = [
   },
   {
     label: "Brand Detail",
-    href: "/brands/fender",
-    desc: "Explore Fender's deal range, contact bundle, and creator reviews.",
+    href: "/brands/sennheiser",
+    desc: "Explore Sennheiser's deal range, contact bundle, and creator reviews.",
     match: (p: string) => p.startsWith("/brands/"),
   },
   {

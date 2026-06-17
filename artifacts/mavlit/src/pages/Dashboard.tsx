@@ -14,7 +14,7 @@ import ReplyLoggerModal from "@/components/ReplyLoggerModal";
 const STATS = [
   { label: "Brand Matches",     value: "6",   sub: "+3 this week",          icon: Users,       color: "#7c3aed" },
   { label: "Active Deals",      value: "3",   sub: "2 in progress",         icon: Zap,         color: "#0ea5e9" },
-  { label: "Response Rate",     value: "34%", sub: "+8% vs last month",     icon: TrendingUp,  color: "#10b981" },
+  { label: "Response Rate",     value: "34%", sub: "Based on your active pitches", icon: TrendingUp,  color: "#10b981" },
   { label: "Verified Contacts", value: "6",   sub: "Across matched brands", icon: ShieldCheck, color: "#f59e0b" },
 ];
 
@@ -135,7 +135,7 @@ export default function Dashboard() {
             className="bg-card border border-border rounded-2xl p-6"
           >
             <h2 className="text-sm font-bold text-white mb-4">Quick Actions</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button onClick={() => setLocation("/brand-matches")}
                 className="group flex flex-col items-start gap-3 p-4 rounded-xl border border-border hover:border-primary/40 bg-secondary/40 hover:bg-secondary transition-all text-left">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "#7c3aed20" }}>
@@ -155,17 +155,6 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm font-bold text-white leading-tight">Start a new pitch →</p>
                   <p className="text-xs text-muted-foreground mt-1 leading-snug">Build your outreach email to a brand you found</p>
-                </div>
-              </button>
-
-              <button onClick={() => setLocation("/pitch?mode=inbound")}
-                className="group flex flex-col items-start gap-3 p-4 rounded-xl border border-border hover:border-primary/40 bg-secondary/40 hover:bg-secondary transition-all text-left">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "#10b98120" }}>
-                  <TrendingUp size={16} style={{ color: "#10b981" }} />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-white leading-tight">A brand contacted me →</p>
-                  <p className="text-xs text-muted-foreground mt-1 leading-snug">A brand reached out — figure out how to respond</p>
                 </div>
               </button>
             </div>

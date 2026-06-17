@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import {
   Users, Zap, TrendingUp, ShieldCheck,
-  Headphones, Music, Cpu, ChevronRight,
+  Headphones, Music, Cpu, ChevronRight, Wrench, UserCircle,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -155,6 +155,28 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm font-bold text-white leading-tight">Start a new pitch →</p>
                   <p className="text-xs text-muted-foreground mt-1 leading-snug">Build your outreach email to a brand you found</p>
+                </div>
+              </button>
+
+              <button onClick={() => setLocation("/deals")}
+                className="group flex flex-col items-start gap-3 p-4 rounded-xl border border-border hover:border-primary/40 bg-secondary/40 hover:bg-secondary transition-all text-left">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "#10b98120" }}>
+                  <Wrench size={16} style={{ color: "#10b981" }} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white leading-tight">Deal Tools →</p>
+                  <p className="text-xs text-muted-foreground mt-1 leading-snug">Get help negotiating payments and contracts</p>
+                </div>
+              </button>
+
+              <button onClick={() => setLocation("/profile")}
+                className="group flex flex-col items-start gap-3 p-4 rounded-xl border border-border hover:border-primary/40 bg-secondary/40 hover:bg-secondary transition-all text-left">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "#f59e0b20" }}>
+                  <UserCircle size={16} style={{ color: "#f59e0b" }} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white leading-tight">Profile →</p>
+                  <p className="text-xs text-muted-foreground mt-1 leading-snug">Keep your profile updated to get new brand matches</p>
                 </div>
               </button>
             </div>

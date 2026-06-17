@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { isDemoMode } from "@/components/DemoBar";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -171,6 +172,7 @@ function OutboundMode() {
   const canGenerate  = brandName.trim() && form.creatorName.trim() && form.handle.trim() && form.followers.trim() && form.engagementRate.trim() && form.story.trim();
 
   const generate = async () => {
+    if (isDemoMode()) { setLocation("/deals"); return; }
     if (!canGenerate) return;
     setGenerating(true); setEmail(null); setError(null); setHasCopied(false); setPitchLogged(false);
     try {
@@ -304,7 +306,7 @@ function OutboundMode() {
         </div>
 
         {/* Generate */}
-        <button onClick={generate} disabled={!canGenerate || generating}
+        <button onClick={generate} disabled={!isDemoMode() && (!canGenerate || generating)}
           className="w-full py-4 rounded-2xl text-base font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-lg shadow-primary/30 transition-all flex items-center justify-center gap-2">
           {generating
             ? (<><motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />Generating your pitch email…</>)

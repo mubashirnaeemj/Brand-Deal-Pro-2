@@ -28,6 +28,12 @@ const STEPS = [
     desc: "Build your outreach email — story-driven, no rates, no deck.",
     match: (p: string) => p === "/pitch" || p === "/pitch-deck" || p === "/outreach-email",
   },
+  {
+    label: "Pipeline",
+    href: "/deals",
+    desc: "Track your pitches and use the Deal Maker to plan every next step.",
+    match: (p: string) => p === "/deals",
+  },
 ];
 
 function activateDemo() {

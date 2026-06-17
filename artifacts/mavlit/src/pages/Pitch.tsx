@@ -2,9 +2,9 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useLocation, useSearch } from "wouter";
 import {
-  Sparkles, Copy, Check, ChevronDown, ChevronUp, AlertTriangle, Lightbulb,
+  Sparkles, Copy, Check, ChevronDown, AlertTriangle, Lightbulb,
   Headphones, Music, Cpu, Camera, ShoppingBag, Zap, User, ArrowRight,
-  Building2, Users, Mail, CheckCircle2, AlertCircle,
+  Building2, Users, Mail, CheckCircle2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -31,7 +31,6 @@ const BRAND_CONTACTS: Record<string, { name: string; title: string; company: str
 
 const NICHES    = ["Music Production","Music Performance","Audio Engineering","Gear Reviews","Lifestyle & Music","Electronic Music","Hip-Hop / Beats","Singer-Songwriter","Studio Vlogging","DJ / Live Sets","Music Education","Other"];
 const PLATFORMS = ["Instagram","TikTok","YouTube","Substack"];
-const CONTACT_METHODS = ["Email","Instagram DM","TikTok DM","LinkedIn","Other"];
 
 const TIPS = [
   { title: "Story beats stats",           body: "Brands get hundreds of pitches with follower counts. A real story about why you use their product cuts through."       },
@@ -43,8 +42,6 @@ const TIPS = [
 ];
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-
-type Mode = "outbound" | "inbound";
 
 interface OutboundForm {
   brandSource: "matched" | "found";
@@ -59,12 +56,6 @@ interface OutboundForm {
   story: string;
   pastDeals: string;
   contentLink: string;
-}
-
-interface InboundAnalysis {
-  whatAsking: string;
-  budget: "yes" | "no" | "vague";
-  redFlags: string[];
 }
 
 const EMPTY_OUTBOUND: OutboundForm = {
@@ -97,19 +88,6 @@ function Select({ value, onChange, options }: { value: string; onChange: (v: str
     <div className="relative">
       <select value={value} onChange={e => onChange(e.target.value)}
         className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm appearance-none focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all pr-9">
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-    </div>
-  );
-}
-
-function SelectPlaceholder({ value, onChange, options, placeholder }: { value: string; onChange: (v: string) => void; options: string[]; placeholder: string }) {
-  return (
-    <div className="relative">
-      <select value={value} onChange={e => onChange(e.target.value)}
-        className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-border text-sm appearance-none focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all pr-9 text-white">
-        <option value="" disabled className="text-muted-foreground">{placeholder}</option>
         {options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
       <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -171,7 +149,6 @@ async function readStream(endpoint: string, body: Record<string, unknown>, onChu
 function OutboundMode() {
   const [, setLocation] = useLocation();
   const search = useSearch();
-  // Capture prefill brand once on mount (useState initializer runs once)
   const [prefillBrand] = useState(() => new URLSearchParams(search).get("brand") ?? "");
   const [form, setFormState] = useState<OutboundForm>(() => {
     if (prefillBrand && MATCHED_BRANDS.some(b => b.name === prefillBrand)) {
@@ -180,19 +157,18 @@ function OutboundMode() {
     return EMPTY_OUTBOUND;
   });
   const [generating, setGenerating] = useState(false);
-  const [email, setEmail] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [hasCopied, setHasCopied] = useState(false);
+  const [email, setEmail]           = useState<string | null>(null);
+  const [copied, setCopied]         = useState(false);
+  const [hasCopied, setHasCopied]   = useState(false);
   const [pitchLogged, setPitchLogged] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]           = useState<string | null>(null);
   const emailRef = useRef<HTMLDivElement>(null);
 
   const set = <K extends keyof OutboundForm>(k: K, v: OutboundForm[K]) => setFormState(p => ({ ...p, [k]: v }));
 
-  const brandName = form.brandSource === "matched" ? form.selectedBrand : form.customBrand;
+  const brandName    = form.brandSource === "matched" ? form.selectedBrand : form.customBrand;
   const activeContact = form.brandSource === "matched" && form.selectedBrand ? (BRAND_CONTACTS[form.selectedBrand] ?? null) : null;
-
-  const canGenerate = brandName.trim() && form.creatorName.trim() && form.handle.trim() && form.followers.trim() && form.engagementRate.trim() && form.story.trim();
+  const canGenerate  = brandName.trim() && form.creatorName.trim() && form.handle.trim() && form.followers.trim() && form.engagementRate.trim() && form.story.trim();
 
   const generate = async () => {
     if (!canGenerate) return;
@@ -219,8 +195,17 @@ function OutboundMode() {
   };
 
   const markSent = () => {
+    const existing = JSON.parse(localStorage.getItem("mavlit_pitches") ?? "[]") as unknown[];
+    const now = new Date();
+    const newEntry = {
+      id: String(Date.now()),
+      brand: brandName,
+      date: now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      status: "waiting",
+    };
+    localStorage.setItem("mavlit_pitches", JSON.stringify([newEntry, ...existing]));
     setPitchLogged(true);
-    setTimeout(() => setLocation("/deals"), 2000);
+    setTimeout(() => setLocation("/deals"), 1500);
   };
 
   return (
@@ -321,7 +306,9 @@ function OutboundMode() {
         {/* Generate */}
         <button onClick={generate} disabled={!canGenerate || generating}
           className="w-full py-4 rounded-2xl text-base font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-lg shadow-primary/30 transition-all flex items-center justify-center gap-2">
-          {generating ? (<><motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />Generating your pitch email…</>) : (<><Sparkles size={16} />✦ Generate pitch email rough draft</>)}
+          {generating
+            ? (<><motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />Generating your pitch email…</>)
+            : (<><Sparkles size={16} />✦ Generate pitch email rough draft</>)}
         </button>
 
         {error && <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
@@ -350,12 +337,10 @@ function OutboundMode() {
               <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
                 <AlertTriangle size={15} className="text-amber-400 mt-0.5 shrink-0" />
                 <p className="text-sm text-amber-200/90 leading-relaxed">
-                  <span className="font-bold text-amber-300">Before you send:</span> Do not mention rates. Get in the door first. When they respond, head to the{" "}
-                  <Link href="/rate-calculator" className="underline underline-offset-2 text-amber-300 hover:text-amber-100 font-semibold">Deal Negotiator</Link>.
+                  <span className="font-bold text-amber-300">Before you send:</span> Do not mention rates. Get in the door first. When they respond, use the Deal Maker in your Pipeline to plan your next move.
                 </p>
               </div>
 
-              {/* Mark as sent — appears after copying */}
               <AnimatePresence>
                 {hasCopied && !pitchLogged && (
                   <motion.button initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -372,7 +357,7 @@ function OutboundMode() {
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                     className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
                     <CheckCircle2 size={15} className="text-emerald-400 mt-0.5 shrink-0" />
-                    <p className="text-sm text-emerald-300 leading-relaxed">Pitch logged. We'll remind you when your follow-up window opens in 5 days.</p>
+                    <p className="text-sm text-emerald-300 leading-relaxed">Pitch logged. Taking you to your pipeline…</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -426,259 +411,20 @@ function OutboundMode() {
   );
 }
 
-// ── Inbound Mode ───────────────────────────────────────────────────────────────
-
-function parseInbound(raw: string): { analysis: InboundAnalysis | null; email: string } {
-  const sep = raw.indexOf("\n---\n");
-  if (sep === -1) return { analysis: null, email: raw };
-  const head = raw.slice(0, sep);
-  const body = raw.slice(sep + 5).trim();
-  const whatMatch  = head.match(/^WHAT_ASKING:\s*(.+)$/m);
-  const budgetMatch = head.match(/^BUDGET:\s*(yes|no|vague)/im);
-  const flagsMatch  = head.match(/^RED_FLAGS:\s*(.+)$/m);
-  const flagsRaw = flagsMatch?.[1]?.trim() ?? "None";
-  return {
-    analysis: {
-      whatAsking: whatMatch?.[1]?.trim() ?? "",
-      budget: (budgetMatch?.[1]?.toLowerCase() ?? "vague") as "yes" | "no" | "vague",
-      redFlags: flagsRaw.toLowerCase() === "none" ? [] : flagsRaw.split(",").map(s => s.trim()).filter(Boolean),
-    },
-    email: body,
-  };
-}
-
-function InboundMode() {
-  const [, setLocation] = useLocation();
-  const [brandName, setBrandName] = useState("");
-  const [contactMethod, setContactMethod] = useState("");
-  const [message, setMessage] = useState("");
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [creatorName, setCreatorName] = useState("");
-  const [handle, setHandle] = useState("");
-  const [followers, setFollowers] = useState("");
-  const [engagementRate, setEngagementRate] = useState("");
-  const [platform, setPlatform] = useState("Instagram");
-  const [niche, setNiche] = useState("Music Production");
-  const [generating, setGenerating] = useState(false);
-  const [rawResult, setRawResult] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [marked, setMarked] = useState(false);
-  const outputRef = useRef<HTMLDivElement>(null);
-
-  const canGenerate = brandName.trim() && contactMethod && message.trim();
-
-  const generate = async () => {
-    if (!canGenerate) return;
-    setGenerating(true); setRawResult(null); setError(null); setMarked(false);
-    try {
-      let full = "";
-      await readStream("/api/pitch/inbound", {
-        brandName, contactMethod, message,
-        ...(profileOpen ? { creatorName, handle, followers, engagementRate, platform, niche } : {}),
-      }, chunk => { full += chunk; setRawResult(full); });
-      setTimeout(() => outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    } catch { setError("Something went wrong. Please try again."); }
-    finally { setGenerating(false); }
-  };
-
-  const parsed = rawResult ? parseInbound(rawResult) : null;
-  const showOutput = parsed && parsed.email.length > 10;
-
-  const markReplied = () => {
-    setMarked(true);
-    setTimeout(() => setLocation("/deals"), 2000);
-  };
-
-  return (
-    <motion.div key="inbound" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }}
-      className="max-w-2xl mx-auto space-y-6">
-
-      {/* Purple tip */}
-      <div className="flex items-start gap-3 px-4 py-4 rounded-xl bg-primary/10 border border-primary/30">
-        <Sparkles size={15} className="text-primary mt-0.5 shrink-0" />
-        <p className="text-sm text-white/90 leading-relaxed">
-          <span className="font-bold text-white">When a brand contacts you first, you have leverage.</span> They already want to work with you. Do not give your rate in your first reply. Ask what they have in mind before you name a number.
-        </p>
-      </div>
-
-      {/* Section 1 — About the brand */}
-      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-        <h2 className="text-lg font-bold text-white">1 — About the brand</h2>
-        <div><Label>Brand name</Label><Input value={brandName} onChange={setBrandName} placeholder="e.g. Red Bull" /></div>
-        <div>
-          <Label>How did they contact you?</Label>
-          <SelectPlaceholder value={contactMethod} onChange={setContactMethod} options={CONTACT_METHODS} placeholder="Select a channel…" />
-        </div>
-      </div>
-
-      {/* Section 2 — Their message */}
-      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-        <h2 className="text-lg font-bold text-white">2 — Their message</h2>
-        <div>
-          <Label>Paste their message here</Label>
-          <textarea value={message} onChange={e => setMessage(e.target.value)} rows={5}
-            placeholder="Paste exactly what they sent you."
-            className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all resize-none" />
-        </div>
-      </div>
-
-      {/* Section 3 — Your profile (collapsible) */}
-      <div className="bg-card border border-border rounded-2xl overflow-hidden">
-        <button onClick={() => setProfileOpen(o => !o)}
-          className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-secondary/40 transition-colors">
-          <div>
-            <p className="text-sm font-bold text-white">3 — Your profile <span className="text-muted-foreground font-normal">(optional)</span></p>
-            <p className="text-xs text-muted-foreground mt-0.5">Helps MAVLIT personalise your response</p>
-          </div>
-          {profileOpen ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
-        </button>
-        <AnimatePresence>
-          {profileOpen && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }}
-              className="overflow-hidden">
-              <div className="px-6 pb-6 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div><Label>Your name</Label><Input value={creatorName} onChange={setCreatorName} placeholder="Alex Rivera" /></div>
-                  <div><Label>Handle</Label><Input value={handle} onChange={setHandle} placeholder="@alexproduces" /></div>
-                  <div><Label>Followers</Label><Input value={followers} onChange={setFollowers} placeholder="52,000" /></div>
-                  <div><Label>Engagement rate (%)</Label><Input value={engagementRate} onChange={setEngagementRate} placeholder="5.8" /></div>
-                  <div><Label>Platform</Label><Select value={platform} onChange={setPlatform} options={PLATFORMS} /></div>
-                  <div><Label>Niche</Label><Select value={niche} onChange={setNiche} options={NICHES} /></div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Generate */}
-      <button onClick={generate} disabled={!canGenerate || generating}
-        className="w-full py-4 rounded-2xl text-base font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-lg shadow-primary/30 transition-all flex items-center justify-center gap-2">
-        {generating ? (<><motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />Analyzing message…</>) : (<><Sparkles size={16} />✦ Analyze message and generate response</>)}
-      </button>
-
-      {error && <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
-
-      {/* Output */}
-      <AnimatePresence>
-        {parsed && (
-          <motion.div ref={outputRef} key="inbound-output" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className="space-y-4">
-
-            {/* Analysis card */}
-            {parsed.analysis && (
-              <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
-                <p className="text-xs font-bold text-white uppercase tracking-wider">Message analysis</p>
-                <div className="space-y-2.5">
-                  <div className="flex items-start gap-2">
-                    <span className="text-xs font-semibold text-muted-foreground w-28 shrink-0 pt-0.5">What they want</span>
-                    <span className="text-sm text-white leading-snug">{parsed.analysis.whatAsking}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-muted-foreground w-28 shrink-0">Budget mentioned</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                      parsed.analysis.budget === "yes" ? "bg-emerald-500/15 text-emerald-400" :
-                      parsed.analysis.budget === "vague" ? "bg-amber-500/15 text-amber-400" :
-                      "bg-red-500/15 text-red-400"
-                    }`}>
-                      {parsed.analysis.budget === "yes" ? "Yes" : parsed.analysis.budget === "vague" ? "Vague" : "Not mentioned"}
-                    </span>
-                  </div>
-                  {parsed.analysis.redFlags.length > 0 && (
-                    <div className="flex items-start gap-2">
-                      <span className="text-xs font-semibold text-muted-foreground w-28 shrink-0 pt-0.5">Red flags</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {parsed.analysis.redFlags.map((f, i) => (
-                          <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-500/15 text-orange-400 border border-orange-500/20">
-                            <AlertCircle size={10} />{f}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Generated response */}
-            {showOutput && (
-              <>
-                <div className="relative bg-black/60 border border-border rounded-2xl p-5">
-                  <pre className="font-mono text-sm text-white/90 whitespace-pre-wrap leading-relaxed">{parsed.email}</pre>
-                  <div className="absolute top-4 right-4"><CopyButton text={parsed.email} /></div>
-                </div>
-
-                {!marked ? (
-                  <button onClick={markReplied}
-                    className="w-full py-3.5 rounded-2xl text-sm font-bold border border-primary/50 text-primary hover:bg-primary hover:text-white transition-all flex items-center justify-center gap-2">
-                    <CheckCircle2 size={15} />
-                    Mark as replied and add to pipeline →
-                  </button>
-                ) : (
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                    className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                    <CheckCircle2 size={15} className="text-emerald-400 mt-0.5 shrink-0" />
-                    <p className="text-sm text-emerald-300 leading-relaxed">Deal added to your Pipeline. Track it from your Dashboard.</p>
-                  </motion.div>
-                )}
-              </>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
-
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-const MODE_LABELS: { id: Mode; label: string }[] = [
-  { id: "outbound", label: "Outbound" },
-  { id: "inbound",  label: "Inbound"  },
-];
-
 export default function Pitch() {
-  const search = useSearch();
-  const [mode, setMode] = useState<Mode>(() => {
-    const m = new URLSearchParams(search).get("mode");
-    if (m === "inbound") return "inbound";
-    return "outbound";
-  });
-
-  const subtitles: Record<Mode, string> = {
-    outbound: "Build your outreach email to a brand. Keep it casual, personal, and story-driven. No rates. No deck.",
-    inbound:  "A brand reached out to you. Paste their message below and MAVLIT will help you respond — without giving away your rate.",
-  };
-
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <Navbar />
 
       <main className="pt-28 pb-24 px-4">
         <div className="max-w-6xl mx-auto">
-
-          {/* Header */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="mb-8">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="mb-10">
             <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">Pitch</h1>
-            <p className="text-muted-foreground text-base max-w-xl">{subtitles[mode]}</p>
+            <p className="text-muted-foreground text-base max-w-xl">Build your outreach email to a brand. Keep it casual, personal, and story-driven. No rates. No deck.</p>
           </motion.div>
-
-          {/* Mode toggle */}
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.06 }}
-            className="flex gap-2 mb-10 p-1 bg-card border border-border rounded-2xl w-fit">
-            {MODE_LABELS.map(({ id, label }) => (
-              <button key={id} onClick={() => setMode(id)}
-                className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${mode === id ? "bg-primary text-white shadow-md shadow-primary/30" : "text-muted-foreground hover:text-white"}`}>
-                {label}
-              </button>
-            ))}
-          </motion.div>
-
-          {/* Mode content */}
-          <AnimatePresence mode="wait">
-            {mode === "outbound" && <OutboundMode key="outbound" />}
-            {mode === "inbound"  && <InboundMode  key="inbound"  />}
-          </AnimatePresence>
-
+          <OutboundMode />
         </div>
       </main>
 

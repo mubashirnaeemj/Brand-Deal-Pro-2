@@ -245,4 +245,76 @@ Output only the media kit content. No preamble, no explanation, no title line th
   }
 });
 
+// ── Contract advice ───────────────────────────────────────────────────────────
+
+const ContractAdviceSchema = z.object({
+  contractText: z.string().min(1).max(12000),
+  contactType:  z.enum(["agency", "in-house"]).optional(),
+  brandName:    z.string().max(MAX).optional(),
+});
+
+router.post("/pipeline/contract-advice", async (req, res) => {
+  const parsed = ContractAdviceSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "Invalid input" }); return; }
+
+  const { contractText, contactType, brandName } = parsed.data;
+
+  const agencyNote = contactType === "agency"
+    ? "\nImportant: This is an agency-managed contract. Flag any broad usage rights, whitelisting provisions, or indemnification clauses with particular care — agency contracts tend to be more aggressive in these areas."
+    : "";
+
+  const prompt = `You are a creator-side contract advisor reviewing a sponsorship or brand deal contract on behalf of an independent content creator.
+${brandName ? `Brand: ${brandName}` : ""}${agencyNote}
+
+Contract text:
+---
+${contractText}
+---
+
+Review this contract and identify the issues that matter most to an independent creator. Check specifically for:
+1. Usage rights — Scope too broad? No defined end date?
+2. Exclusivity — How broad is the category? Hard end date?
+3. Content ownership — Who owns the created content?
+4. Kill fee — Is there one? Trigger and amount?
+5. Payment terms — NET 30/60/90? Deposit?
+6. Whitelisting / paid amplification — Addressed and compensated?
+7. Revision rounds — Specified?
+8. Indemnification — Creator bearing excessive risk?
+
+Format your response as a numbered list. For each issue:
+[number]. ⚠️ [Issue name]: [1–2 sentence explanation of the problem and what to push for]
+
+If a clause looks creator-favorable, use ✓ instead of ⚠️.
+Skip sections with no obvious issues.
+End with exactly one line: "Bottom line: [one-sentence overall assessment and the single most important action to take]"
+
+Be direct and practical. Write for a smart creator who is not a lawyer. Under 400 words total.`;
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  const controller = new AbortController();
+  req.on("close", () => controller.abort());
+
+  try {
+    const stream = anthropic.messages.stream(
+      { model: "claude-sonnet-4-6", max_tokens: 1024, messages: [{ role: "user", content: prompt }] },
+      { signal: controller.signal },
+    );
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+        res.write(`data: ${JSON.stringify({ content: event.delta.text })}\n\n`);
+      }
+    }
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === "AbortError") { res.end(); return; }
+    req.log.error({ err }, "Contract advice failed");
+    res.write(`data: ${JSON.stringify({ error: "Generation failed" })}\n\n`);
+    res.end();
+  }
+});
+
 export default router;

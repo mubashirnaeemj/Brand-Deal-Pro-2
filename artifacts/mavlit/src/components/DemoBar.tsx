@@ -31,7 +31,7 @@ const STEPS = [
   {
     label: "Pipeline",
     href: "/deals",
-    desc: "Track your pitches and use the Deal Maker to plan every next step.",
+    desc: "Track your pitches and use Deal Tools to plan every next step.",
     match: (p: string) => p === "/deals",
   },
 ];

@@ -225,7 +225,7 @@ function MyPitchesTab({
                   onClick={() => onUseDealMaker(deal.brand)}
                   className="shrink-0 text-xs text-primary font-semibold hover:text-primary/80 transition-colors whitespace-nowrap"
                 >
-                  Use Deal Maker →
+                  Use Deal Tools →
                 </button>
                 <button
                   onClick={() => openClose(deal.id)}
@@ -604,13 +604,13 @@ export default function Pipeline() {
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="mb-8">
             <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">Pipeline</h1>
-            <p className="text-muted-foreground text-base">Track your pitches and use the Deal Maker to prepare for every conversation.</p>
+            <p className="text-muted-foreground text-base">Track your pitches and use Deal Tools to prepare for every conversation.</p>
           </motion.div>
 
           {/* Tabs */}
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.06 }}
             className="flex gap-2 mb-7 p-1 bg-card border border-border rounded-2xl w-fit">
-            {[{ id: "pitches" as const, label: "My Pitches" }, { id: "dealmaker" as const, label: "Deal Maker" }].map(t => (
+            {[{ id: "pitches" as const, label: "My Pitches" }, { id: "dealmaker" as const, label: "Deal Tools" }].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${tab === t.id ? "bg-primary text-white shadow-md shadow-primary/30" : "text-muted-foreground hover:text-white"}`}>
                 {t.label}

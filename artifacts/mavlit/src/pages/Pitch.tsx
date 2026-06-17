@@ -339,7 +339,7 @@ function OutboundMode() {
               <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
                 <AlertTriangle size={15} className="text-amber-400 mt-0.5 shrink-0" />
                 <p className="text-sm text-amber-200/90 leading-relaxed">
-                  <span className="font-bold text-amber-300">Before you send:</span> Do not mention rates. Get in the door first. When they respond, use the Deal Maker in your Pipeline to plan your next move.
+                  <span className="font-bold text-amber-300">Before you send:</span> Do not mention rates. Get in the door first. When they respond, use Deal Tools in your Pipeline to plan your next move.
                 </p>
               </div>
 

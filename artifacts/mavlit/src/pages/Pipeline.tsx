@@ -31,6 +31,16 @@ const BRAND_DB: Record<string, {
   "Red Bull":            { Icon: Zap,          color: "#ef4444", category: "Beverage",  type: "agency",   signal: "Music culture content series — studio sessions and live events"        },
 };
 
+// ── Activity context (hardcoded for demo) ──────────────────────────────────────
+
+const ACTIVITY_CONTEXT: Record<string, string> = {
+  "Sennheiser":          "Closed Jun 10",
+  "Spotify for Artists": "Last activity 4 days ago",
+  "Native Instruments":  "Last activity 11 days ago",
+  "Red Bull":            "Last activity today",
+  "GoPro":              "Pitched today",
+};
+
 // ── Rate data ──────────────────────────────────────────────────────────────────
 
 const RATE_PLATFORMS = ["YouTube", "Instagram", "TikTok"] as const;
@@ -79,6 +89,10 @@ function loadPitches(): PitchRecord[] {
 
 function savePitches(pitches: PitchRecord[]) {
   try { localStorage.setItem("mavlit_pitches", JSON.stringify(pitches)); } catch { /* ignore */ }
+}
+
+function formatRate(rate: string): string {
+  return rate.trim().startsWith("$") ? rate.trim() : `$${rate.trim()}`;
 }
 
 // ── Shared UI ──────────────────────────────────────────────────────────────────
@@ -148,19 +162,23 @@ function BrandAvatar({ brand }: { brand: string }) {
 // ── My Pitches Tab ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: PitchRecord["status"] }) {
-  if (status === "waiting")      return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-zinc-500/15 text-zinc-400 border border-zinc-500/20">Waiting</span>;
-  if (status === "conversation") return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/25">In conversation</span>;
-  return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">Closed</span>;
+  if (status === "waiting")      return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-zinc-500/15 text-zinc-400 border border-zinc-500/20 whitespace-nowrap">Waiting for reply</span>;
+  if (status === "conversation") return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/25 whitespace-nowrap">In conversation</span>;
+  return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 whitespace-nowrap">Closed</span>;
 }
 
-function MyPitchesTab({ pitches, onUpdate }: { pitches: PitchRecord[]; onUpdate: (p: PitchRecord[]) => void }) {
-  const [closingId, setClosingId]     = useState<string | null>(null);
-  const [closingAnswer, setAnswer]    = useState<"yes" | "no" | null>(null);
-  const [closingRate, setRate]        = useState("");
+function MyPitchesTab({
+  pitches, onUpdate, onUseDealMaker,
+}: {
+  pitches: PitchRecord[];
+  onUpdate: (p: PitchRecord[]) => void;
+  onUseDealMaker: (brand: string) => void;
+}) {
+  const [closingId, setClosingId]  = useState<string | null>(null);
+  const [closingAnswer, setAnswer] = useState<"yes" | "no" | null>(null);
+  const [closingRate, setRate]     = useState("");
 
-  const openClose = (id: string) => {
-    setClosingId(id); setAnswer(null); setRate("");
-  };
+  const openClose  = (id: string) => { setClosingId(id); setAnswer(null); setRate(""); };
   const cancelClose = () => { setClosingId(null); setAnswer(null); setRate(""); };
 
   const confirmClose = () => {
@@ -188,19 +206,41 @@ function MyPitchesTab({ pitches, onUpdate }: { pitches: PitchRecord[]; onUpdate:
         <div key={deal.id}>
           <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-card border border-border">
             <BrandAvatar brand={deal.brand} />
+
+            {/* Brand name + date + activity context */}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate">{deal.brand}</p>
               <p className="text-xs text-muted-foreground">{deal.date}</p>
+              {ACTIVITY_CONTEXT[deal.brand] && (
+                <p className="text-xs text-muted-foreground/60">{ACTIVITY_CONTEXT[deal.brand]}</p>
+              )}
             </div>
+
             <StatusBadge status={deal.status} />
+
+            {/* Non-closed actions */}
             {deal.status !== "closed" && (
-              <button onClick={() => openClose(deal.id)}
-                className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border text-muted-foreground hover:text-white hover:border-white/30 transition-all whitespace-nowrap">
-                Mark as closed
-              </button>
+              <>
+                <button
+                  onClick={() => onUseDealMaker(deal.brand)}
+                  className="shrink-0 text-xs text-primary font-semibold hover:text-primary/80 transition-colors whitespace-nowrap"
+                >
+                  Use Deal Maker →
+                </button>
+                <button
+                  onClick={() => openClose(deal.id)}
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border text-muted-foreground hover:text-white hover:border-white/30 transition-all whitespace-nowrap"
+                >
+                  Mark as closed
+                </button>
+              </>
             )}
+
+            {/* Closed rate */}
             {deal.status === "closed" && deal.agreedRate && (
-              <span className="shrink-0 text-xs text-emerald-400 font-semibold">{deal.agreedRate}</span>
+              <span className="shrink-0 text-xs text-emerald-400 font-semibold">
+                {formatRate(deal.agreedRate)}
+              </span>
             )}
           </div>
 
@@ -250,15 +290,20 @@ function MyPitchesTab({ pitches, onUpdate }: { pitches: PitchRecord[]; onUpdate:
 
 // ── Accordion card ─────────────────────────────────────────────────────────────
 
-function AccordionCard({ title, isOpen, onToggle, children }: {
-  title: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode;
+function AccordionCard({ title, description, isOpen, onToggle, children }: {
+  title: string; description?: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode;
 }) {
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden">
       <button onClick={onToggle}
         className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-secondary/30 transition-colors">
-        <span className="text-sm font-bold text-white">{title}</span>
-        {isOpen ? <ChevronUp size={16} className="text-muted-foreground shrink-0" /> : <ChevronDown size={16} className="text-muted-foreground shrink-0" />}
+        <div>
+          <span className="text-sm font-bold text-white">{title}</span>
+          {description && (
+            <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+          )}
+        </div>
+        {isOpen ? <ChevronUp size={16} className="text-muted-foreground shrink-0 ml-3" /> : <ChevronDown size={16} className="text-muted-foreground shrink-0 ml-3" />}
       </button>
       <AnimatePresence>
         {isOpen && (
@@ -342,10 +387,10 @@ function RateEstimator() {
 // ── Contract Advice ────────────────────────────────────────────────────────────
 
 function ContractAdvice({ contactType }: { contactType?: "agency" | "in-house" }) {
-  const [text, setText]         = useState("");
-  const [generating, setGen]    = useState(false);
-  const [output, setOutput]     = useState<string | null>(null);
-  const [error, setError]       = useState<string | null>(null);
+  const [text, setText]      = useState("");
+  const [generating, setGen] = useState(false);
+  const [output, setOutput]  = useState<string | null>(null);
+  const [error, setError]    = useState<string | null>(null);
 
   const analyze = async () => {
     if (!text.trim()) return;
@@ -428,8 +473,13 @@ function MediaKit({ brandName, brandCategory }: { brandName?: string; brandCateg
 
 // ── Deal Maker Tab ─────────────────────────────────────────────────────────────
 
-function DealMakerTab({ pitches }: { pitches: PitchRecord[] }) {
-  const [selected, setSelected] = useState("");
+function DealMakerTab({
+  pitches, selectedBrand, onSelectBrand,
+}: {
+  pitches: PitchRecord[];
+  selectedBrand: string;
+  onSelectBrand: (b: string) => void;
+}) {
   const [custom, setCustom]     = useState("");
   const [openCard, setOpenCard] = useState<string | null>(null);
 
@@ -441,9 +491,9 @@ function DealMakerTab({ pitches }: { pitches: PitchRecord[] }) {
   ];
   const uniqueOptions = [...new Set(brandOptions)];
 
-  const isCustom   = selected === "A brand I found myself";
-  const brandName  = isCustom ? custom.trim() : selected;
-  const brandInfo  = brandName && !isCustom ? BRAND_DB[brandName] : null;
+  const isCustom  = selectedBrand === "A brand I found myself";
+  const brandName = isCustom ? custom.trim() : selectedBrand;
+  const brandInfo = brandName && !isCustom ? BRAND_DB[brandName] : null;
 
   return (
     <div className="space-y-5">
@@ -452,8 +502,11 @@ function DealMakerTab({ pitches }: { pitches: PitchRecord[] }) {
         <div>
           <p className="text-xs font-bold text-white uppercase tracking-wider mb-2">Which brand are you working on?</p>
           <div className="relative">
-            <select value={selected} onChange={e => { setSelected(e.target.value); setCustom(""); }}
-              className="w-full px-3.5 py-3 rounded-xl bg-black/40 border border-border text-white text-sm appearance-none focus:outline-none focus:border-primary/60 transition-all pr-9">
+            <select
+              value={selectedBrand}
+              onChange={e => { onSelectBrand(e.target.value); setCustom(""); }}
+              className="w-full px-3.5 py-3 rounded-xl bg-black/40 border border-border text-white text-sm appearance-none focus:outline-none focus:border-primary/60 transition-all pr-9"
+            >
               <option value="" disabled>Select a brand…</option>
               {uniqueOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
@@ -495,15 +548,30 @@ function DealMakerTab({ pitches }: { pitches: PitchRecord[] }) {
       </div>
 
       {/* Tool cards */}
-      <AccordionCard title="Rate Estimator" isOpen={openCard === "rate"} onToggle={() => toggle("rate")}>
+      <AccordionCard
+        title="Rate Estimator"
+        description="See observed deal ranges for your niche and deliverable type"
+        isOpen={openCard === "rate"}
+        onToggle={() => toggle("rate")}
+      >
         <RateEstimator />
       </AccordionCard>
 
-      <AccordionCard title="Contract Advice" isOpen={openCard === "contract"} onToggle={() => toggle("contract")}>
+      <AccordionCard
+        title="Contract Advice"
+        description="Paste a message with contract terms to flag potential issues"
+        isOpen={openCard === "contract"}
+        onToggle={() => toggle("contract")}
+      >
         <ContractAdvice contactType={brandInfo?.type} />
       </AccordionCard>
 
-      <AccordionCard title="Media Kit" isOpen={openCard === "media"} onToggle={() => toggle("media")}>
+      <AccordionCard
+        title="Media Kit"
+        description="Generate a quick stats summary to share with brands"
+        isOpen={openCard === "media"}
+        onToggle={() => toggle("media")}
+      >
         <MediaKit brandName={brandName || undefined} brandCategory={brandInfo?.category} />
       </AccordionCard>
     </div>
@@ -513,12 +581,18 @@ function DealMakerTab({ pitches }: { pitches: PitchRecord[] }) {
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function Pipeline() {
-  const [tab, setTab]       = useState<"pitches" | "dealmaker">("pitches");
-  const [pitches, setPitches] = useState<PitchRecord[]>(() => loadPitches());
+  const [tab, setTab]               = useState<"pitches" | "dealmaker">("pitches");
+  const [pitches, setPitches]       = useState<PitchRecord[]>(() => loadPitches());
+  const [dealmakerBrand, setDealmakerBrand] = useState("");
 
   const updatePitches = (updated: PitchRecord[]) => {
     setPitches(updated);
     savePitches(updated);
+  };
+
+  const goToDealMaker = (brand: string) => {
+    setDealmakerBrand(brand);
+    setTab("dealmaker");
   };
 
   return (
@@ -550,12 +624,12 @@ export default function Pipeline() {
           <AnimatePresence mode="wait">
             {tab === "pitches" && (
               <motion.div key="pitches" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-                <MyPitchesTab pitches={pitches} onUpdate={updatePitches} />
+                <MyPitchesTab pitches={pitches} onUpdate={updatePitches} onUseDealMaker={goToDealMaker} />
               </motion.div>
             )}
             {tab === "dealmaker" && (
               <motion.div key="dealmaker" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-                <DealMakerTab pitches={pitches} />
+                <DealMakerTab pitches={pitches} selectedBrand={dealmakerBrand} onSelectBrand={setDealmakerBrand} />
               </motion.div>
             )}
           </AnimatePresence>

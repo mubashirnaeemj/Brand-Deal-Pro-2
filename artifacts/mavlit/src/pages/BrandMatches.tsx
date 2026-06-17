@@ -392,7 +392,7 @@ function BrandCard({ brand, index, onOpen }: { brand: Brand; index: number; onOp
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-white font-bold text-lg leading-tight truncate" data-testid={`text-brandname-${brand.id}`}>
+            <h3 className="text-white font-bold text-sm leading-snug" data-testid={`text-brandname-${brand.id}`}>
               {brand.name}
             </h3>
             <ScoreRing score={brand.matchScore} />

@@ -484,6 +484,9 @@ export default function BrandDetail() {
                   <span className="text-2xl font-extrabold text-white">${brand.dealMax.toLocaleString()}</span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">{brand.dealNote}</p>
+                <p className="text-xs text-muted-foreground/50 leading-relaxed mt-2">
+                  Observed range based on reported deals — not a guaranteed rate. Varies significantly by deliverables, exclusivity terms, and negotiation.
+                </p>
               </motion.div>
 
               {/* Contact bundle */}
@@ -518,6 +521,18 @@ export default function BrandDetail() {
                   <CheckCircle2 size={12} className="text-green-400 shrink-0" />
                   {brand.contact.responseTime}
                 </p>
+              </motion.div>
+
+              {/* Pitch CTA */}
+              <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, delay: 0.24 }}>
+                <button
+                  data-testid="button-pitch-sidebar"
+                  onClick={() => setLocation(`/pitch?brand=${encodeURIComponent(brand.name)}`)}
+                  className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-sm shadow-lg shadow-primary/30 transition-all hover:shadow-primary/50 flex items-center justify-center gap-2"
+                >
+                  <Zap size={15} />
+                  Pitch this brand →
+                </button>
               </motion.div>
 
               {/* MAVLIT score */}

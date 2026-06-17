@@ -1,0 +1,37 @@
+"On the Matches page, fix the brand name truncation on the cards. Brand names like 'Spotify for Artists' and 'Native Instruments' are being cut off with ellipsis. Fix this by allowing the brand name text to wrap to two lines if needed, or reduce the font size of the brand name from its current size to 14px so longer names fit on one line. Do not truncate brand names under any circumstances."
+
+Fix 3: Brand Detail Page — Rate Disclaimer
+Tell Replit:
+"On the Brand Detail page, directly below the Deal Range figures (the $600–$2,500 display), add a one-line disclaimer in small grey text: 'Observed range based on reported deals — not a guaranteed rate. Varies significantly by deliverables, exclusivity terms, and negotiation.'
+Also check that the full disclaimer text at the bottom of the brand detail page ('These are general guidelines...') is fully visible and not truncated or cut off. If it is being cut off, fix the layout so the full text displays."
+
+Fix 4: Brand Detail Page — CTA Button
+Tell Replit:
+"On the Brand Detail page, ensure there is a clearly visible 'Pitch this brand →' button that is not hidden below the fold. This button should be positioned in the right sidebar panel, below the Contact Bundle section, so it is visible without scrolling. The button should be full width within the sidebar, purple background, white text, and should navigate to the Pitch page with this brand pre-selected in the brand picker."
+
+Fix 5: Pitch Page — Remove Inbound
+Tell Replit:
+"On the Pitch page, confirm that there is no 'A brand contacted me' mode, toggle, or button anywhere on this page. The Pitch page handles outbound pitches only. If any inbound mode, toggle, or reference to inbound messaging still exists on the Pitch page, remove it completely. The Pitch page should have no mode toggles at all — it is a single-purpose outbound pitch builder."
+
+Fix 6: Pipeline — My Pitches Dollar Sign
+Tell Replit:
+"On the Pipeline My Pitches tab, find where closed deals display their agreed rate. The rate is currently showing as a plain number like '1,200'. Add a dollar sign so it displays as '$1,200'. Apply this formatting to all deal rates shown anywhere in the Pipeline."
+
+Fix 7: Pipeline — My Pitches Status Clarity
+Tell Replit:
+"On the Pipeline My Pitches tab, update the deal status badges and add last activity context. Change the status options from the current set to three clear states: 'Waiting for reply' in grey for deals where no response has been received, 'In conversation' in purple for deals where there has been back and forth, and 'Closed' in green for completed deals.
+Below each brand name and date on the deal row, add a second line of small grey text showing last activity context. For the demo hardcode these: Sennheiser shows 'Closed Jun 10', Spotify for Artists shows 'Last activity 4 days ago', Native Instruments shows 'Last activity 11 days ago', Red Bull shows 'Last activity today', GoPro shows 'Pitched today'."
+
+Fix 8: Pipeline — Deal Maker Tool Descriptions
+Tell Replit:
+"On the Pipeline Deal Maker tab, add a one-line description under each collapsed tool card title so creators understand what each tool does without having to expand it.
+Under 'Rate Estimator' add in small grey text: 'See observed deal ranges for your niche and deliverable type'
+Under 'Contract Advice' add in small grey text: 'Paste a message with contract terms to flag potential issues'
+Under 'Media Kit' add in small grey text: 'Generate a quick stats summary to share with brands'
+These descriptions should be visible on the collapsed card, not hidden inside the expanded view."
+
+Fix 9: Pipeline — Connect My Pitches to Deal Maker
+Tell Replit:
+"On the Pipeline My Pitches tab, add a small link on every deal row that is not in Closed status. The link should appear as small purple text reading 'Use Deal Maker →' positioned to the left of the Mark as closed button on each row.
+When clicked, this link should switch the Pipeline page to the Deal Maker tab and automatically pre-select that deal's brand in the 'Which brand are you working on?' dropdown, so the creator lands directly in Deal Maker with the correct brand already loaded.
+This creates a direct connection between tracking a pitch in My Pitches and using the Deal Maker tools for that same deal."

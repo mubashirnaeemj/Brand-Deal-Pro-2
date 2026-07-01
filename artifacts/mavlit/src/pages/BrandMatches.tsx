@@ -509,8 +509,8 @@ function BrandCard({ brand, index, onOpen }: { brand: Brand; index: number; onOp
         {/* Compact contact preview */}
         <div className="mt-1 px-4 py-3 rounded-xl bg-[hsl(240_10%_8%)] border border-border flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-bold text-white leading-snug truncate">{brand.contact.name}</p>
-            <p className="text-xs text-muted-foreground truncate">{brand.contact.title} · {brand.contact.company}</p>
+            <p className="text-sm font-bold text-white leading-snug">{brand.contact.name}</p>
+            <p className="text-xs text-muted-foreground leading-snug">{brand.contact.title} · {brand.contact.company}</p>
           </div>
           <ContactBadge type={brand.contactType} />
         </div>

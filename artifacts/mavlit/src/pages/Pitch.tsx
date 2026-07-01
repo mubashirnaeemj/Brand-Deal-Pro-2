@@ -322,8 +322,11 @@ function OutboundMode() {
               {activeContact && (
                 <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card border border-border">
                   <Mail size={13} className="text-muted-foreground shrink-0" />
-                  <span className="text-xs text-muted-foreground font-semibold mr-1">To:</span>
-                  <span className="text-xs text-white font-mono flex-1 truncate">{activeContact.name} &lt;{activeContact.email}&gt;</span>
+                  <span className="text-xs text-muted-foreground font-semibold mr-1 shrink-0">To:</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-white font-semibold leading-tight">{activeContact.name}</p>
+                    <p className="text-xs text-white/60 font-mono leading-tight">{activeContact.email}</p>
+                  </div>
                   <CopyButton text={`${activeContact.name} <${activeContact.email}>`} />
                 </div>
               )}
@@ -385,7 +388,10 @@ function OutboundMode() {
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-1.5">To:</p>
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border border-border">
-                  <span className="text-xs text-white/80 font-mono flex-1 truncate">{activeContact.name} &lt;{activeContact.email}&gt;</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-white/90 font-semibold leading-tight">{activeContact.name}</p>
+                    <p className="text-xs text-white/50 font-mono leading-tight">{activeContact.email}</p>
+                  </div>
                   <CopyButton text={`${activeContact.name} <${activeContact.email}>`} />
                 </div>
               </div>

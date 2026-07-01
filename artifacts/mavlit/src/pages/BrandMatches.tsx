@@ -24,6 +24,7 @@ const BRANDS = [
     category: "Audio",
     color: "#7c3aed",
     matchScore: 97,
+    scoreBreakdown: { nicheFit: 98, audienceOverlap: 95, creatorTierFit: 96, platformMatch: 98 },
     icon: Headphones,
     contactType: "agency" as ContactType,
     contact: {
@@ -48,6 +49,7 @@ const BRANDS = [
     category: "Streaming",
     color: "#1db954",
     matchScore: 94,
+    scoreBreakdown: { nicheFit: 91, audienceOverlap: 97, creatorTierFit: 93, platformMatch: 94 },
     icon: Music,
     contactType: "in-house" as ContactType,
     contact: {
@@ -72,6 +74,7 @@ const BRANDS = [
     category: "Software",
     color: "#f59e0b",
     matchScore: 91,
+    scoreBreakdown: { nicheFit: 95, audienceOverlap: 88, creatorTierFit: 90, platformMatch: 91 },
     icon: Cpu,
     contactType: "agency" as ContactType,
     contact: {
@@ -96,6 +99,7 @@ const BRANDS = [
     category: "Lifestyle",
     color: "#0ea5e9",
     matchScore: 88,
+    scoreBreakdown: { nicheFit: 83, audienceOverlap: 88, creatorTierFit: 91, platformMatch: 88 },
     icon: Camera,
     contactType: "in-house" as ContactType,
     contact: {
@@ -120,6 +124,7 @@ const BRANDS = [
     category: "Retail",
     color: "#ec4899",
     matchScore: 85,
+    scoreBreakdown: { nicheFit: 90, audienceOverlap: 82, creatorTierFit: 82, platformMatch: 86 },
     icon: ShoppingBag,
     contactType: "in-house" as ContactType,
     contact: {
@@ -144,6 +149,7 @@ const BRANDS = [
     category: "Beverage",
     color: "#ef4444",
     matchScore: 81,
+    scoreBreakdown: { nicheFit: 78, audienceOverlap: 83, creatorTierFit: 85, platformMatch: 78 },
     icon: Zap,
     contactType: "agency" as ContactType,
     contact: {
@@ -166,18 +172,65 @@ const BRANDS = [
 type Brand = (typeof BRANDS)[0];
 
 /* ─── Score Ring ─────────────────────────────────────────── */
-function ScoreRing({ score, size = 56 }: { score: number; size?: number }) {
+type ScoreBreakdown = { nicheFit: number; audienceOverlap: number; creatorTierFit: number; platformMatch: number };
+
+const BREAKDOWN_LABELS: { key: keyof ScoreBreakdown; label: string }[] = [
+  { key: "nicheFit",       label: "Niche Fit" },
+  { key: "audienceOverlap", label: "Audience Overlap" },
+  { key: "creatorTierFit", label: "Creator Tier Fit" },
+  { key: "platformMatch",  label: "Platform Match" },
+];
+
+function barColor(v: number) {
+  if (v >= 90) return "hsl(262 83% 58%)";
+  if (v >= 80) return "hsl(160 84% 39%)";
+  return "hsl(38 92% 50%)";
+}
+
+function ScoreRing({ score, size = 56, breakdown }: { score: number; size?: number; breakdown?: ScoreBreakdown }) {
+  const [hovered, setHovered] = useState(false);
   const r = size / 2 - 6;
   const circ = 2 * Math.PI * r;
   const dash = (score / 100) * circ;
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+    <div
+      className="relative flex items-center justify-center cursor-default"
+      style={{ width: size, height: size }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <svg className="absolute inset-0 -rotate-90" width={size} height={size}>
         <circle cx={size / 2} cy={size / 2} r={r} stroke="hsl(240 5% 15%)" strokeWidth="4" fill="none" />
         <circle cx={size / 2} cy={size / 2} r={r} stroke="hsl(262 83% 58%)" strokeWidth="4" fill="none"
           strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" />
       </svg>
       <span className="text-xs font-bold text-white z-10">{score}%</span>
+
+      {hovered && breakdown && (
+        <div className="absolute bottom-[calc(100%+8px)] right-0 z-[100] w-52 rounded-xl border border-border bg-[hsl(240_10%_6%)] shadow-2xl p-3 pointer-events-none">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2.5">Score Breakdown</p>
+          <div className="flex flex-col gap-2">
+            {BREAKDOWN_LABELS.map(({ key, label }) => {
+              const val = breakdown[key];
+              return (
+                <div key={key}>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[11px] text-muted-foreground">{label}</span>
+                    <span className="text-[11px] font-bold text-white">{val}</span>
+                  </div>
+                  <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{ width: `${val}%`, background: barColor(val) }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="absolute bottom-[-5px] right-3 w-2.5 h-2.5 rotate-45 bg-[hsl(240_10%_6%)] border-r border-b border-border" />
+        </div>
+      )}
     </div>
   );
 }
@@ -274,7 +327,7 @@ function ContactPanel({ brand, onClose }: { brand: Brand; onClose: () => void })
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <ScoreRing score={brand.matchScore} size={44} />
+            <ScoreRing score={brand.matchScore} size={44} breakdown={brand.scoreBreakdown} />
             <button
               onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-white hover:bg-white/5 transition-colors"
@@ -404,7 +457,7 @@ function BrandCard({ brand, index, onOpen }: { brand: Brand; index: number; onOp
             <h3 className="text-white font-bold text-sm leading-snug" data-testid={`text-brandname-${brand.id}`}>
               {brand.name}
             </h3>
-            <ScoreRing score={brand.matchScore} />
+            <ScoreRing score={brand.matchScore} breakdown={brand.scoreBreakdown} />
           </div>
           <span
             className="inline-flex items-center mt-1 px-2 py-0.5 rounded-md text-xs font-semibold"

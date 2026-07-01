@@ -32,6 +32,7 @@ const BRANDS = [
       company: "Edelman",
       linkedin: "https://linkedin.com/in/sarah-chen-example",
       email: "sarah.chen@edelman.com",
+      verifiedAt: "Jun 12, 2026",
       note: "Handles creator partnerships for Sennheiser's North America campaigns.",
     },
     hashtag: "SennheiserPartner",
@@ -55,6 +56,7 @@ const BRANDS = [
       company: "Spotify",
       linkedin: "https://linkedin.com/in/marcus-williams-example",
       email: "m.williams@spotify.com",
+      verifiedAt: "Jun 20, 2026",
       note: "Manages creator campaigns directly from Spotify's internal partnerships team.",
     },
     hashtag: "SpotifyPartner",
@@ -78,6 +80,7 @@ const BRANDS = [
       company: "Fleischman Hillard",
       linkedin: "https://linkedin.com/in/priya-sharma-example",
       email: "p.sharma@fleishman.com",
+      verifiedAt: "Jun 8, 2026",
       note: "Oversees influencer and creator strategy for Native Instruments' global campaigns.",
     },
     hashtag: "NativeInstrumentsPartner",
@@ -101,6 +104,7 @@ const BRANDS = [
       company: "GoPro",
       linkedin: "https://linkedin.com/in/jake-torres-example",
       email: "j.torres@gopro.com",
+      verifiedAt: "Jun 15, 2026",
       note: "Runs GoPro's creator program and reviews inbound partnership pitches directly.",
     },
     hashtag: "GoPro",
@@ -124,6 +128,7 @@ const BRANDS = [
       company: "Sweetwater",
       linkedin: "https://linkedin.com/in/dana-kim-example",
       email: "d.kim@sweetwater.com",
+      verifiedAt: "Jun 18, 2026",
       note: "Leads Sweetwater's affiliate and creator partnership initiatives from their Fort Wayne HQ.",
     },
     hashtag: "SweetwaterPartner",
@@ -147,6 +152,7 @@ const BRANDS = [
       company: "Edelman",
       linkedin: "https://linkedin.com/in/alex-rivera-example",
       email: "a.rivera@edelman.com",
+      verifiedAt: "May 29, 2026",
       note: "Manages Red Bull Music creator campaigns across North America and Latin America.",
     },
     hashtag: "RedBullMusicPartner",
@@ -311,10 +317,13 @@ function ContactPanel({ brand, onClose }: { brand: Brand; onClose: () => void })
                 <CopyEmailButton email={brand.contact.email} variant="panel" />
               </div>
 
-              {/* Email display */}
+              {/* Email display + verified */}
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border border-border">
                 <span className="text-xs text-muted-foreground font-mono flex-1 truncate">{brand.contact.email}</span>
               </div>
+              <p className="text-xs text-muted-foreground/60 -mt-1">
+                {brand.contact.verifiedAt ? `Last verified: ${brand.contact.verifiedAt}` : "Verification pending"}
+              </p>
 
               {/* Note */}
               <p className="text-xs text-muted-foreground leading-relaxed">{brand.contact.note}</p>

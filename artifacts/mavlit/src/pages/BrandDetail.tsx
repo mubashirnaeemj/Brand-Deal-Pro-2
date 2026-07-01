@@ -18,6 +18,13 @@ interface Review {
   rating: number; date: string; text: string; deal: string;
 }
 
+type SignalLevel = "Strong" | "Moderate" | "Limited" | "Unknown";
+
+interface PlatformSignal {
+  level: SignalLevel;
+  note?: string;
+}
+
 interface BrandData {
   name: string; category: string; tagline: string; description: string;
   Icon: React.ElementType; color: string; iconBg: string;
@@ -29,6 +36,7 @@ interface BrandData {
   contactType: ContactType;
   contact: { email: string; linkedin: string; responseTime: string };
   reviews: Review[];
+  platformSignals: { instagram: PlatformSignal; tiktok: PlatformSignal; youtube: PlatformSignal };
 }
 
 const BRANDS: Record<string, BrandData> = {
@@ -54,6 +62,11 @@ const BRANDS: Record<string, BrandData> = {
       email: "sarah.chen@edelman.com",
       linkedin: "linkedin.com/in/sarah-chen-edelman",
       responseTime: "Typically responds in 3–7 business days via Edelman",
+    },
+    platformSignals: {
+      youtube:   { level: "Strong" },
+      instagram: { level: "Moderate" },
+      tiktok:    { level: "Limited", note: "TikTok campaign data is based on limited public sources — Instagram signal is more reliable for this brand." },
     },
     reviews: [
       {
@@ -100,6 +113,11 @@ const BRANDS: Record<string, BrandData> = {
       linkedin: "linkedin.com/in/marcus-williams-spotify",
       responseTime: "Typically responds in 2–4 business days",
     },
+    platformSignals: {
+      instagram: { level: "Strong" },
+      tiktok:    { level: "Strong" },
+      youtube:   { level: "Moderate" },
+    },
     reviews: [
       {
         id: 1, author: "Layla H.", handle: "@laylamakes", avatar: "LH", avatarColor: "#1db954",
@@ -138,6 +156,11 @@ const BRANDS: Record<string, BrandData> = {
       email: "p.sharma@fleishman.com",
       linkedin: "linkedin.com/in/priya-sharma-fleishman",
       responseTime: "Typically responds in 4–8 business days via Fleishman Hillard",
+    },
+    platformSignals: {
+      youtube:   { level: "Strong" },
+      instagram: { level: "Moderate" },
+      tiktok:    { level: "Limited", note: "TikTok campaign data is based on limited public sources — Instagram signal is more reliable for this brand." },
     },
     reviews: [
       {
@@ -178,6 +201,11 @@ const BRANDS: Record<string, BrandData> = {
       linkedin: "linkedin.com/in/jake-torres-gopro",
       responseTime: "Typically responds in 2–5 business days",
     },
+    platformSignals: {
+      youtube:   { level: "Strong" },
+      instagram: { level: "Strong" },
+      tiktok:    { level: "Moderate" },
+    },
     reviews: [
       {
         id: 1, author: "Nico M.", handle: "@nicoonstage", avatar: "NM", avatarColor: "#0ea5e9",
@@ -216,6 +244,11 @@ const BRANDS: Record<string, BrandData> = {
       email: "d.kim@sweetwater.com",
       linkedin: "linkedin.com/in/dana-kim-sweetwater",
       responseTime: "Typically responds in 2–4 business days",
+    },
+    platformSignals: {
+      youtube:   { level: "Strong" },
+      instagram: { level: "Moderate" },
+      tiktok:    { level: "Limited", note: "TikTok campaign data is based on limited public sources — Instagram signal is more reliable for this brand." },
     },
     reviews: [
       {
@@ -256,6 +289,11 @@ const BRANDS: Record<string, BrandData> = {
       linkedin: "linkedin.com/in/alex-rivera-edelman",
       responseTime: "Typically responds in 5–10 business days via Edelman",
     },
+    platformSignals: {
+      instagram: { level: "Strong" },
+      youtube:   { level: "Strong" },
+      tiktok:    { level: "Moderate" },
+    },
     reviews: [
       {
         id: 1, author: "Kenji O.", handle: "@kenjionkeys", avatar: "KO", avatarColor: "#ef4444",
@@ -294,6 +332,49 @@ function ActivityGauge({ score }: { score: number }) {
         <span className="font-semibold text-white">{score}/100</span>
         <span>Very Active</span>
       </div>
+    </div>
+  );
+}
+
+function PlatformSignalBreakdown({ signals }: { signals: BrandData["platformSignals"] }) {
+  const rows: { label: string; key: keyof typeof signals }[] = [
+    { label: "Instagram", key: "instagram" },
+    { label: "TikTok",    key: "tiktok"    },
+    { label: "YouTube",   key: "youtube"   },
+  ];
+
+  const badge: Record<SignalLevel, { text: string; cls: string }> = {
+    Strong:   { text: "Strong",   cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25" },
+    Moderate: { text: "Moderate", cls: "bg-amber-500/15 text-amber-400 border-amber-500/25"       },
+    Limited:  { text: "Limited",  cls: "bg-zinc-500/15 text-zinc-400 border-zinc-500/25"          },
+    Unknown:  { text: "Unknown",  cls: "bg-zinc-500/10 text-zinc-500 border-zinc-500/20"          },
+  };
+
+  const limitedRows = rows.filter(r => signals[r.key].level === "Limited" && signals[r.key].note);
+
+  return (
+    <div className="mt-5 pt-4 border-t border-border">
+      <p className="text-xs font-bold text-white mb-3">Platform Signal</p>
+      <div className="flex flex-col gap-2">
+        {rows.map(({ label, key }) => {
+          const { level } = signals[key];
+          const b = badge[level];
+          return (
+            <div key={key} className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">{label}</span>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${b.cls}`}>
+                {b.text}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {limitedRows.map(({ key, label }) => (
+        <p key={key} className="mt-3 text-xs text-muted-foreground/70 leading-relaxed">
+          <span className="font-semibold text-muted-foreground">{label}:</span>{" "}
+          {signals[key].note}
+        </p>
+      ))}
     </div>
   );
 }
@@ -469,6 +550,7 @@ export default function BrandDetail() {
                   <h3 className="text-sm font-bold text-white">Sponsorship Score</h3>
                 </div>
                 <ActivityGauge score={brand.activityScore} />
+                <PlatformSignalBreakdown signals={brand.platformSignals} />
               </motion.div>
 
               {/* Deal range */}

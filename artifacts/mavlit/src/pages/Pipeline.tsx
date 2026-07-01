@@ -34,7 +34,6 @@ const BRAND_DB: Record<string, {
 // ── Activity context (hardcoded for demo) ──────────────────────────────────────
 
 const ACTIVITY_CONTEXT: Record<string, string> = {
-  "Sennheiser":          "Closed Jun 10",
   "Spotify for Artists": "Last activity 4 days ago",
   "Native Instruments":  "Last activity 11 days ago",
   "Red Bull":            "Last activity today",
@@ -71,19 +70,25 @@ const CREATOR_PROFILE = {
 // ── LocalStorage helpers ───────────────────────────────────────────────────────
 
 const DEMO_PITCHES: PitchRecord[] = [
-  { id: "demo-1", brand: "Sennheiser",          date: "Jun 10, 2026", status: "waiting"      },
+  { id: "demo-1", brand: "Sennheiser",          date: "Jun 10, 2026", status: "closed", agreedRate: "$2,400" },
   { id: "demo-2", brand: "Spotify for Artists", date: "Jun 12, 2026", status: "conversation" },
   { id: "demo-3", brand: "Native Instruments",  date: "Jun 5, 2026",  status: "conversation" },
   { id: "demo-4", brand: "Red Bull",            date: "Jun 16, 2026", status: "conversation" },
   { id: "demo-5", brand: "GoPro",               date: "Jun 15, 2026", status: "waiting"      },
 ];
 
+const PITCHES_VERSION = "v2";
+
 function loadPitches(): PitchRecord[] {
   try {
-    const raw = localStorage.getItem("mavlit_pitches");
-    if (raw) return JSON.parse(raw) as PitchRecord[];
+    const version = localStorage.getItem("mavlit_pitches_version");
+    if (version === PITCHES_VERSION) {
+      const raw = localStorage.getItem("mavlit_pitches");
+      if (raw) return JSON.parse(raw) as PitchRecord[];
+    }
   } catch { /* ignore */ }
   localStorage.setItem("mavlit_pitches", JSON.stringify(DEMO_PITCHES));
+  localStorage.setItem("mavlit_pitches_version", PITCHES_VERSION);
   return DEMO_PITCHES;
 }
 
@@ -211,7 +216,7 @@ function MyPitchesTab({
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate">{deal.brand}</p>
               <p className="text-xs text-muted-foreground">{deal.date}</p>
-              {ACTIVITY_CONTEXT[deal.brand] && (
+              {deal.status !== "closed" && ACTIVITY_CONTEXT[deal.brand] && (
                 <p className="text-xs text-muted-foreground/60">{ACTIVITY_CONTEXT[deal.brand]}</p>
               )}
             </div>

@@ -172,6 +172,121 @@ function StatusBadge({ status }: { status: PitchRecord["status"] }) {
   return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 whitespace-nowrap">Closed</span>;
 }
 
+// ── Close Deal Modal ────────────────────────────────────────────────────────────
+
+type CloseOutcome = "yes" | "no" | "no_response";
+
+function CloseDealModal({
+  brand,
+  onConfirm,
+  onCancel,
+}: {
+  brand: string;
+  onConfirm: (outcome: CloseOutcome, rate: string) => void;
+  onCancel: () => void;
+}) {
+  const [outcome, setOutcome] = useState<CloseOutcome | null>(null);
+  const [rate, setRate] = useState("");
+
+  const OUTCOMES: { value: CloseOutcome; label: string }[] = [
+    { value: "yes",         label: "Yes — deal closed" },
+    { value: "no",          label: "No — didn't happen" },
+    { value: "no_response", label: "No response" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onCancel}
+      />
+
+      {/* Modal card */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 8 }}
+        transition={{ duration: 0.18 }}
+        className="relative w-full max-w-sm bg-card border border-border rounded-2xl p-6 shadow-2xl space-y-5"
+      >
+        <div>
+          <p className="text-xs text-muted-foreground font-medium mb-1">{brand}</p>
+          <h3 className="text-white font-bold text-base leading-snug">
+            Did this deal close successfully?
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            This helps MAVLIT learn which matches actually convert.
+          </p>
+        </div>
+
+        {/* Outcome buttons */}
+        <div className="flex flex-col gap-2">
+          {OUTCOMES.map(o => (
+            <button
+              key={o.value}
+              onClick={() => setOutcome(o.value)}
+              className={`w-full px-4 py-2.5 rounded-xl text-sm font-semibold border text-left transition-all ${
+                outcome === o.value
+                  ? o.value === "yes"
+                    ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300"
+                    : "bg-zinc-500/15 border-zinc-500/40 text-zinc-300"
+                  : "border-border text-muted-foreground hover:text-white hover:border-white/20"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Rate field — only when "yes" */}
+        <AnimatePresence>
+          {outcome === "yes" && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <label className="block text-xs font-semibold text-white/70 mb-1.5">
+                What was the final rate? <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                <input
+                  value={rate}
+                  onChange={e => setRate(e.target.value)}
+                  placeholder="1,200"
+                  className="w-full pl-7 pr-3 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 transition-all"
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Actions */}
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-white transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => outcome && onConfirm(outcome, rate)}
+            disabled={outcome === null}
+            className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-40 transition-all"
+          >
+            Save outcome
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ── My Pitches Tab ─────────────────────────────────────────────────────────────
+
 function MyPitchesTab({
   pitches, onUpdate, onUseDealMaker,
 }: {
@@ -179,23 +294,26 @@ function MyPitchesTab({
   onUpdate: (p: PitchRecord[]) => void;
   onUseDealMaker: (brand: string) => void;
 }) {
-  const [closingId, setClosingId]  = useState<string | null>(null);
-  const [closingAnswer, setAnswer] = useState<"yes" | "no" | null>(null);
-  const [closingRate, setRate]     = useState("");
+  const [closingId, setClosingId] = useState<string | null>(null);
 
-  const openClose  = (id: string) => { setClosingId(id); setAnswer(null); setRate(""); };
-  const cancelClose = () => { setClosingId(null); setAnswer(null); setRate(""); };
+  const openClose   = (id: string) => setClosingId(id);
+  const cancelClose = () => setClosingId(null);
 
-  const confirmClose = () => {
+  const confirmClose = (outcome: CloseOutcome, rate: string) => {
     if (!closingId) return;
+    const finalRate = outcome === "yes" && rate.trim()
+      ? (rate.trim().startsWith("$") ? rate.trim() : `$${rate.trim()}`)
+      : undefined;
     const updated = pitches.map(p =>
       p.id === closingId
-        ? { ...p, status: "closed" as const, agreedRate: closingAnswer === "yes" && closingRate.trim() ? closingRate.trim() : undefined }
+        ? { ...p, status: "closed" as const, agreedRate: finalRate }
         : p
     );
     onUpdate(updated);
     cancelClose();
   };
+
+  const closingBrand = pitches.find(p => p.id === closingId)?.brand ?? "";
 
   if (pitches.length === 0) {
     return (
@@ -206,10 +324,21 @@ function MyPitchesTab({
   }
 
   return (
-    <div className="space-y-2">
-      {pitches.map(deal => (
-        <div key={deal.id}>
-          <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-card border border-border">
+    <>
+      {/* Modal */}
+      <AnimatePresence>
+        {closingId && (
+          <CloseDealModal
+            brand={closingBrand}
+            onConfirm={confirmClose}
+            onCancel={cancelClose}
+          />
+        )}
+      </AnimatePresence>
+
+      <div className="space-y-2">
+        {pitches.map(deal => (
+          <div key={deal.id} className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-card border border-border">
             <BrandAvatar brand={deal.brand} />
 
             {/* Brand name + date + activity context */}
@@ -248,48 +377,9 @@ function MyPitchesTab({
               </span>
             )}
           </div>
-
-          <AnimatePresence>
-            {closingId === deal.id && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden">
-                <div className="mx-2 mt-1 mb-2 px-5 py-4 rounded-xl bg-secondary/60 border border-border space-y-4">
-                  <div>
-                    <p className="text-sm font-semibold text-white mb-3">Did the deal happen?</p>
-                    <div className="flex gap-2">
-                      {(["yes", "no"] as const).map(opt => (
-                        <button key={opt} onClick={() => setAnswer(opt)}
-                          className={`px-5 py-2 rounded-xl text-sm font-semibold border transition-all ${closingAnswer === opt ? opt === "yes" ? "bg-emerald-500/20 border-emerald-500/60 text-emerald-300" : "bg-zinc-500/20 border-zinc-500/40 text-zinc-300" : "border-border text-muted-foreground hover:text-white"}`}>
-                          {opt === "yes" ? "Yes" : "No"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <AnimatePresence>
-                    {closingAnswer === "yes" && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                        <p className="text-xs font-semibold text-white/70 mb-1.5">Agreed rate (optional)</p>
-                        <input value={closingRate} onChange={e => setRate(e.target.value)} placeholder="e.g. $1,200"
-                          className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 transition-all" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <div className="flex gap-2">
-                    <button onClick={cancelClose} className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:text-white transition-all">Cancel</button>
-                    <button onClick={confirmClose} disabled={closingAnswer === null}
-                      className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 disabled:opacity-40 transition-all">
-                      Confirm
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </>
   );
 }
 

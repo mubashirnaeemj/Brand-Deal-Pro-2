@@ -17,25 +17,32 @@ function HomeNav() {
       className="sticky top-0 z-50 w-full"
     >
       <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 shrink-0">
           <div
             style={{ background: ACCENT }}
-            className="w-7 h-7 rounded-lg flex items-center justify-center"
+            className="w-8 h-8 rounded flex items-center justify-center"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M2 12L7 2L12 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M4 8.5H10" stroke="white" strokeWidth="2" strokeLinecap="round" />
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="2"
+              className="w-5 h-5"
+            >
+              <path d="M4 14l8-10 8 10M4 20h16" />
             </svg>
           </div>
-          <span className="text-white font-extrabold text-lg tracking-tight">MAVLIT</span>
+          <span className="text-white font-bold text-xl tracking-tight">MAVLIT</span>
         </div>
-        <button
-          onClick={scrollToSignup}
+        <a
+          href="https://mavlitdemo.replit.app/dashboard"
+          target="_blank"
+          rel="noopener noreferrer"
           style={{ background: ACCENT }}
           className="px-4 py-2 rounded-lg text-white text-sm font-bold hover:opacity-90 transition-opacity"
         >
           Get early access →
-        </button>
+        </a>
       </div>
     </nav>
   );
@@ -56,13 +63,15 @@ function Hero() {
         <p style={{ color: SUBTEXT }} className="text-lg sm:text-xl leading-relaxed max-w-2xl mx-auto mb-10">
           MAVLIT matches you with brands that actually pay, shows you the verified contact to reach, and helps you write a pitch that gets read. Quality over volume. Built for creators who mean business.
         </p>
-        <button
-          onClick={scrollToSignup}
+        <a
+          href="https://mavlitdemo.replit.app/dashboard"
+          target="_blank"
+          rel="noopener noreferrer"
           style={{ background: ACCENT }}
-          className="px-8 py-4 rounded-xl text-white text-base font-bold hover:opacity-90 transition-opacity mb-4"
+          className="inline-block px-8 py-4 rounded-xl text-white text-base font-bold hover:opacity-90 transition-opacity mb-4"
         >
           Get early access →
-        </button>
+        </a>
         <p style={{ color: SUBTEXT }} className="text-sm">
           For creators in the US and Canada. Free to join the early access list.
         </p>
@@ -454,13 +463,15 @@ function FinalCTA() {
         <h2 className="text-white font-extrabold text-3xl sm:text-4xl leading-tight mb-8">
           Stop waiting for brands to find you.<br />Go get them.
         </h2>
-        <button
-          onClick={scrollToSignup}
+        <a
+          href="https://mavlitdemo.replit.app/dashboard"
+          target="_blank"
+          rel="noopener noreferrer"
           style={{ background: ACCENT }}
-          className="px-8 py-4 rounded-xl text-white font-bold text-base hover:opacity-90 transition-opacity"
+          className="inline-block px-8 py-4 rounded-xl text-white font-bold text-base hover:opacity-90 transition-opacity"
         >
           Get early access →
-        </button>
+        </a>
       </div>
 
       <div style={{ borderTop: "1px solid #ffffff10" }} className="pt-8">

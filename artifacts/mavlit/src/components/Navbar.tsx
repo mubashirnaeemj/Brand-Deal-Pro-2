@@ -67,12 +67,18 @@ export default function Navbar() {
               Sign In
             </Button>
           )}
-          <Button
-            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_20px_rgba(124,58,237,0.3)] transition-all text-sm"
-            onClick={() => {}}
-          >
-            {isApp ? "Upgrade to Pro" : "Get Early Access"}
-          </Button>
+          {isApp ? (
+            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/30 select-none">
+              Founding Creator
+            </span>
+          ) : (
+            <Button
+              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_20px_rgba(124,58,237,0.3)] transition-all text-sm"
+              onClick={() => {}}
+            >
+              Get Early Access
+            </Button>
+          )}
         </div>
       </div>
     </motion.nav>

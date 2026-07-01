@@ -1,0 +1,98 @@
+"Replace the entire homepage with the following. Dark theme: background #0a0a0f, purple accent #7c3aed, white text, grey subtext #8080a0. Remove all existing copy, fake dashboard numbers, pitch deck references, automation/autopilot language, the pricing table, and any features not listed below. Match the MAVLIT app's logo and styling."
+
+NAV BAR
+
+Left: MAVLIT logo + wordmark
+Right: one button "Get early access →" (purple) that scrolls to the sign-up section
+
+
+HERO
+Find the brand deals you deserve — without the guesswork.
+MAVLIT matches you with brands that actually pay, shows you the verified contact to reach, and helps you write a pitch that gets read. Quality over volume. Built for creators who mean business.
+Button: Get early access →
+
+Small grey text under button: For creators in the US and Canada. Free to join the early access list.
+
+THE PROBLEM
+You're a creator. Not a full-time salesperson.
+Endless spreadsheets of generic contacts. Hours crafting cold DMs that get ignored. No idea which brands are actually spending or who to even email. The sponsorship process is broken — and built to make independent creators give up.
+Three columns:
+You can't find the right contact.
+
+Brands hide behind info@ inboxes and agency partners. You waste hours guessing who to email — and usually guess wrong.
+You don't know who's actually spending.
+
+Some brands run active creator campaigns. Most don't. There's no way to tell from the outside — until now.
+You're guessing at everything else.
+
+What to charge. What to say. What to watch for in the contract. Most creators fly blind and leave money on the table.
+
+HOW IT WORKS
+From "I want a brand deal" to "I got a reply."
+1. Get matched with brands that pay.
+
+MAVLIT shows you brands actively running creator campaigns in your niche — with the signal data to prove it and the verified contact to reach.
+2. Build a pitch that gets read.
+
+Create a personalized, story-driven pitch email in minutes. No templates. No spray-and-pray. The kind of pitch that actually gets a reply.
+3. Manage the whole deal.
+
+Track every pitch, get help with follow-ups, see real rate ranges, and know what to check before you sign — all in one place.
+
+WHAT MAKES MAVLIT DIFFERENT
+Quality over volume. Always.
+Other tools tell you to blast hundreds of automated emails a month. That's how you burn every contact you have. MAVLIT is built the opposite way: fewer, better-targeted pitches to brands we've verified are actually spending, sent to the real person who makes the decision. One great pitch beats a hundred generic ones.
+Two-column comparison — header the columns clearly:
+Volume tools
+
+Thousands of scraped brands
+Generic automated emails
+No idea who to contact
+You look like spam
+
+MAVLIT
+
+Verified brands that actually spend
+Personalized, story-driven pitches
+The real contact — in-house or agency
+You stand out
+
+
+HONESTY / TRUST
+We tell you the truth, even when it's inconvenient.
+Three columns:
+Rates aren't formulaic.
+
+We show you real observed deal ranges from reported data — not a made-up number. What you charge depends on your audience, the brand, and the terms. We give you the context and let you decide.
+We show you our confidence.
+
+Every contact shows when it was last verified. Every brand shows what signals we found. If we're not sure, we say so.
+We're on your side.
+
+Other platforms are built for brands. MAVLIT is built for creators — to help you pitch smarter and not get ripped off. That's the whole point.
+
+EARLY ACCESS (with sign-up form)
+Join the founding creators.
+MAVLIT is opening to a small group of creators first. Founding creators get free early access, help shape the product, and lock in a lifetime discount when we launch.
+Form fields:
+
+Email address (required)
+Creator handle (required) — placeholder "@yourhandle"
+Primary platform (dropdown, required): Instagram, TikTok, YouTube, Substack, Other
+Niche (dropdown, required): Music, Health & Wellness, Food & Beverage, Beauty, Fitness, Other
+Follower count (dropdown, required): Under 10k, 10k–50k, 50k–200k, 200k–500k, 500k+
+
+Button: Join the early access list →
+On submit, replace form with:
+
+You're on the list.
+
+Thanks — you're in. We're onboarding founding creators in small groups and we'll email you when it's your turn. If your niche isn't live yet, we'll tell you the moment it is.
+Small grey text: We'll only email you about MAVLIT. No spam, ever.
+
+FINAL CTA / FOOTER
+Stop waiting for brands to find you. Go get them.
+Button: Get early access →
+Footer: MAVLIT · A BWB Media Inc. company · Newport Beach, CA · Privacy Policy · Terms of Service
+
+Two notes: I kept niche as a dropdown field in the sign-up form even though I removed the niches display section — that data is worth collecting from signups even if you're not advertising specific niches publicly. And since the niches section is gone, the "You're on the list" confirmation still references "if your niche isn't live yet" — that line still works and sets honest expectations, so I left it. If you'd rather it not mention niches at all, say the word and I'll swap it.

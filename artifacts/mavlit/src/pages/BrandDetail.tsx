@@ -559,24 +559,6 @@ export default function BrandDetail() {
                 <PlatformSignalBreakdown signals={brand.platformSignals} />
               </motion.div>
 
-              {/* Deal range */}
-              <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, delay: 0.12 }}
-                className="bg-card border border-border rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <TrendingUp size={15} className="text-primary" />
-                  <h3 className="text-sm font-bold text-white">Deal Range</h3>
-                </div>
-                <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-2xl font-extrabold text-white">${brand.dealMin.toLocaleString()}</span>
-                  <span className="text-muted-foreground text-sm">–</span>
-                  <span className="text-2xl font-extrabold text-white">${brand.dealMax.toLocaleString()}</span>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">{brand.dealNote}</p>
-                <p className="text-xs text-muted-foreground/50 leading-relaxed mt-2">
-                  Observed range based on reported deals — not a guaranteed rate. Varies significantly by deliverables, exclusivity terms, and negotiation.
-                </p>
-              </motion.div>
-
               {/* Contact bundle */}
               <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, delay: 0.19 }}
                 className="bg-card border border-border rounded-2xl p-6" data-testid="card-contact">

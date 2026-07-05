@@ -263,16 +263,20 @@ function OutboundMode() {
           </AnimatePresence>
         </div>
 
-        {/* Section 2 — Creator profile */}
+        {/* Section 2 — Story */}
         <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
-          <h2 className="text-lg font-bold text-white">2 — Your creator profile</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div><Label>Your name</Label><Input value={form.creatorName} onChange={v => set("creatorName", v)} placeholder="Alex Rivera" /></div>
-            <div><Label>Creator handle</Label><Input value={form.handle} onChange={v => set("handle", v)} placeholder="@alexproduces" /></div>
-            <div><Label>Primary platform</Label><Select value={form.platform} onChange={v => set("platform", v)} options={PLATFORMS} /></div>
-            <div><Label>Followers / subscribers</Label><Input value={form.followers} onChange={v => set("followers", v)} placeholder="52,000" /></div>
-            <div><Label>Avg. engagement rate (%)</Label><Input value={form.engagementRate} onChange={v => set("engagementRate", v)} placeholder="5.8" /></div>
-            <div><Label>Content niche</Label><Select value={form.niche} onChange={v => set("niche", v)} options={NICHES} /></div>
+          <h2 className="text-lg font-bold text-white">2 — Your story &amp; social proof</h2>
+          <div>
+            <Label>Your authentic connection to {brandName || "[brand]"} — the story</Label>
+            <textarea value={form.story} onChange={e => set("story", e.target.value)} rows={4}
+              placeholder={`e.g. I've used ${brandName || "[brand]"} gear since I was 16 learning in my bedroom studio. My audience of 18–34 producers knows I only mention what I actually use.`}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all resize-none" />
+          </div>
+          <div><Label>Past brand partnerships (optional)</Label><Input value={form.pastDeals} onChange={v => set("pastDeals", v)} placeholder="e.g. Focusrite, Splice, Roland — or leave blank if none yet" /></div>
+          <div>
+            <Label>Link to your most relevant content</Label>
+            <Input value={form.contentLink} onChange={v => set("contentLink", v)} placeholder="https://instagram.com/p/your-best-post" />
+            <p className="mt-1.5 text-xs text-muted-foreground/70 leading-relaxed">Link to content that shows your connection to this brand.</p>
           </div>
           <div className="flex items-start justify-between gap-4 pt-1 px-4 py-3.5 rounded-xl bg-primary/5 border border-primary/20">
             <div className="flex items-start gap-3 min-w-0">
@@ -285,23 +289,6 @@ function OutboundMode() {
             <Link href="/profile" className="shrink-0 flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors whitespace-nowrap pt-0.5">
               Update profile <ArrowRight size={11} />
             </Link>
-          </div>
-        </div>
-
-        {/* Section 3 — Story */}
-        <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
-          <h2 className="text-lg font-bold text-white">3 — Your story &amp; social proof</h2>
-          <div>
-            <Label>Your authentic connection to {brandName || "[brand]"} — the story</Label>
-            <textarea value={form.story} onChange={e => set("story", e.target.value)} rows={4}
-              placeholder={`e.g. I've used ${brandName || "[brand]"} gear since I was 16 learning in my bedroom studio. My audience of 18–34 producers knows I only mention what I actually use.`}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all resize-none" />
-          </div>
-          <div><Label>Past brand partnerships (optional)</Label><Input value={form.pastDeals} onChange={v => set("pastDeals", v)} placeholder="e.g. Focusrite, Splice, Roland — or leave blank if none yet" /></div>
-          <div>
-            <Label>Link to your most relevant content</Label>
-            <Input value={form.contentLink} onChange={v => set("contentLink", v)} placeholder="https://instagram.com/p/your-best-post" />
-            <p className="mt-1.5 text-xs text-muted-foreground/70 leading-relaxed">Link to content that shows your connection to this brand.</p>
           </div>
         </div>
 

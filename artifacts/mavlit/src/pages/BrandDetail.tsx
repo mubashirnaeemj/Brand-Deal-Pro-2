@@ -4,7 +4,7 @@ import {
   ArrowLeft, Mail, Linkedin, Zap, DollarSign, Star, TrendingUp,
   Activity, CheckCircle2, Copy, ChevronRight, MessageSquare,
   Headphones, Music, Cpu, Camera, ShoppingBag, Building2, Users,
-  Clock, BarChart2, AlertTriangle, Info,
+  Clock, BarChart2, AlertTriangle, Info, Store, Sparkles,
 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
 import Navbar from "@/components/Navbar";
@@ -37,6 +37,8 @@ interface BrandData {
   lastPartnership?: string;
   metaAdsActive?: boolean;
   creatorTier: { avg: number; min: number; max: number };
+  retailPresence?: string[];
+  recentLaunches?: string[];
   contactType: ContactType;
   contact: { email: string; linkedin: string; responseTime: string; verifiedAt?: string };
   reviews: Review[];
@@ -58,6 +60,8 @@ const BRANDS: Record<string, BrandData> = {
     lastPartnership: "~2 weeks ago",
     metaAdsActive: true,
     creatorTier: { avg: 75_000, min: 30_000, max: 200_000 },
+    retailPresence: ["Best Buy", "B&H Photo", "Sweetwater", "Thomann"],
+    recentLaunches: ["HD 490 Pro Headphones", "Profile USB Mic", "Momentum True Wireless 4"],
     highlightsLabel: "What Sennheiser looks for",
     highlights: [
       "Creators whose content naturally features audio gear — reviews, tutorials, or studio workflow videos.",
@@ -112,6 +116,7 @@ const BRANDS: Record<string, BrandData> = {
     lastPartnership: "~3 days ago",
     metaAdsActive: true,
     creatorTier: { avg: 120_000, min: 50_000, max: 500_000 },
+    recentLaunches: ["Countdown Pages", "Discovery Mode expansion", "Clips for Artists"],
     highlightsLabel: "What Spotify for Artists looks for",
     highlights: [
       "Music creators with audiences who stream regularly — ideally 18–34 core demographic.",
@@ -160,6 +165,8 @@ const BRANDS: Record<string, BrandData> = {
     lastPartnership: "~1 month ago",
     metaAdsActive: true,
     creatorTier: { avg: 60_000, min: 20_000, max: 150_000 },
+    retailPresence: ["Sweetwater", "Guitar Center", "B&H Photo", "Thomann"],
+    recentLaunches: ["Komplete 15 Ultimate", "Maschine+ standalone", "Traktor Pro 4"],
     highlightsLabel: "What Native Instruments looks for",
     highlights: [
       "Tutorial and workflow content where NI software or hardware plays a core role — not a side mention.",
@@ -208,6 +215,8 @@ const BRANDS: Record<string, BrandData> = {
     lastPartnership: "~6 weeks ago",
     metaAdsActive: false,
     creatorTier: { avg: 200_000, min: 80_000, max: 1_000_000 },
+    retailPresence: ["Best Buy", "REI", "Target", "Amazon"],
+    recentLaunches: ["HERO13 Black", "MAX 2 camera", "Quik app redesign"],
     highlightsLabel: "What GoPro looks for",
     highlights: [
       "Live performance, studio BTS, or on-the-road content where a POV camera narrative fits naturally.",
@@ -256,6 +265,7 @@ const BRANDS: Record<string, BrandData> = {
     lastPartnership: "~3 weeks ago",
     metaAdsActive: true,
     creatorTier: { avg: 45_000, min: 15_000, max: 120_000 },
+    recentLaunches: ["SweetCare Pro support tier", "Sweetwater Studios expansion", "Musician financing upgrades"],
     highlightsLabel: "What Sweetwater looks for",
     highlights: [
       "Gear review, studio setup, and 'what I use in my studio' content formats where product links convert.",
@@ -304,6 +314,8 @@ const BRANDS: Record<string, BrandData> = {
     lastPartnership: "~2 months ago",
     metaAdsActive: false,
     creatorTier: { avg: 350_000, min: 100_000, max: 2_000_000 },
+    retailPresence: ["7-Eleven", "Walmart", "Target", "Costco", "Amazon"],
+    recentLaunches: ["Red Bull Organics range", "Red Bull Basement 2025", "Team Red Bull creator roster"],
     highlightsLabel: "What Red Bull looks for",
     highlights: [
       "Music-lifestyle content at the intersection of creative process and performance — studio and stage both work.",
@@ -583,6 +595,39 @@ export default function BrandDetail() {
                   </p>
                 </div>
               </motion.div>
+
+              {/* Retail presence + Recent launches — hidden per card if no data */}
+              {(brand.retailPresence || brand.recentLaunches) && (
+                <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.08 }}
+                  className="grid grid-cols-2 gap-4">
+                  {brand.retailPresence && (
+                    <div className="bg-card border border-border rounded-2xl p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Store size={13} className="text-primary shrink-0" />
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">Retail presence</span>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        {brand.retailPresence.map(store => (
+                          <span key={store} className="text-xs text-muted-foreground">{store}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {brand.recentLaunches && (
+                    <div className="bg-card border border-border rounded-2xl p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Sparkles size={13} className="text-primary shrink-0" />
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">Recent launches</span>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        {brand.recentLaunches.map(launch => (
+                          <span key={launch} className="text-xs text-muted-foreground">{launch}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
 
               {/* Action button */}
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="flex">

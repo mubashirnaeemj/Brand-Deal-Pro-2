@@ -23,6 +23,7 @@ const PitchEmailInputSchema = z.object({
   contentLink: z.string().max(MAX_SHORT).optional(),
   contactName: z.string().max(MAX_SHORT).optional(),
   contactEmail: z.string().max(MAX_SHORT).optional(),
+  recentProductLaunch: z.string().max(MAX_SHORT).optional(),
 });
 
 router.post("/pitch/generate", aiRateLimiter, async (req, res) => {
@@ -39,11 +40,12 @@ router.post("/pitch/generate", aiRateLimiter, async (req, res) => {
 
   const {
     brandName, creatorName, handle, platform, followers, engagementRate,
-    niche, story, pastDeals, contentLink, contactName, contactEmail,
+    niche, story, pastDeals, contentLink, contactName, contactEmail, recentProductLaunch,
   } = parsed.data;
 
   const pastDealsLine = pastDeals?.trim() ? `Past brand partnerships: ${pastDeals}` : "No prior brand deals yet.";
   const contentLinkLine = contentLink?.trim() ? `Most relevant content: ${contentLink}` : "";
+  const recentLaunchLine = recentProductLaunch?.trim() ? `Recent ${brandName} product launch the creator wants to reference: ${recentProductLaunch}` : "";
   const contactFirstName = contactName ? contactName.split(" ")[0] : null;
   const openerInstruction = contactFirstName
     ? `Opens with "Hi ${contactFirstName}," — address them by first name directly`
@@ -66,10 +68,11 @@ Brand being pitched: ${brandName}
 ${toLine}
 
 Their authentic connection/story: ${story}
+${recentLaunchLine}
 
 Write a pitch email that:
 1. ${openerInstruction}
-2. Opens the body with something specific and real about ${brandName} — show genuine knowledge of the brand
+2. Opens the body with something specific and real about ${brandName} — show genuine knowledge of the brand${recentLaunchLine ? `; if it fits naturally, the opening can reference the recent launch listed above as a timely reason for reaching out — but only if it flows as something a real person would say, not as a formal announcement` : ""}
 3. Tells the creator's authentic story and connection to ${brandName}
 4. Includes social proof (${followers} followers on ${platform}, ${engagementRate}% engagement rate${pastDeals ? `, past deals: ${pastDeals}` : ""})
 5. Keeps it casual — no formal business language, write like a real person

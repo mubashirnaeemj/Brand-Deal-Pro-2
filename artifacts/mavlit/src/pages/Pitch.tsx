@@ -30,6 +30,15 @@ const BRAND_CONTACTS: Record<string, { name: string; title: string; company: str
   "Red Bull":            { name: "Alex Rivera",     title: "Account Manager",                  company: "Edelman",             type: "agency",   email: "a.rivera@edelman.com"     },
 };
 
+const BRAND_LAUNCHES: Record<string, string[]> = {
+  "Sennheiser":          ["HD 490 Pro Headphones", "Profile USB Mic", "Momentum True Wireless 4"],
+  "Spotify for Artists": ["Countdown Pages", "Discovery Mode expansion", "Clips for Artists"],
+  "Native Instruments":  ["Komplete 15 Ultimate", "Maschine+ standalone", "Traktor Pro 4"],
+  "GoPro":               ["HERO13 Black", "MAX 2 camera", "Quik app redesign"],
+  "Sweetwater":          ["SweetCare Pro support tier", "Sweetwater Studios expansion", "Musician financing upgrades"],
+  "Red Bull":            ["Red Bull Organics range", "Red Bull Basement 2025", "Team Red Bull creator roster"],
+};
+
 const NICHES    = ["Music Production","Music Performance","Audio Engineering","Gear Reviews","Lifestyle & Music","Electronic Music","Hip-Hop / Beats","Singer-Songwriter","Studio Vlogging","DJ / Live Sets","Music Education","Other"];
 const PLATFORMS = ["Instagram","TikTok","YouTube","Substack"];
 
@@ -55,6 +64,7 @@ interface OutboundForm {
   engagementRate: string;
   niche: string;
   story: string;
+  recentProductLaunch: string;
   pastDeals: string;
   contentLink: string;
 }
@@ -63,7 +73,7 @@ const EMPTY_OUTBOUND: OutboundForm = {
   brandSource: "matched", selectedBrand: "", customBrand: "",
   creatorName: "", handle: "", platform: "Instagram",
   followers: "", engagementRate: "", niche: "Music Production",
-  story: "", pastDeals: "", contentLink: "",
+  story: "", recentProductLaunch: "", pastDeals: "", contentLink: "",
 };
 
 // ── Shared UI ──────────────────────────────────────────────────────────────────
@@ -180,7 +190,8 @@ function OutboundMode() {
       await readStream("/api/pitch/generate", {
         brandName, creatorName: form.creatorName, handle: form.handle, platform: form.platform,
         followers: form.followers, engagementRate: form.engagementRate, niche: form.niche,
-        story: form.story, pastDeals: form.pastDeals, contentLink: form.contentLink,
+        story: form.story, recentProductLaunch: form.recentProductLaunch,
+        pastDeals: form.pastDeals, contentLink: form.contentLink,
         contactName: activeContact?.name, contactEmail: activeContact?.email,
       }, chunk => { full += chunk; setEmail(full); });
       setTimeout(() => emailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
@@ -240,7 +251,11 @@ function OutboundMode() {
                     const Icon = b.icon;
                     const selected = form.selectedBrand === b.name;
                     return (
-                      <button key={b.id} onClick={() => set("selectedBrand", selected ? "" : b.name)}
+                      <button key={b.id} onClick={() => {
+                          const next = selected ? "" : b.name;
+                          const firstLaunch = BRAND_LAUNCHES[next]?.[0] ?? "";
+                          setFormState(p => ({ ...p, selectedBrand: next, recentProductLaunch: firstLaunch }));
+                        }}
                         className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${selected ? "border-primary bg-primary/10 text-white" : "border-border text-muted-foreground hover:border-primary/40 hover:text-white"}`}>
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${b.color}30` }}>
                           <Icon size={15} style={{ color: b.color }} />
@@ -272,6 +287,26 @@ function OutboundMode() {
               placeholder={`e.g. I've used ${brandName || "[brand]"} gear since I was 16 learning in my bedroom studio. My audience of 18–34 producers knows I only mention what I actually use.`}
               className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all resize-none" />
           </div>
+          {form.brandSource === "matched" && form.selectedBrand && (BRAND_LAUNCHES[form.selectedBrand]?.length ?? 0) > 0 && (
+            <div>
+              <Label>Reference a recent product launch <span className="font-normal text-muted-foreground/50">— optional</span></Label>
+              <Input
+                value={form.recentProductLaunch}
+                onChange={v => set("recentProductLaunch", v)}
+                placeholder="Leave blank to skip, or pick one below"
+              />
+              <div className="flex flex-wrap gap-2 mt-2">
+                {(BRAND_LAUNCHES[form.selectedBrand] ?? []).map(launch => (
+                  <button key={launch} type="button"
+                    onClick={() => set("recentProductLaunch", form.recentProductLaunch === launch ? "" : launch)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${form.recentProductLaunch === launch ? "bg-primary/15 border-primary/40 text-primary" : "border-border text-muted-foreground hover:border-primary/30 hover:text-white"}`}>
+                    {launch}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground/60 leading-relaxed">If filled in, it'll be woven into your pitch as a natural reason for the timing — not added as a separate line.</p>
+            </div>
+          )}
           <div><Label>Past brand partnerships (optional)</Label><Input value={form.pastDeals} onChange={v => set("pastDeals", v)} placeholder="e.g. Focusrite, Splice, Roland — or leave blank if none yet" /></div>
           <div>
             <Label>Link to your most relevant content</Label>

@@ -511,38 +511,6 @@ export default function BrandDetail() {
                 </button>
               </motion.div>
 
-              {/* Reviews */}
-              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }}
-                className="bg-card border border-border rounded-2xl p-7">
-                <div className="flex items-center gap-2 mb-6">
-                  <MessageSquare size={16} className="text-primary" />
-                  <h2 className="text-lg font-bold text-white">Creator Reviews</h2>
-                  <span className="ml-auto text-xs text-muted-foreground">{brand.reviews.length} verified deals</span>
-                </div>
-                <div className="flex flex-col gap-5">
-                  {brand.reviews.map((review, i) => (
-                    <motion.div key={review.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.35, delay: 0.25 + i * 0.08 }} data-testid={`card-review-${review.id}`} className="flex gap-4">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                        style={{ background: `linear-gradient(135deg, ${review.avatarColor}cc, ${review.avatarColor}66)` }}>
-                        {review.avatar}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="text-sm font-bold text-white">{review.author}</span>
-                          <span className="text-xs text-muted-foreground">{review.handle}</span>
-                          <StarRow rating={review.rating} />
-                          <span className="text-xs text-muted-foreground ml-auto hidden sm:block">{review.date}</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed mb-2">{review.text}</p>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-green-500/10 text-green-400 border border-green-500/20">
-                          <DollarSign size={11} />{review.deal}
-                        </span>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.div>
             </div>
 
             {/* ── Right sidebar ── */}
@@ -609,15 +577,6 @@ export default function BrandDetail() {
                   <Zap size={15} />
                   Pitch this brand →
                 </button>
-              </motion.div>
-
-              {/* MAVLIT score */}
-              <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, delay: 0.26 }}
-                className="rounded-2xl p-5 border border-primary/30"
-                style={{ background: "linear-gradient(135deg, hsl(262 83% 10%), hsl(262 83% 6%))" }}>
-                <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">MAVLIT Score</p>
-                <p className="text-4xl font-black text-white mb-1">{brand.matchScore}%</p>
-                <p className="text-xs text-muted-foreground">Match confidence for your profile</p>
               </motion.div>
 
             </div>

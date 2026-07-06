@@ -73,7 +73,7 @@ const BRANDS: Record<string, BrandData> = {
       email: "sarah.chen@edelman.com",
       linkedin: "linkedin.com/in/sarah-chen-edelman",
       responseTime: "Typically responds in 3–7 business days via Edelman",
-      verifiedAt: "Jun 12, 2026",
+      verifiedAt: "2026-06-12",
     },
     platformSignals: {
       youtube:   { level: "Strong" },
@@ -128,7 +128,7 @@ const BRANDS: Record<string, BrandData> = {
       email: "m.williams@spotify.com",
       linkedin: "linkedin.com/in/marcus-williams-spotify",
       responseTime: "Typically responds in 2–4 business days",
-      verifiedAt: "Jun 20, 2026",
+      verifiedAt: "2026-06-20",
     },
     platformSignals: {
       instagram: { level: "Strong" },
@@ -178,7 +178,7 @@ const BRANDS: Record<string, BrandData> = {
       email: "p.sharma@fleishman.com",
       linkedin: "linkedin.com/in/priya-sharma-fleishman",
       responseTime: "Typically responds in 4–8 business days via Fleishman Hillard",
-      verifiedAt: "Jun 8, 2026",
+      verifiedAt: "2026-06-08",
     },
     platformSignals: {
       youtube:   { level: "Strong" },
@@ -228,7 +228,7 @@ const BRANDS: Record<string, BrandData> = {
       email: "j.torres@gopro.com",
       linkedin: "linkedin.com/in/jake-torres-gopro",
       responseTime: "Typically responds in 2–5 business days",
-      verifiedAt: "Jun 15, 2026",
+      verifiedAt: "2026-06-15",
     },
     platformSignals: {
       youtube:   { level: "Strong" },
@@ -277,7 +277,7 @@ const BRANDS: Record<string, BrandData> = {
       email: "d.kim@sweetwater.com",
       linkedin: "linkedin.com/in/dana-kim-sweetwater",
       responseTime: "Typically responds in 2–4 business days",
-      verifiedAt: "Jun 18, 2026",
+      verifiedAt: "2026-06-18",
     },
     platformSignals: {
       youtube:   { level: "Strong" },
@@ -327,7 +327,7 @@ const BRANDS: Record<string, BrandData> = {
       email: "a.rivera@edelman.com",
       linkedin: "linkedin.com/in/alex-rivera-edelman",
       responseTime: "Typically responds in 5–10 business days via Edelman",
-      verifiedAt: "May 29, 2026",
+      verifiedAt: "2026-05-29",
     },
     platformSignals: {
       instagram: { level: "Strong" },
@@ -437,6 +437,12 @@ function CopyButton({ value }: { value: string }) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+function fmtVerifiedDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
 function fmtTierK(n: number): string {
   if (n >= 1_000_000) return `${Number.isInteger(n / 1_000_000) ? Math.round(n / 1_000_000) : (n / 1_000_000).toFixed(1)}M`;
@@ -705,7 +711,7 @@ export default function BrandDetail() {
                       <p className="text-xs text-muted-foreground mb-0.5">Email</p>
                       <p className="text-sm font-semibold text-white truncate" data-testid="text-contact-email">{brand.contact.email}</p>
                       <p className="text-xs text-muted-foreground/60 mt-0.5">
-                        {brand.contact.verifiedAt ? `Last verified: ${brand.contact.verifiedAt}` : "Verification pending"}
+                        {brand.contact.verifiedAt ? `Verified ${fmtVerifiedDate(brand.contact.verifiedAt)}` : "Verification pending"}
                       </p>
                     </div>
                     <CopyButton value={brand.contact.email} />
@@ -716,7 +722,7 @@ export default function BrandDetail() {
                       <p className="text-xs text-muted-foreground mb-0.5">LinkedIn</p>
                       <p className="text-sm font-semibold text-white truncate" data-testid="text-contact-linkedin">{brand.contact.linkedin}</p>
                       <p className="text-xs text-muted-foreground/60 mt-0.5">
-                        {brand.contact.verifiedAt ? `Last verified: ${brand.contact.verifiedAt}` : "Verification pending"}
+                        {brand.contact.verifiedAt ? `Verified ${fmtVerifiedDate(brand.contact.verifiedAt)}` : "Verification pending"}
                       </p>
                     </div>
                     <CopyButton value={brand.contact.linkedin} />

@@ -383,21 +383,20 @@ function PlatformSignalBreakdown({ signals }: { signals: BrandData["platformSign
     { label: "YouTube",   key: "youtube"   },
   ];
 
-  const badge: Record<SignalLevel, { text: string; cls: string }> = {
+  const badge: Record<Exclude<SignalLevel, "Unknown">, { text: string; cls: string }> = {
     Strong:   { text: "Strong",   cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25" },
     Moderate: { text: "Moderate", cls: "bg-amber-500/15 text-amber-400 border-amber-500/25"       },
     Limited:  { text: "Limited",  cls: "bg-zinc-500/15 text-zinc-400 border-zinc-500/25"          },
-    Unknown:  { text: "Unknown",  cls: "bg-zinc-500/10 text-zinc-500 border-zinc-500/20"          },
   };
 
-  const tiktokLevel = signals.tiktok.level;
-  const showTikTokCaveat = tiktokLevel === "Limited" || tiktokLevel === "Unknown";
+  const visibleRows = rows.filter(({ key }) => signals[key].level !== "Unknown");
+  const notes = rows.flatMap(({ key }) => signals[key].note ? [signals[key].note as string] : []);
 
   return (
     <div className="flex flex-col gap-2">
-      {rows.map(({ label, key }) => {
+      {visibleRows.map(({ label, key }) => {
         const { level } = signals[key];
-        const b = badge[level];
+        const b = badge[level as Exclude<SignalLevel, "Unknown">];
         return (
           <div key={key} className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">{label}</span>
@@ -407,11 +406,9 @@ function PlatformSignalBreakdown({ signals }: { signals: BrandData["platformSign
           </div>
         );
       })}
-      {showTikTokCaveat && (
-        <p className="mt-1 text-xs text-muted-foreground/70 leading-relaxed">
-          TikTok data is based on limited public sources — Instagram signal is more reliable for this brand.
-        </p>
-      )}
+      {notes.map((note, i) => (
+        <p key={i} className="mt-1 text-xs text-muted-foreground/70 leading-relaxed">{note}</p>
+      ))}
     </div>
   );
 }
@@ -605,7 +602,7 @@ export default function BrandDetail() {
               {/* Retail presence + Recent launches — hidden per card if no data */}
               {(brand.retailPresence || brand.recentLaunches) && (
                 <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.08 }}
-                  className="grid grid-cols-2 gap-4">
+                  className={`grid gap-4 ${brand.retailPresence && brand.recentLaunches ? "grid-cols-2" : "grid-cols-1"}`}>
                   {brand.retailPresence && (
                     <div className="bg-card border border-border rounded-2xl p-5">
                       <div className="flex items-center gap-2 mb-3">

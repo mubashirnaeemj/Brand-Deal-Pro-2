@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Mail, Linkedin, Zap, DollarSign, Star, TrendingUp,
   Activity, CheckCircle2, Copy, ChevronRight, MessageSquare,
   Headphones, Music, Cpu, Camera, ShoppingBag, Building2, Users,
-  Clock, BarChart2,
+  Clock, BarChart2, AlertTriangle, Info,
 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
 import Navbar from "@/components/Navbar";
@@ -36,6 +36,7 @@ interface BrandData {
   highlightsLabel: string;
   lastPartnership?: string;
   metaAdsActive?: boolean;
+  creatorTier: { avg: number; min: number; max: number };
   contactType: ContactType;
   contact: { email: string; linkedin: string; responseTime: string; verifiedAt?: string };
   reviews: Review[];
@@ -56,6 +57,7 @@ const BRANDS: Record<string, BrandData> = {
     tags: ["Studio Gear", "Pro Audio", "Long-term Friendly", "Agency Campaign"],
     lastPartnership: "~2 weeks ago",
     metaAdsActive: true,
+    creatorTier: { avg: 75_000, min: 30_000, max: 200_000 },
     highlightsLabel: "What Sennheiser looks for",
     highlights: [
       "Creators whose content naturally features audio gear — reviews, tutorials, or studio workflow videos.",
@@ -109,6 +111,7 @@ const BRANDS: Record<string, BrandData> = {
     tags: ["Streaming", "Music Culture", "Creator Program", "In-house Team"],
     lastPartnership: "~3 days ago",
     metaAdsActive: true,
+    creatorTier: { avg: 120_000, min: 50_000, max: 500_000 },
     highlightsLabel: "What Spotify for Artists looks for",
     highlights: [
       "Music creators with audiences who stream regularly — ideally 18–34 core demographic.",
@@ -156,6 +159,7 @@ const BRANDS: Record<string, BrandData> = {
     tags: ["Music Software", "Hardware", "Tutorial Friendly", "Agency Campaign"],
     lastPartnership: "~1 month ago",
     metaAdsActive: true,
+    creatorTier: { avg: 60_000, min: 20_000, max: 150_000 },
     highlightsLabel: "What Native Instruments looks for",
     highlights: [
       "Tutorial and workflow content where NI software or hardware plays a core role — not a side mention.",
@@ -203,6 +207,7 @@ const BRANDS: Record<string, BrandData> = {
     tags: ["Lifestyle", "Action Camera", "Creator Ambassador", "In-house Team"],
     lastPartnership: "~6 weeks ago",
     metaAdsActive: false,
+    creatorTier: { avg: 200_000, min: 80_000, max: 1_000_000 },
     highlightsLabel: "What GoPro looks for",
     highlights: [
       "Live performance, studio BTS, or on-the-road content where a POV camera narrative fits naturally.",
@@ -250,6 +255,7 @@ const BRANDS: Record<string, BrandData> = {
     tags: ["Gear Retail", "Affiliate Friendly", "Audio Gear", "In-house Team"],
     lastPartnership: "~3 weeks ago",
     metaAdsActive: true,
+    creatorTier: { avg: 45_000, min: 15_000, max: 120_000 },
     highlightsLabel: "What Sweetwater looks for",
     highlights: [
       "Gear review, studio setup, and 'what I use in my studio' content formats where product links convert.",
@@ -297,6 +303,7 @@ const BRANDS: Record<string, BrandData> = {
     tags: ["Beverage", "Music Culture", "High Budget", "Agency Campaign"],
     lastPartnership: "~2 months ago",
     metaAdsActive: false,
+    creatorTier: { avg: 350_000, min: 100_000, max: 2_000_000 },
     highlightsLabel: "What Red Bull looks for",
     highlights: [
       "Music-lifestyle content at the intersection of creative process and performance — studio and stage both work.",
@@ -417,12 +424,77 @@ function CopyButton({ value }: { value: string }) {
   );
 }
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function fmtTierK(n: number): string {
+  if (n >= 1_000_000) return `${Number.isInteger(n / 1_000_000) ? Math.round(n / 1_000_000) : (n / 1_000_000).toFixed(1)}M`;
+  return `${Math.round(n / 1_000)}K`;
+}
+
+function CreatorTierFitCard({ tier, creatorFollowers }: { tier: BrandData["creatorTier"]; creatorFollowers: number | null }) {
+  const { avg, min, max } = tier;
+
+  let banner: React.ReactNode;
+  if (creatorFollowers === null) {
+    banner = (
+      <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/5 border border-border">
+        <Info size={12} className="text-muted-foreground shrink-0" />
+        <span className="text-xs text-muted-foreground">Complete your profile to see how you compare</span>
+      </div>
+    );
+  } else if (creatorFollowers >= min && creatorFollowers <= max) {
+    banner = (
+      <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
+        <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+        <span className="text-xs text-emerald-400 font-medium">Your {fmtTierK(creatorFollowers)} is in their range</span>
+      </div>
+    );
+  } else if (creatorFollowers < min) {
+    banner = (
+      <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25">
+        <AlertTriangle size={13} className="text-amber-400 shrink-0 mt-0.5" />
+        <span className="text-xs text-amber-400 leading-relaxed">You're below their typical range — still worth a pitch if the fit is strong</span>
+      </div>
+    );
+  } else {
+    banner = (
+      <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-zinc-500/10 border border-zinc-500/25">
+        <Info size={13} className="text-zinc-400 shrink-0" />
+        <span className="text-xs text-zinc-400">You're above their typical range</span>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+        Recent partners averaged{" "}
+        <span className="text-white font-medium">~{fmtTierK(avg)}</span> followers, typically{" "}
+        <span className="text-white font-medium">{fmtTierK(min)}–{fmtTierK(max)}</span>
+      </p>
+      {banner}
+    </>
+  );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function BrandDetail() {
   const [, setLocation] = useLocation();
   const params = useParams<{ slug: string }>();
   const brand = BRANDS[params.slug ?? ""];
+
+  const creatorFollowers = useMemo((): number | null => {
+    try {
+      const raw = localStorage.getItem("mavlit_creator_profile");
+      if (!raw) return null;
+      const profile = JSON.parse(raw) as { stats?: Record<string, { followers?: string }> };
+      const counts = Object.values(profile.stats ?? {})
+        .map(s => parseInt((s.followers ?? "").replace(/[^0-9]/g, ""), 10))
+        .filter(n => !isNaN(n) && n > 0);
+      return counts.length > 0 ? Math.max(...counts) : null;
+    } catch { return null; }
+  }, []);
 
   if (!brand) {
     return (
@@ -552,6 +624,16 @@ export default function BrandDetail() {
                     )}
                   </div>
                 )}
+              </motion.div>
+
+              {/* Creator Tier Fit */}
+              <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, delay: 0.10 }}
+                className="bg-card border border-border rounded-2xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Users size={15} className="text-primary" />
+                  <h3 className="text-sm font-bold text-white">Creator tier fit</h3>
+                </div>
+                <CreatorTierFitCard tier={brand.creatorTier} creatorFollowers={creatorFollowers} />
               </motion.div>
 
               {/* Platform Signal */}

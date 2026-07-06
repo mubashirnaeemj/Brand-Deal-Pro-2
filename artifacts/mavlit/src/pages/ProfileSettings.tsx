@@ -105,7 +105,13 @@ const inputCls =
   "w-full px-4 py-2.5 rounded-xl bg-secondary border border-border text-white placeholder:text-muted-foreground/50 text-sm font-medium focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all";
 
 export default function ProfileSettings() {
-  const [form, setForm] = useState<ProfileForm>(DEFAULT);
+  const [form, setForm] = useState<ProfileForm>(() => {
+    try {
+      const raw = localStorage.getItem("mavlit_creator_profile");
+      if (raw) return JSON.parse(raw) as ProfileForm;
+    } catch { /* ignore */ }
+    return DEFAULT;
+  });
   const [saved, setSaved] = useState(false);
 
   const set = (field: keyof Omit<ProfileForm, "links">, value: string) =>
@@ -119,6 +125,7 @@ export default function ProfileSettings() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    try { localStorage.setItem("mavlit_creator_profile", JSON.stringify(form)); } catch { /* ignore */ }
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };

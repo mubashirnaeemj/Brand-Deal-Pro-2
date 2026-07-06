@@ -4,6 +4,7 @@ import {
   ArrowLeft, Mail, Linkedin, Zap, DollarSign, Star, TrendingUp,
   Activity, CheckCircle2, Copy, ChevronRight, MessageSquare,
   Headphones, Music, Cpu, Camera, ShoppingBag, Building2, Users,
+  Clock, BarChart2,
 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
 import Navbar from "@/components/Navbar";
@@ -33,6 +34,8 @@ interface BrandData {
   tags: string[];
   highlights: string[];
   highlightsLabel: string;
+  lastPartnership?: string;
+  metaAdsActive?: boolean;
   contactType: ContactType;
   contact: { email: string; linkedin: string; responseTime: string; verifiedAt?: string };
   reviews: Review[];
@@ -51,6 +54,8 @@ const BRANDS: Record<string, BrandData> = {
     dealMin: 600, dealMax: 2500,
     dealNote: "Per sponsored video or integration. Rate scales with deliverables and exclusivity window.",
     tags: ["Studio Gear", "Pro Audio", "Long-term Friendly", "Agency Campaign"],
+    lastPartnership: "~2 weeks ago",
+    metaAdsActive: true,
     highlightsLabel: "What Sennheiser looks for",
     highlights: [
       "Creators whose content naturally features audio gear — reviews, tutorials, or studio workflow videos.",
@@ -102,6 +107,8 @@ const BRANDS: Record<string, BrandData> = {
     dealMin: 400, dealMax: 1800,
     dealNote: "Per campaign post or video integration. Rates include Spotify premium promotion of the content.",
     tags: ["Streaming", "Music Culture", "Creator Program", "In-house Team"],
+    lastPartnership: "~3 days ago",
+    metaAdsActive: true,
     highlightsLabel: "What Spotify for Artists looks for",
     highlights: [
       "Music creators with audiences who stream regularly — ideally 18–34 core demographic.",
@@ -147,6 +154,8 @@ const BRANDS: Record<string, BrandData> = {
     dealMin: 500, dealMax: 2200,
     dealNote: "Per video integration or dedicated review. Higher rates for longer exclusivity and bundle campaigns.",
     tags: ["Music Software", "Hardware", "Tutorial Friendly", "Agency Campaign"],
+    lastPartnership: "~1 month ago",
+    metaAdsActive: true,
     highlightsLabel: "What Native Instruments looks for",
     highlights: [
       "Tutorial and workflow content where NI software or hardware plays a core role — not a side mention.",
@@ -192,6 +201,8 @@ const BRANDS: Record<string, BrandData> = {
     dealMin: 400, dealMax: 1500,
     dealNote: "Per post/video plus performance bonuses for ambassador tier creators.",
     tags: ["Lifestyle", "Action Camera", "Creator Ambassador", "In-house Team"],
+    lastPartnership: "~6 weeks ago",
+    metaAdsActive: false,
     highlightsLabel: "What GoPro looks for",
     highlights: [
       "Live performance, studio BTS, or on-the-road content where a POV camera narrative fits naturally.",
@@ -237,6 +248,8 @@ const BRANDS: Record<string, BrandData> = {
     dealMin: 300, dealMax: 1200,
     dealNote: "Base flat fee + affiliate commission on driven sales. Top creators earn significantly above base.",
     tags: ["Gear Retail", "Affiliate Friendly", "Audio Gear", "In-house Team"],
+    lastPartnership: "~3 weeks ago",
+    metaAdsActive: true,
     highlightsLabel: "What Sweetwater looks for",
     highlights: [
       "Gear review, studio setup, and 'what I use in my studio' content formats where product links convert.",
@@ -282,6 +295,8 @@ const BRANDS: Record<string, BrandData> = {
     dealMin: 700, dealMax: 3500,
     dealNote: "Per campaign asset or event partnership. Higher for multi-deliverable campaigns and exclusivity.",
     tags: ["Beverage", "Music Culture", "High Budget", "Agency Campaign"],
+    lastPartnership: "~2 months ago",
+    metaAdsActive: false,
     highlightsLabel: "What Red Bull looks for",
     highlights: [
       "Music-lifestyle content at the intersection of creative process and performance — studio and stage both work.",
@@ -521,6 +536,22 @@ export default function BrandDetail() {
                   <h3 className="text-sm font-bold text-white">Sponsorship Score</h3>
                 </div>
                 <ActivityGauge score={brand.activityScore} />
+                {(brand.lastPartnership !== undefined || brand.metaAdsActive !== undefined) && (
+                  <div className="mt-4 pt-4 border-t border-border flex flex-col gap-2.5">
+                    {brand.lastPartnership && (
+                      <div className="flex items-center gap-2">
+                        <Clock size={12} className="text-muted-foreground shrink-0" />
+                        <span className="text-xs text-muted-foreground">Last partnership <span className="text-white font-medium">{brand.lastPartnership}</span></span>
+                      </div>
+                    )}
+                    {brand.metaAdsActive !== undefined && (
+                      <div className="flex items-center gap-2">
+                        <BarChart2 size={12} className="text-muted-foreground shrink-0" />
+                        <span className="text-xs text-muted-foreground">Meta ads active: <span className={brand.metaAdsActive ? "text-emerald-400 font-medium" : "text-zinc-400 font-medium"}>{brand.metaAdsActive ? "Yes" : "No"}</span></span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </motion.div>
 
               {/* Platform Signal */}

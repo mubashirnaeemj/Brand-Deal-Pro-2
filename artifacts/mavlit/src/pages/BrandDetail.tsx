@@ -632,16 +632,6 @@ export default function BrandDetail() {
                 </motion.div>
               )}
 
-              {/* Action button */}
-              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="flex">
-                <button data-testid="button-generate-pitch"
-                  onClick={() => setLocation(`/pitch?brand=${encodeURIComponent(brand.name)}`)}
-                  className="flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-sm shadow-lg shadow-primary/30 transition-all hover:shadow-primary/50 hover:-translate-y-0.5 active:translate-y-0">
-                  <Zap size={16} />
-                  Create Pitch Email
-                  <ChevronRight size={14} className="ml-1 opacity-60" />
-                </button>
-              </motion.div>
 
             </div>
 
@@ -725,10 +715,6 @@ export default function BrandDetail() {
                     <CopyButton value={brand.contact.linkedin} />
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1.5">
-                  <CheckCircle2 size={12} className="text-green-400 shrink-0" />
-                  {brand.contact.responseTime}
-                </p>
               </motion.div>
 
               {/* Pitch CTA */}

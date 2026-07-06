@@ -620,7 +620,7 @@ export default function BrandDetail() {
                     <div className="bg-card border border-border rounded-2xl p-5">
                       <div className="flex items-center gap-2 mb-3">
                         <Sparkles size={13} className="text-primary shrink-0" />
-                        <span className="text-xs font-bold text-white uppercase tracking-wider">Recent launches</span>
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">Recent product launches</span>
                       </div>
                       <div className="flex flex-col gap-1.5">
                         {brand.recentLaunches.map(launch => (

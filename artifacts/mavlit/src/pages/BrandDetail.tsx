@@ -356,31 +356,28 @@ function PlatformSignalBreakdown({ signals }: { signals: BrandData["platformSign
     Unknown:  { text: "Unknown",  cls: "bg-zinc-500/10 text-zinc-500 border-zinc-500/20"          },
   };
 
-  const limitedRows = rows.filter(r => signals[r.key].level === "Limited" && signals[r.key].note);
+  const tiktokLevel = signals.tiktok.level;
+  const showTikTokCaveat = tiktokLevel === "Limited" || tiktokLevel === "Unknown";
 
   return (
-    <div className="mt-5 pt-4 border-t border-border">
-      <p className="text-xs font-bold text-white mb-3">Platform Signal</p>
-      <div className="flex flex-col gap-2">
-        {rows.map(({ label, key }) => {
-          const { level } = signals[key];
-          const b = badge[level];
-          return (
-            <div key={key} className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">{label}</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${b.cls}`}>
-                {b.text}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      {limitedRows.map(({ key, label }) => (
-        <p key={key} className="mt-3 text-xs text-muted-foreground/70 leading-relaxed">
-          <span className="font-semibold text-muted-foreground">{label}:</span>{" "}
-          {signals[key].note}
+    <div className="flex flex-col gap-2">
+      {rows.map(({ label, key }) => {
+        const { level } = signals[key];
+        const b = badge[level];
+        return (
+          <div key={key} className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">{label}</span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${b.cls}`}>
+              {b.text}
+            </span>
+          </div>
+        );
+      })}
+      {showTikTokCaveat && (
+        <p className="mt-1 text-xs text-muted-foreground/70 leading-relaxed">
+          TikTok data is based on limited public sources — Instagram signal is more reliable for this brand.
         </p>
-      ))}
+      )}
     </div>
   );
 }
@@ -524,6 +521,12 @@ export default function BrandDetail() {
                   <h3 className="text-sm font-bold text-white">Sponsorship Score</h3>
                 </div>
                 <ActivityGauge score={brand.activityScore} />
+              </motion.div>
+
+              {/* Platform Signal */}
+              <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, delay: 0.12 }}
+                className="bg-card border border-border rounded-2xl p-6">
+                <h3 className="text-sm font-bold text-white mb-4">Platform Signal</h3>
                 <PlatformSignalBreakdown signals={brand.platformSignals} />
               </motion.div>
 

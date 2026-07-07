@@ -583,8 +583,15 @@ export default function BrandDetail() {
 
               </motion.div>
 
+              {/* Platform Signal */}
+              <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.08 }}
+                className="bg-card border border-border rounded-2xl p-6">
+                <h3 className="text-sm font-bold text-white mb-4">Platform Signal</h3>
+                <PlatformSignalBreakdown signals={brand.platformSignals} />
+              </motion.div>
+
               {brand.recentLaunches && (
-                <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.08 }}
+                <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.12 }}
                   className="bg-card border border-border rounded-2xl p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Sparkles size={13} className="text-primary shrink-0" />
@@ -597,13 +604,6 @@ export default function BrandDetail() {
                   </div>
                 </motion.div>
               )}
-
-              {/* Platform Signal */}
-              <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.12 }}
-                className="bg-card border border-border rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-4">Platform Signal</h3>
-                <PlatformSignalBreakdown signals={brand.platformSignals} />
-              </motion.div>
 
 
             </div>

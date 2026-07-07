@@ -4,7 +4,7 @@ import {
   ArrowLeft, Mail, Linkedin, Zap, DollarSign, Star, TrendingUp,
   Activity, CheckCircle2, Copy, ChevronRight, MessageSquare,
   Headphones, Music, Cpu, Camera, ShoppingBag, Building2, Users,
-  Clock, BarChart2, AlertTriangle, Info, Store, Sparkles,
+  Clock, BarChart2, AlertTriangle, Info, Sparkles,
 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
 import Navbar from "@/components/Navbar";
@@ -581,56 +581,29 @@ export default function BrandDetail() {
                   {brand.description}
                 </p>
 
-                <div className="h-px bg-border my-5" />
-
-                <div className="flex flex-col gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                    {brand.highlightsLabel}
-                  </p>
-                  {brand.highlights.map((h, i) => (
-                    <div key={i} className="flex items-start gap-2.5">
-                      <CheckCircle2 size={14} className="text-primary mt-0.5 shrink-0" />
-                      <span className="text-sm text-muted-foreground">{h}</span>
-                    </div>
-                  ))}
-                  <p className="text-xs text-muted-foreground/60 mt-1 leading-relaxed">
-                    These are general guidelines and campaign signals — not every point applies to every deal. Use them as context when crafting your pitch, not as requirements.
-                  </p>
-                </div>
               </motion.div>
 
-              {/* Retail presence + Recent launches — hidden per card if no data */}
-              {(brand.retailPresence || brand.recentLaunches) && (
+              {brand.recentLaunches && (
                 <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.08 }}
-                  className={`grid gap-4 ${brand.retailPresence && brand.recentLaunches ? "grid-cols-2" : "grid-cols-1"}`}>
-                  {brand.retailPresence && (
-                    <div className="bg-card border border-border rounded-2xl p-5">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Store size={13} className="text-primary shrink-0" />
-                        <span className="text-xs font-bold text-white uppercase tracking-wider">Retail presence</span>
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        {brand.retailPresence.map(store => (
-                          <span key={store} className="text-xs text-muted-foreground">{store}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {brand.recentLaunches && (
-                    <div className="bg-card border border-border rounded-2xl p-5">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Sparkles size={13} className="text-primary shrink-0" />
-                        <span className="text-xs font-bold text-white uppercase tracking-wider">Recent product launches</span>
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        {brand.recentLaunches.map(launch => (
-                          <span key={launch} className="text-xs text-muted-foreground">{launch}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  className="bg-card border border-border rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles size={13} className="text-primary shrink-0" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">Recent product launches</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {brand.recentLaunches.map(launch => (
+                      <span key={launch} className="text-xs text-muted-foreground">{launch}</span>
+                    ))}
+                  </div>
                 </motion.div>
               )}
+
+              {/* Platform Signal */}
+              <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.12 }}
+                className="bg-card border border-border rounded-2xl p-6">
+                <h3 className="text-sm font-bold text-white mb-4">Platform Signal</h3>
+                <PlatformSignalBreakdown signals={brand.platformSignals} />
+              </motion.div>
 
 
             </div>
@@ -672,13 +645,6 @@ export default function BrandDetail() {
                   <h3 className="text-sm font-bold text-white">Creator tier fit</h3>
                 </div>
                 <CreatorTierFitCard tier={brand.creatorTier} creatorFollowers={creatorFollowers} />
-              </motion.div>
-
-              {/* Platform Signal */}
-              <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, delay: 0.12 }}
-                className="bg-card border border-border rounded-2xl p-6">
-                <h3 className="text-sm font-bold text-white mb-4">Platform Signal</h3>
-                <PlatformSignalBreakdown signals={brand.platformSignals} />
               </motion.div>
 
               {/* Contact bundle */}

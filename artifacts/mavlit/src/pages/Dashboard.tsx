@@ -1,22 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import {
-  Users, Zap, TrendingUp, ShieldCheck,
+  Users, Zap, Send, ShieldCheck,
   Headphones, Music, Cpu, ChevronRight, Wrench, UserCircle,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ReplyLoggerModal from "@/components/ReplyLoggerModal";
 
-// ── Stats ─────────────────────────────────────────────────────────────────────
-
-const STATS = [
-  { label: "Brand Matches",     value: "6",   sub: "+3 this week",          icon: Users,       color: "#7c3aed" },
-  { label: "Active Deals",      value: "3",   sub: "2 in progress",         icon: Zap,         color: "#0ea5e9" },
-  { label: "Response Rate",     value: "34%", sub: "Based on your active pitches", icon: TrendingUp,  color: "#10b981" },
-  { label: "Verified Contacts", value: "6",   sub: "Across matched brands", icon: ShieldCheck, color: "#f59e0b" },
-];
+// ── Verified contacts count — all 6 matched brands have a verified contact ────
+const VERIFIED_CONTACTS = 6;
 
 // ── Deals ─────────────────────────────────────────────────────────────────────
 
@@ -93,6 +87,22 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const [replyDeal, setReplyDeal] = useState<Deal | null>(null);
 
+  const stats = useMemo(() => {
+    let pitches: Array<{ status: string }> = [];
+    try {
+      const raw = localStorage.getItem("mavlit_pitches");
+      if (raw) pitches = JSON.parse(raw) as Array<{ status: string }>;
+    } catch { /* ignore */ }
+    const pitchesSent  = pitches.length;
+    const activeDeals  = pitches.filter(p => p.status === "waiting" || p.status === "conversation").length;
+    return [
+      { label: "Brand Matches",     value: "6",                       sub: "In your niche",          icon: Users,       color: "#7c3aed" },
+      { label: "Active Deals",      value: String(activeDeals),        sub: "In your pipeline",       icon: Zap,         color: "#0ea5e9" },
+      { label: "Pitches Sent",      value: String(pitchesSent),        sub: "Tracked in pipeline",    icon: Send,        color: "#10b981" },
+      { label: "Verified Contacts", value: String(VERIFIED_CONTACTS),  sub: "Across matched brands",  icon: ShieldCheck, color: "#f59e0b" },
+    ];
+  }, []);
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <Navbar />
@@ -102,7 +112,7 @@ export default function Dashboard() {
 
           {/* Stats row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {STATS.map((s, i) => {
+            {stats.map((s, i) => {
               const Icon = s.icon;
               return (
                 <motion.div

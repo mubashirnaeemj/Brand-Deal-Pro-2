@@ -499,9 +499,9 @@ function ContractAdvice({ contactType }: { contactType?: "agency" | "in-house" }
 
   return (
     <div className="space-y-4">
-      <div className="px-4 py-3.5 rounded-xl bg-primary/8 border border-primary/20 space-y-2">
-        <p className="text-xs text-white/80 leading-relaxed">
-          This tool looks for specific contract issues that commonly affect independent creators. It does not review your full contract and is not legal advice. You will need to use your own judgment and consult a lawyer before signing anything.
+      <div className="px-4 py-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+        <p className="text-sm text-amber-100 leading-relaxed">
+          <span className="font-bold text-amber-300">MAVLIT is not a law firm or an attorney and does not provide legal advice.</span> This tool flags common contract issues for informational and educational purposes only. It does not review your full contract, it may be incomplete or inaccurate, and it is not a substitute for a lawyer. Always consult a licensed attorney before signing, relying on, or negotiating any contract.
         </p>
         {contactType === "agency" && (
           <p className="text-xs text-white/70 leading-relaxed border-t border-primary/15 pt-2">

@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import {
-  Users, Zap, Send, ShieldCheck,
+  Users, Zap, Bookmark, ShieldCheck,
   Headphones, Music, Cpu, ChevronRight, Wrench, UserCircle,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -93,13 +93,19 @@ export default function Dashboard() {
       const raw = localStorage.getItem("mavlit_pitches");
       if (raw) pitches = JSON.parse(raw) as Array<{ status: string }>;
     } catch { /* ignore */ }
-    const pitchesSent  = pitches.length;
     const activeDeals  = pitches.filter(p => p.status === "waiting" || p.status === "conversation").length;
+
+    let savedCount = 0;
+    try {
+      const raw = localStorage.getItem("mavlit_saved_brands");
+      savedCount = raw ? (JSON.parse(raw) as string[]).length : 0;
+    } catch { /* ignore */ }
+
     return [
-      { label: "Brand Matches",     value: "6",                       sub: "In your niche",          icon: Users,       color: "#7c3aed" },
-      { label: "Active Deals",      value: String(activeDeals),        sub: "In your pipeline",       icon: Zap,         color: "#0ea5e9" },
-      { label: "Pitches Sent",      value: String(pitchesSent),        sub: "Tracked in pipeline",    icon: Send,        color: "#10b981" },
-      { label: "Verified Contacts", value: String(VERIFIED_CONTACTS),  sub: "Across matched brands",  icon: ShieldCheck, color: "#f59e0b" },
+      { label: "Brand Matches",  value: "6",                      sub: "In your niche",         icon: Users,       color: "#7c3aed" },
+      { label: "Active Deals",   value: String(activeDeals),       sub: "In your pipeline",      icon: Zap,         color: "#0ea5e9" },
+      { label: "Saved Brands",   value: String(savedCount),        sub: "On your shortlist",     icon: Bookmark,    color: "#10b981" },
+      { label: "Verified Contacts", value: String(VERIFIED_CONTACTS), sub: "Across matched brands", icon: ShieldCheck, color: "#f59e0b" },
     ];
   }, []);
 

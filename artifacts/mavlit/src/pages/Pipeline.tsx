@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Headphones, Music, Cpu, Camera, ShoppingBag, Zap,
-  ChevronDown, ChevronUp, Copy, Check, Sparkles, AlertTriangle, Building2, Users,
+  ChevronDown, ChevronUp, Copy, Check, Sparkles, AlertTriangle, Building2, Users, BookOpen,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -524,6 +524,29 @@ function ContractAdvice({ contactType }: { contactType?: "agency" | "in-house" }
 
       {error && <p className="text-xs text-red-400">{error}</p>}
       {output && <OutputBox text={output} />}
+
+      {/* Static educational checklist — always visible */}
+      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <BookOpen size={14} className="text-primary shrink-0" />
+          <p className="text-xs font-bold text-white uppercase tracking-wider">What to check in any brand deal</p>
+        </div>
+        <ul className="space-y-3.5">
+          {[
+            { label: "Usage rights", body: "Know exactly how the brand can use your content and for how long. The more they can do with it — sharing, ads, other campaigns, your name and likeness — the more it's worth, so make sure the fee reflects the usage." },
+            { label: "Exclusivity", body: "Understand whether you're barred from working with other brands, and try to keep any exclusivity as narrow and short as possible." },
+            { label: "Payment", body: "Confirm how much, when you'll be paid, and consider asking for a portion upfront so you're protected if payment is delayed." },
+            { label: "Kill / cancellation clauses", body: "Check whether the brand can cancel, on what notice, and what happens to your fee if they do — especially after you've already delivered." },
+            { label: "Ownership vs. license", body: "Know whether you keep ownership of your content or hand it over, and what permissions the brand is getting." },
+            { label: "Scope and revisions", body: "Make sure the deliverables and the number of revisions are clearly defined, so you're not doing unlimited unpaid rework." },
+          ].map(({ label, body }) => (
+            <li key={label} className="flex flex-col gap-0.5">
+              <span className="text-xs font-semibold text-white">{label}</span>
+              <span className="text-xs text-muted-foreground leading-relaxed">{body}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

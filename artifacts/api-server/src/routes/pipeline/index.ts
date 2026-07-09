@@ -272,24 +272,32 @@ Contract text:
 ${contractText}
 ---
 
-Identify the terms in this contract that creators commonly pay close attention to. For each one:
-1. Name the issue and quote or point to the specific language in the contract where it appears.
-2. Explain in plain English what that term means and why creators generally pay attention to it.
+Look for and explain the following six issues when they appear in the pasted text. For each one that is present, flag it and explain what it means and why creators pay attention to it. If one of these issues is entirely absent from the contract, note that too — its absence can itself be relevant.
 
-Do not recommend actions. Do not suggest edits. Do not propose specific numbers, durations, or replacement language. Do not say what the creator should do. Only explain what the term is and why it matters.
+The six issues to check:
 
-If a term appears creator-favorable, note that it is favorable and explain why.
+1. Usage rights — How can the brand use the content, and for how long? Note whether usage is limited to the creator's own post or extends to the brand sharing it, boosting it, running ads with it, using it in other campaigns, or using the creator's name, image, or likeness. Note whether usage is time-limited or perpetual.
 
-Skip any sections with no notable terms.
+2. Exclusivity — Is the creator restricted from working with other brands? Note how broad the restriction is (entire category vs. narrow product type) and how long it lasts.
+
+3. Payment terms — What is the amount, when is it due (e.g., net-30), and is any portion paid upfront?
+
+4. Kill / cancellation clauses — Can the brand cancel the deal? On what notice? What happens to fees already owed or partially paid if they do?
+
+5. Ownership vs. license — Does the creator keep ownership of the content or transfer it? What license or permissions does the brand receive?
+
+6. Scope and revisions — What exactly must the creator deliver, and how many revisions can the brand request?
+
+Do not recommend actions. Do not suggest edits. Do not propose specific numbers, durations, or replacement language. Do not say what the creator should do. Only explain what the term is and why it matters. If a term appears creator-favorable, note that and explain why.
 
 Format each item as:
 [number]. [⚠️ or ✓] [Issue name]
-Relevant language: "[quote or description of the specific clause]"
+Relevant language: "[quote or description of the specific clause, or 'Not addressed in this contract' if absent]"
 What this means: [plain-English explanation of the term and why creators pay attention to it]
 
 End with exactly this sentence on its own line: "These are informational flags, not legal advice — review anything important with a licensed attorney."
 
-Write for a smart creator who is not a lawyer. Under 500 words total.`;
+Write for a smart creator who is not a lawyer. Under 600 words total.`;
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");

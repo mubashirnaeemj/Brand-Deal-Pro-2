@@ -263,32 +263,33 @@ router.post("/pipeline/contract-advice", async (req, res) => {
     ? "\nImportant: This is an agency-managed contract. Flag any broad usage rights, whitelisting provisions, or indemnification clauses with particular care — agency contracts tend to be more aggressive in these areas."
     : "";
 
-  const prompt = `You are a creator-side contract advisor reviewing a sponsorship or brand deal contract on behalf of an independent content creator.
-${brandName ? `Brand: ${brandName}` : ""}${agencyNote}
+  const prompt = `You are a contract educator reviewing a sponsorship or brand deal contract on behalf of an independent content creator. Your only job is to identify terms that commonly matter to creators and explain — in plain English — what each term means and why creators typically pay attention to it. You must not recommend any action, suggest edits, propose replacement language or numbers, tell the creator to accept or reject anything, or say anything like "you should," "push back," "reject," "change this to," or "negotiate for."
+
+${brandName ? `Brand: ${brandName}\n` : ""}${agencyNote}
 
 Contract text:
 ---
 ${contractText}
 ---
 
-Review this contract and identify the issues that matter most to an independent creator. Check specifically for:
-1. Usage rights — Scope too broad? No defined end date?
-2. Exclusivity — How broad is the category? Hard end date?
-3. Content ownership — Who owns the created content?
-4. Kill fee — Is there one? Trigger and amount?
-5. Payment terms — NET 30/60/90? Deposit?
-6. Whitelisting / paid amplification — Addressed and compensated?
-7. Revision rounds — Specified?
-8. Indemnification — Creator bearing excessive risk?
+Identify the terms in this contract that creators commonly pay close attention to. For each one:
+1. Name the issue and quote or point to the specific language in the contract where it appears.
+2. Explain in plain English what that term means and why creators generally pay attention to it.
 
-Format your response as a numbered list. For each issue:
-[number]. ⚠️ [Issue name]: [1–2 sentence explanation of the problem and what to push for]
+Do not recommend actions. Do not suggest edits. Do not propose specific numbers, durations, or replacement language. Do not say what the creator should do. Only explain what the term is and why it matters.
 
-If a clause looks creator-favorable, use ✓ instead of ⚠️.
-Skip sections with no obvious issues.
-End with exactly one line: "Bottom line: [one-sentence overall assessment and the single most important action to take]"
+If a term appears creator-favorable, note that it is favorable and explain why.
 
-Be direct and practical. Write for a smart creator who is not a lawyer. Under 400 words total.`;
+Skip any sections with no notable terms.
+
+Format each item as:
+[number]. [⚠️ or ✓] [Issue name]
+Relevant language: "[quote or description of the specific clause]"
+What this means: [plain-English explanation of the term and why creators pay attention to it]
+
+End with exactly this sentence on its own line: "These are informational flags, not legal advice — review anything important with a licensed attorney."
+
+Write for a smart creator who is not a lawyer. Under 500 words total.`;
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");

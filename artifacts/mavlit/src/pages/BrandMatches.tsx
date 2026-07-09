@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   CheckCircle2, SlidersHorizontal, Music, Headphones, Zap, Camera,
   ShoppingBag, Cpu, Copy, Check, Linkedin, ChevronDown, ChevronUp,
-  Clock, X, Building2, Users,
+  Clock, X, Building2, Users, Bookmark,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -421,7 +421,10 @@ function ContactPanel({ brand, onClose }: { brand: Brand; onClose: () => void })
 }
 
 /* ─── Brand Card ─────────────────────────────────────────── */
-function BrandCard({ brand, index, onOpen }: { brand: Brand; index: number; onOpen: () => void }) {
+function BrandCard({ brand, index, onOpen, saved, onToggleSave }: {
+  brand: Brand; index: number; onOpen: () => void;
+  saved: boolean; onToggleSave: (e: React.MouseEvent) => void;
+}) {
   const Icon = brand.icon;
   const [timingOpen, setTimingOpen] = useState(false);
   const [, setLocation] = useLocation();
@@ -457,7 +460,16 @@ function BrandCard({ brand, index, onOpen }: { brand: Brand; index: number; onOp
             <h3 className="text-white font-bold text-sm leading-snug" data-testid={`text-brandname-${brand.id}`}>
               {brand.name}
             </h3>
-            <ScoreRing score={brand.matchScore} breakdown={brand.scoreBreakdown} />
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={onToggleSave}
+                title={saved ? "Remove from shortlist" : "Save to shortlist"}
+                className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${saved ? "text-primary bg-primary/15" : "text-muted-foreground hover:text-white hover:bg-white/5"}`}
+              >
+                <Bookmark size={14} className={saved ? "fill-primary" : ""} />
+              </button>
+              <ScoreRing score={brand.matchScore} breakdown={brand.scoreBreakdown} />
+            </div>
           </div>
           <span
             className="inline-flex items-center mt-1 px-2 py-0.5 rounded-md text-xs font-semibold"
@@ -534,6 +546,22 @@ function BrandCard({ brand, index, onOpen }: { brand: Brand; index: number; onOp
 export default function BrandMatches() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
+  const [savedBrands, setSavedBrands] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem("mavlit_saved_brands");
+      return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch { return []; }
+  });
+
+  const toggleSave = (brandName: string) => {
+    setSavedBrands(prev => {
+      const next = prev.includes(brandName)
+        ? prev.filter(n => n !== brandName)
+        : [...prev, brandName];
+      localStorage.setItem("mavlit_saved_brands", JSON.stringify(next));
+      return next;
+    });
+  };
 
   const filtered =
     activeCategory === "All" ? BRANDS : BRANDS.filter((b) => b.category === activeCategory);
@@ -599,7 +627,9 @@ export default function BrandMatches() {
             {filtered.length > 0 ? (
               <motion.div key="grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filtered.map((brand, i) => (
-                  <BrandCard key={brand.id} brand={brand} index={i} onOpen={() => setSelectedBrand(brand)} />
+                  <BrandCard key={brand.id} brand={brand} index={i} onOpen={() => setSelectedBrand(brand)}
+                    saved={savedBrands.includes(brand.name)}
+                    onToggleSave={(e) => { e.stopPropagation(); toggleSave(brand.name); }} />
                 ))}
               </motion.div>
             ) : (

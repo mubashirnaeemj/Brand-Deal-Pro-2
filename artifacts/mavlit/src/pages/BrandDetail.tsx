@@ -4,7 +4,7 @@ import {
   ArrowLeft, Mail, Linkedin, Zap, DollarSign, Star, TrendingUp,
   Activity, CheckCircle2, Copy, ChevronRight, MessageSquare,
   Headphones, Music, Cpu, Camera, ShoppingBag, Building2, Users,
-  Clock, BarChart2, AlertTriangle, Info, Sparkles,
+  Clock, BarChart2, AlertTriangle, Info, Sparkles, Bookmark,
 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
 import Navbar from "@/components/Navbar";
@@ -499,6 +499,29 @@ export default function BrandDetail() {
   const params = useParams<{ slug: string }>();
   const brand = BRANDS[params.slug ?? ""];
 
+  const [saved, setSaved] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem("mavlit_saved_brands");
+      const list = raw ? (JSON.parse(raw) as string[]) : [];
+      return brand ? list.includes(brand.name) : false;
+    } catch { return false; }
+  });
+
+  const toggleSave = () => {
+    setSaved(prev => {
+      const next = !prev;
+      try {
+        const raw = localStorage.getItem("mavlit_saved_brands");
+        const list = raw ? (JSON.parse(raw) as string[]) : [];
+        const updated = next
+          ? [...list.filter(n => n !== brand.name), brand.name]
+          : list.filter(n => n !== brand.name);
+        localStorage.setItem("mavlit_saved_brands", JSON.stringify(updated));
+      } catch { /* ignore */ }
+      return next;
+    });
+  };
+
   const creatorFollowers = useMemo((): number | null => {
     try {
       const raw = localStorage.getItem("mavlit_creator_profile");
@@ -567,6 +590,14 @@ export default function BrandDetail() {
                       <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/30">
                         {brand.category}
                       </span>
+                      <button
+                        onClick={toggleSave}
+                        title={saved ? "Remove from shortlist" : "Save to shortlist"}
+                        className={`ml-1 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${saved ? "bg-primary/15 border-primary/40 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:text-white"}`}
+                      >
+                        <Bookmark size={12} className={saved ? "fill-primary" : ""} />
+                        {saved ? "Saved" : "Save"}
+                      </button>
                     </div>
                     <p className="text-muted-foreground text-sm mt-1.5 leading-relaxed">{brand.tagline}</p>
                     <div className="flex flex-wrap gap-2 mt-3">

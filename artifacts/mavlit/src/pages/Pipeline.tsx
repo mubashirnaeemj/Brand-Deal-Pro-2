@@ -768,16 +768,19 @@ function ContractAdvice({ contactType, dealContext }: { contactType?: "agency" |
         </div>
         <ul className="space-y-3.5">
           {[
-            { label: "Usage rights", body: "Know exactly how the brand can use your content and for how long. The more they can do with it — sharing, ads, other campaigns, your name and likeness — the more it's worth, so make sure the fee reflects the usage." },
-            { label: "Exclusivity", body: "Understand whether you're barred from working with other brands, and try to keep any exclusivity as narrow and short as possible." },
-            { label: "Payment", body: "Confirm how much, when you'll be paid, and consider asking for a portion upfront so you're protected if payment is delayed." },
-            { label: "Kill / cancellation clauses", body: "Check whether the brand can cancel, on what notice, and what happens to your fee if they do — especially after you've already delivered." },
-            { label: "Ownership vs. license", body: "Know whether you keep ownership of your content or hand it over, and what permissions the brand is getting." },
-            { label: "Scope and revisions", body: "Make sure the deliverables and the number of revisions are clearly defined, so you're not doing unlimited unpaid rework." },
+            { label: "Usage rights",            body: "How the brand can use your content and for how long. The more they can do with it — ads, other campaigns, your name and likeness — the more it should be worth. Make sure the fee reflects the usage." },
+            { label: "Exclusivity",             body: "Whether you're barred from working with other brands in the same space. Keep any exclusivity as narrow in scope and as short in duration as possible." },
+            { label: "Payment",                 body: "How much you'll be paid and when. Consider asking for a portion upfront so you're protected if payment is delayed or the deal falls through after you've delivered." },
+            { label: "Kill / cancellation clauses", body: "Whether the brand can cancel the deal, on what notice, and what happens to your fee if they do — especially after you've already started or finished the work." },
+            { label: "Ownership vs. license",   body: "Whether you keep ownership of your content or hand it over entirely, and what permissions the brand is receiving. These are meaningfully different things." },
+            { label: "Scope and revisions",     body: "What exactly you must deliver and how many rounds of revisions the brand can request. Undefined scope and unlimited revisions are the same thing." },
           ].map(({ label, body }) => (
-            <li key={label} className="flex flex-col gap-0.5">
-              <span className="text-xs font-semibold text-white">{label}</span>
-              <span className="text-xs text-muted-foreground leading-relaxed">{body}</span>
+            <li key={label} className="flex items-start gap-3">
+              <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-primary/50 shrink-0" />
+              <div>
+                <span className="text-xs font-semibold text-white">{label} — </span>
+                <span className="text-xs text-muted-foreground leading-relaxed">{body}</span>
+              </div>
             </li>
           ))}
         </ul>

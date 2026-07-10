@@ -274,8 +274,12 @@ router.post("/pipeline/contract-advice", async (req, res) => {
     dealUsage       && `Usage scope: ${dealUsage}`,
   ].filter(Boolean).join("\n");
 
+  const leadWithNote = (dealExclusivity || dealUsage)
+    ? `\nIMPORTANT — lead your analysis with ${[dealExclusivity && "exclusivity (issue #2)", dealUsage && "usage rights (issue #1)"].filter(Boolean).join(" and ")} because the creator's deal context already shows these terms are in play. Address those first before the remaining issues.`
+    : "";
+
   const dealContextNote = dealContextLines
-    ? `\nDeal context provided by the creator:\n${dealContextLines}\nWhen reviewing the contract, pay particular attention to how the contract terms align with or differ from this context — especially around usage, exclusivity scope, and deliverable definitions.`
+    ? `\nDeal context provided by the creator:\n${dealContextLines}${leadWithNote}\nWhen reviewing the contract, pay particular attention to how the contract terms align with or differ from this context — especially around usage, exclusivity scope, and deliverable definitions.`
     : "";
 
   const prompt = `You are a contract educator reviewing a sponsorship or brand deal contract on behalf of an independent content creator. Your only job is to identify terms that commonly matter to creators and explain — in plain English — what each term means and why creators typically pay attention to it. You must not recommend any action, suggest edits, propose replacement language or numbers, tell the creator to accept or reject anything, or say anything like "you should," "push back," "reject," "change this to," or "negotiate for."

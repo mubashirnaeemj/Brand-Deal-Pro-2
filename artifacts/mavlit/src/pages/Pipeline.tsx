@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Headphones, Music, Cpu, Camera, ShoppingBag, Zap,
@@ -502,6 +503,7 @@ function AccordionCard({ title, description, isOpen, onToggle, children }: {
 // ── Rate Intelligence ──────────────────────────────────────────────────────────
 
 function RateEstimator({ dealContext }: { dealContext: DealContext }) {
+  const [, setLocation] = useLocation();
   const { platform, deliverable, exclusivity, usage } = dealContext;
   const hasContext = !!(platform && deliverable);
 
@@ -590,8 +592,8 @@ function RateEstimator({ dealContext }: { dealContext: DealContext }) {
               )}
             </div>
 
-            {/* Your rate row — shown when creator entered a rate for this deliverable */}
-            {hasRate && (
+            {/* Your rate row — or prompt to add rates */}
+            {hasRate ? (
               <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-primary/8 border border-primary/20">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/70 mb-0.5">Your typical rate</p>
@@ -613,6 +615,24 @@ function RateEstimator({ dealContext }: { dealContext: DealContext }) {
                   }
                 </div>
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setLocation("/profile");
+                  setTimeout(() => {
+                    document.getElementById("typical-rates")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }, 120);
+                }}
+                className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-primary/10 border border-primary/25 hover:bg-primary/15 hover:border-primary/40 transition-all text-left group"
+              >
+                <div>
+                  <p className="text-xs font-semibold text-primary group-hover:text-primary/90 transition-colors">
+                    Add your typical rates in Profile →
+                  </p>
+                  <p className="text-[11px] text-primary/50 mt-0.5">See your own rate next to these ranges.</p>
+                </div>
+              </button>
             )}
 
             {/* Range cards */}

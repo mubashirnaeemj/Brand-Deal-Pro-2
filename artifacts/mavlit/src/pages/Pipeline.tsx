@@ -59,37 +59,79 @@ const DELIVERABLES_BY_PLATFORM: Record<string, string[]> = {
   "YouTube":   ["YouTube integration"],
 };
 
-// Maps a deal context deliverable → the nearest Rate Intelligence platform+format
-const RATE_CONTEXT_MAP: Record<string, { platform: RatePlatform; format: string } | null> = {
-  "Reel":                { platform: "Instagram", format: "Reel" },
-  "Story":               { platform: "Instagram", format: "Story set" },
-  "TikTok video":        { platform: "TikTok",   format: "TikTok video" },
-  "YouTube integration": { platform: "YouTube",  format: "Integration / mention" },
-  "Static post":         null,
-};
-
 const EMPTY_DEAL_CONTEXT: DealContext = {
   platform: "", deliverable: "", exclusivity: "", exclusivityMonths: "", usage: "",
 };
 
-// ── Rate data ──────────────────────────────────────────────────────────────────
+// ── Benchmark data (sample ranges — replace with real data) ────────────────────
 
-const RATE_PLATFORMS = ["YouTube", "Instagram", "TikTok"] as const;
-type RatePlatform = typeof RATE_PLATFORMS[number];
+type FollowerTier = "nano" | "micro" | "mid" | "macro";
 
-const RATE_FORMATS: Record<RatePlatform, string[]> = {
-  YouTube:   ["Dedicated video", "Integration / mention"],
-  Instagram: ["Reel", "Story set"],
-  TikTok:    ["Short-form video"],
+interface BenchmarkRange { low: string; median: string; high: string; sampleNote: string; }
+
+// Keys: `${platform}|${deliverable}|${tier}` — SAMPLE RANGES, clearly labeled
+const BENCHMARK_DATA: Record<string, BenchmarkRange> = {
+  // Instagram × Reel
+  "Instagram|Reel|nano":  { low: "$150",   median: "$300",   high: "$600",    sampleNote: "~40 reported deals" },
+  "Instagram|Reel|micro": { low: "$400",   median: "$750",   high: "$1,500",  sampleNote: "~90 reported deals" },
+  "Instagram|Reel|mid":   { low: "$1,200", median: "$2,500", high: "$5,000",  sampleNote: "~55 reported deals" },
+  "Instagram|Reel|macro": { low: "$4,000", median: "$8,000", high: "$15,000", sampleNote: "~25 reported deals" },
+  // Instagram × Story
+  "Instagram|Story|nano":  { low: "$75",    median: "$140",   high: "$250",   sampleNote: "~35 reported deals" },
+  "Instagram|Story|micro": { low: "$175",   median: "$325",   high: "$600",   sampleNote: "~70 reported deals" },
+  "Instagram|Story|mid":   { low: "$500",   median: "$950",   high: "$2,000", sampleNote: "~45 reported deals" },
+  "Instagram|Story|macro": { low: "$1,500", median: "$3,000", high: "$6,000", sampleNote: "~18 reported deals" },
+  // Instagram × Static post
+  "Instagram|Static post|nano":  { low: "$100",   median: "$190",   high: "$350",   sampleNote: "~30 reported deals" },
+  "Instagram|Static post|micro": { low: "$250",   median: "$480",   high: "$850",   sampleNote: "~55 reported deals" },
+  "Instagram|Static post|mid":   { low: "$750",   median: "$1,500", high: "$2,800", sampleNote: "~35 reported deals" },
+  "Instagram|Static post|macro": { low: "$2,500", median: "$5,000", high: "$9,000", sampleNote: "~14 reported deals" },
+  // TikTok × TikTok video
+  "TikTok|TikTok video|nano":  { low: "$100",   median: "$200",   high: "$400",    sampleNote: "~50 reported deals" },
+  "TikTok|TikTok video|micro": { low: "$300",   median: "$600",   high: "$1,200",  sampleNote: "~110 reported deals" },
+  "TikTok|TikTok video|mid":   { low: "$900",   median: "$1,800", high: "$3,500",  sampleNote: "~65 reported deals" },
+  "TikTok|TikTok video|macro": { low: "$3,000", median: "$6,500", high: "$12,000", sampleNote: "~22 reported deals" },
+  // YouTube × YouTube integration
+  "YouTube|YouTube integration|nano":  { low: "$200",   median: "$450",   high: "$800",    sampleNote: "~22 reported deals" },
+  "YouTube|YouTube integration|micro": { low: "$700",   median: "$1,500", high: "$3,000",  sampleNote: "~65 reported deals" },
+  "YouTube|YouTube integration|mid":   { low: "$2,000", median: "$4,500", high: "$9,000",  sampleNote: "~48 reported deals" },
+  "YouTube|YouTube integration|macro": { low: "$7,000", median: "$14,000","high": "$25,000",sampleNote: "~18 reported deals" },
 };
 
-const RATE_DATA: Record<string, { range: string; median: string; topQ: string; count: number }> = {
-  "YouTube|Dedicated video":       { range: "$1,200–$6,000", median: "$2,500", topQ: "$4,500", count: 18 },
-  "YouTube|Integration / mention": { range: "$600–$3,500",   median: "$1,400", topQ: "$2,800", count: 29 },
-  "Instagram|Reel":                { range: "$350–$1,500",   median: "$680",   topQ: "$1,200", count: 47 },
-  "Instagram|Story set":           { range: "$150–$600",     median: "$280",   topQ: "$500",   count: 63 },
-  "TikTok|Short-form video":       { range: "$300–$1,200",   median: "$550",   topQ: "$1,000", count: 41 },
+const TIER_CONFIG: Record<FollowerTier, { label: string; range: string }> = {
+  nano:  { label: "Nano",     range: "under 25k" },
+  micro: { label: "Micro",    range: "25k–100k" },
+  mid:   { label: "Mid-tier", range: "100k–500k" },
+  macro: { label: "Macro",    range: "500k+" },
 };
+
+const TIERS: FollowerTier[] = ["nano", "micro", "mid", "macro"];
+
+function getFollowerTier(n: number): FollowerTier {
+  if (n < 25_000)  return "nano";
+  if (n < 100_000) return "micro";
+  if (n < 500_000) return "mid";
+  return "macro";
+}
+
+function readCreatorFollowers(platform: string): number | null {
+  try {
+    const raw = localStorage.getItem("mavlit_creator_profile");
+    if (!raw) return null;
+    const profile = JSON.parse(raw) as { stats?: Record<string, { followers?: string }> };
+    const stats = profile.stats ?? {};
+    // Try matching platform first, then take max across all
+    const platformKey = Object.keys(stats).find(k => k.toLowerCase() === platform.toLowerCase());
+    if (platformKey && stats[platformKey]?.followers) {
+      const n = parseInt(stats[platformKey].followers!.replace(/[^0-9]/g, ""), 10);
+      if (!isNaN(n) && n > 0) return n;
+    }
+    const counts = Object.values(stats)
+      .map(s => parseInt((s.followers ?? "").replace(/[^0-9]/g, ""), 10))
+      .filter(n => !isNaN(n) && n > 0);
+    return counts.length > 0 ? Math.max(...counts) : null;
+  } catch { return null; }
+}
 
 // ── Creator profile (demo) ─────────────────────────────────────────────────────
 
@@ -449,29 +491,28 @@ function AccordionCard({ title, description, isOpen, onToggle, children }: {
 // ── Rate Intelligence ──────────────────────────────────────────────────────────
 
 function RateEstimator({ dealContext }: { dealContext: DealContext }) {
-  const [platform, setPlatform] = useState<RatePlatform | "">("");
-  const [format, setFormat]     = useState("");
+  const { platform, deliverable, exclusivity, usage } = dealContext;
+  const hasContext = !!(platform && deliverable);
 
-  // Sync from shared deal context whenever it changes
-  useEffect(() => {
-    const ctxPlatform = dealContext.platform as RatePlatform | "";
-    const mapped = dealContext.deliverable ? RATE_CONTEXT_MAP[dealContext.deliverable] : null;
-    if (ctxPlatform) {
-      setPlatform(ctxPlatform);
-      if (mapped && mapped.platform === ctxPlatform) setFormat(mapped.format);
-      else setFormat("");
-    } else if (mapped) {
-      setPlatform(mapped.platform);
-      setFormat(mapped.format);
-    }
-  }, [dealContext.platform, dealContext.deliverable]);
+  const followerCount   = hasContext ? readCreatorFollowers(platform) : null;
+  const followerTier    = followerCount !== null ? getFollowerTier(followerCount) : null;
+  const benchmarkKey    = hasContext && followerTier ? `${platform}|${deliverable}|${followerTier}` : null;
+  const benchmark       = benchmarkKey ? BENCHMARK_DATA[benchmarkKey] ?? null : null;
 
-  const formats = platform ? RATE_FORMATS[platform as RatePlatform] : [];
-  const rateKey = platform && format ? `${platform}|${format}` : "";
-  const rate    = rateKey ? RATE_DATA[rateKey] : null;
+  // Dynamic "what moves this range" callouts
+  const modifierNotes: string[] = [];
+  if (exclusivity === "Narrow")
+    modifierNotes.push("Narrow exclusivity typically pushes deals toward the upper portion of the range.");
+  if (exclusivity === "Broad")
+    modifierNotes.push("Broad category exclusivity often sits noticeably higher in the range — sometimes above it.");
+  if (usage === "Includes paid usage or whitelisting")
+    modifierNotes.push("Paid usage or whitelisting rights commonly add a meaningful premium on top of the base range.");
+  if (!exclusivity && !usage)
+    modifierNotes.push("With no exclusivity and organic-only usage, deals typically sit in the lower to middle of the range.");
 
   return (
     <div className="space-y-4">
+      {/* Disclaimer */}
       <div className="px-4 py-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
         <div className="flex items-start gap-2.5">
           <AlertTriangle size={13} className="text-amber-400 mt-0.5 shrink-0" />
@@ -481,46 +522,109 @@ function RateEstimator({ dealContext }: { dealContext: DealContext }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <p className="text-xs font-semibold text-white/70 mb-1.5">Platform</p>
-          <div className="relative">
-            <select value={platform} onChange={e => { setPlatform(e.target.value as RatePlatform); setFormat(""); }}
-              className="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-border text-sm appearance-none focus:outline-none focus:border-primary/60 transition-all pr-8 text-white">
-              <option value="" disabled className="text-muted-foreground">Select…</option>
-              {RATE_PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          </div>
+      {/* Empty state */}
+      {!hasContext && (
+        <div className="px-4 py-5 rounded-xl bg-secondary/40 border border-border text-center">
+          <p className="text-xs text-muted-foreground">Set a <span className="text-white font-medium">Platform</span> and <span className="text-white font-medium">Deliverable type</span> in the Deal context above to see benchmark ranges.</p>
         </div>
-        <div>
-          <p className="text-xs font-semibold text-white/70 mb-1.5">Content type</p>
-          <div className="relative">
-            <select value={format} onChange={e => setFormat(e.target.value)} disabled={!platform}
-              className="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-border text-sm appearance-none focus:outline-none focus:border-primary/60 transition-all pr-8 text-white disabled:opacity-40">
-              <option value="" disabled className="text-muted-foreground">Select…</option>
-              {formats.map(f => <option key={f} value={f}>{f}</option>)}
-            </select>
-            <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          </div>
-        </div>
-      </div>
+      )}
 
-      <AnimatePresence>
-        {rate && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              {[{ label: "Observed range", val: rate.range }, { label: "Median", val: rate.median }, { label: "Top quartile", val: rate.topQ }].map(c => (
-                <div key={c.label} className="bg-secondary/60 border border-border rounded-xl p-3 text-center">
-                  <p className="text-xs text-muted-foreground mb-1 leading-tight">{c.label}</p>
-                  <p className="text-sm font-extrabold text-white">{c.val}</p>
-                </div>
-              ))}
+      {/* Benchmark */}
+      {hasContext && (
+        <AnimatePresence mode="wait">
+          <motion.div key={benchmarkKey ?? "no-data"} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
+
+            {/* Context bar */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-primary/15 text-primary border border-primary/30">{platform}</span>
+              <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-secondary text-muted-foreground border border-border">{deliverable}</span>
+              {followerTier && (
+                <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-secondary text-muted-foreground border border-border">
+                  {TIER_CONFIG[followerTier].label} · {TIER_CONFIG[followerTier].range}
+                  {followerCount !== null && <span className="text-white/50"> ({(followerCount / 1000).toFixed(0)}k from profile)</span>}
+                </span>
+              )}
+              {!followerTier && (
+                <span className="text-xs text-muted-foreground italic">Add your follower count in Profile settings to personalise this</span>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground text-center">Based on {rate.count} reported deals · MAVLIT Rate Index</p>
+
+            {/* Range cards */}
+            {benchmark ? (
+              <>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: "Low end",   val: benchmark.low,    dim: true  },
+                    { label: "Median",    val: benchmark.median, dim: false },
+                    { label: "High end",  val: benchmark.high,   dim: true  },
+                  ].map(c => (
+                    <div key={c.label} className={`rounded-xl p-3 text-center border ${c.dim ? "bg-secondary/40 border-border" : "bg-primary/10 border-primary/30"}`}>
+                      <p className="text-xs text-muted-foreground mb-1 leading-tight">{c.label}</p>
+                      <p className={`text-sm font-extrabold ${c.dim ? "text-white/80" : "text-white"}`}>{c.val}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  {benchmark.sampleNote} · MAVLIT Rate Index · <span className="text-amber-400/80">sample data</span>
+                </p>
+              </>
+            ) : (
+              /* No data for this combo yet */
+              <div className="px-4 py-4 rounded-xl bg-secondary/40 border border-border text-center">
+                <p className="text-xs text-muted-foreground">No benchmark data yet for this combination. The developer can add it to the rate table.</p>
+              </div>
+            )}
+
+            {/* What moves this range */}
+            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+              <p className="text-xs font-bold text-white uppercase tracking-wider">What moves this range</p>
+              <ul className="space-y-2">
+                {modifierNotes.map((note, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                    <span className="text-xs text-white/80 leading-relaxed">{note}</span>
+                  </li>
+                ))}
+                {[
+                  "Audience quality matters more than follower count alone — strong engagement and niche specificity both lift rates.",
+                  "In-house brand teams and agency-managed deals often have different budget structures and approval timelines.",
+                  "Being approached rather than cold-pitching typically gives you a stronger negotiating position.",
+                ].map((note, i) => (
+                  <li key={`static-${i}`} className="flex items-start gap-2">
+                    <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-white/20 shrink-0" />
+                    <span className="text-xs text-muted-foreground leading-relaxed">{note}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Tier reference */}
+            {followerTier && (
+              <details className="group">
+                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-white transition-colors select-none list-none flex items-center gap-1">
+                  <ChevronDown size={11} className="group-open:rotate-180 transition-transform" />
+                  See all tiers for {platform} × {deliverable}
+                </summary>
+                <div className="mt-2 grid grid-cols-2 gap-1.5">
+                  {TIERS.map(t => {
+                    const d = BENCHMARK_DATA[`${platform}|${deliverable}|${t}`];
+                    const isActive = t === followerTier;
+                    return (
+                      <div key={t} className={`rounded-lg px-3 py-2 border text-xs ${isActive ? "bg-primary/10 border-primary/30" : "bg-secondary/40 border-border"}`}>
+                        <p className={`font-semibold mb-0.5 ${isActive ? "text-primary" : "text-white/60"}`}>
+                          {TIER_CONFIG[t].label} <span className="font-normal">({TIER_CONFIG[t].range})</span>
+                        </p>
+                        {d ? <p className="text-white/70">{d.low} – {d.high}</p> : <p className="text-muted-foreground italic">No data</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
+
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>
+      )}
     </div>
   );
 }

@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Newspaper,
   BarChart3,
+  DollarSign,
 } from "lucide-react";
 import { SiTiktok, SiFacebook } from "react-icons/si";
 import Navbar from "@/components/Navbar";
@@ -43,6 +44,8 @@ const PLATFORMS = [
 
 type PlatformStat = { followers: string; engagement: string; watchTime: string; avgViews: string };
 
+type RateEntry = { amount: string; includesExclusivity: boolean; includesPaidUsage: boolean; };
+
 type ProfileForm = {
   name: string;
   handle: string;
@@ -51,7 +54,16 @@ type ProfileForm = {
   location: string;
   links: Record<string, string>;
   stats: Record<string, PlatformStat>;
+  rates: Record<string, RateEntry>;
 };
+
+const RATE_DELIVERABLES: { platform: string; Icon: React.ElementType; color: string; deliverables: string[] }[] = [
+  { platform: "Instagram", Icon: Instagram,  color: "#e1306c", deliverables: ["Reel", "Story", "Static post"] },
+  { platform: "TikTok",    Icon: SiTiktok,   color: "#ffffff", deliverables: ["TikTok video"] },
+  { platform: "YouTube",   Icon: Youtube,    color: "#ff0000", deliverables: ["YouTube integration"] },
+];
+
+const EMPTY_RATE: RateEntry = { amount: "", includesExclusivity: false, includesPaidUsage: false };
 
 const STAT_PLATFORMS = [
   { key: "instagram", label: "Instagram", Icon: Instagram,   color: "#e1306c", subscribersOnly: false },
@@ -77,6 +89,7 @@ const DEFAULT: ProfileForm = {
     facebook:  { ...DEMO_STAT },
     substack:  { followers: "12,000", engagement: "", watchTime: "", avgViews: "" },
   },
+  rates: {},
 };
 
 function Field({
@@ -122,6 +135,12 @@ export default function ProfileSettings() {
 
   const setStat = (key: string, field: keyof PlatformStat, value: string) =>
     setForm((f) => ({ ...f, stats: { ...f.stats, [key]: { ...f.stats[key], [field]: value } } }));
+
+  const setRate = (key: string, field: keyof RateEntry, value: string | boolean) =>
+    setForm((f) => ({
+      ...f,
+      rates: { ...f.rates, [key]: { ...EMPTY_RATE, ...f.rates[key], [field]: value } },
+    }));
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -368,6 +387,84 @@ export default function ProfileSettings() {
                         </div>
                       )}
                       {idx < STAT_PLATFORMS.length - 1 && <div className="mt-5 h-px bg-border/50" />}
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+
+              {/* Typical Rates */}
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.26 }}
+                className="bg-card border border-border rounded-2xl p-6"
+              >
+                <div className="flex items-start justify-between gap-3 mb-1">
+                  <div className="flex items-center gap-2">
+                    <DollarSign size={14} className="text-primary" />
+                    <h2 className="text-sm font-bold text-white">Typical Rates</h2>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-md text-xs font-semibold border border-border text-muted-foreground">Optional</span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-5 leading-relaxed">
+                  Adding your typical rates personalizes your Rate Intelligence. Enter just the number — the toggles below each rate are optional.
+                </p>
+
+                <div className="flex flex-col gap-6">
+                  {RATE_DELIVERABLES.map(({ platform, Icon, color, deliverables }, pIdx) => (
+                    <div key={platform}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${color}18` }}>
+                          <Icon size={14} style={{ color }} />
+                        </div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-white/70">{platform}</p>
+                      </div>
+
+                      <div className="flex flex-col gap-4">
+                        {deliverables.map((deliverable, dIdx) => {
+                          const rateKey = `${platform}|${deliverable}`;
+                          const entry: RateEntry = { ...EMPTY_RATE, ...form.rates?.[rateKey] };
+                          return (
+                            <div key={deliverable}>
+                              <div className="flex items-start gap-3">
+                                <p className="text-xs font-medium text-white/70 w-32 pt-2.5 shrink-0">{deliverable}</p>
+                                <div className="flex-1 space-y-2">
+                                  <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">$</span>
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      value={entry.amount}
+                                      onChange={e => setRate(rateKey, "amount", e.target.value)}
+                                      placeholder="e.g. 1,200"
+                                      className={`${inputCls} pl-7`}
+                                    />
+                                  </div>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setRate(rateKey, "includesExclusivity", !entry.includesExclusivity)}
+                                      className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${entry.includesExclusivity ? "bg-primary/15 border-primary/40 text-primary" : "border-border/50 text-muted-foreground/50 hover:border-border hover:text-muted-foreground"}`}
+                                    >
+                                      {entry.includesExclusivity ? "✓ " : ""}Includes exclusivity
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setRate(rateKey, "includesPaidUsage", !entry.includesPaidUsage)}
+                                      className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${entry.includesPaidUsage ? "bg-primary/15 border-primary/40 text-primary" : "border-border/50 text-muted-foreground/50 hover:border-border hover:text-muted-foreground"}`}
+                                    >
+                                      {entry.includesPaidUsage ? "✓ " : ""}Includes paid usage rights
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                              {dIdx < deliverables.length - 1 && <div className="mt-4 h-px bg-border/30" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {pIdx < RATE_DELIVERABLES.length - 1 && <div className="mt-5 h-px bg-border/50" />}
                     </div>
                   ))}
                 </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Headphones, Music, Cpu, Camera, ShoppingBag, Zap,
@@ -15,6 +15,14 @@ interface PitchRecord {
   date: string;
   status: "waiting" | "conversation" | "closed";
   agreedRate?: string;
+}
+
+interface DealContext {
+  platform: "" | "Instagram" | "TikTok" | "YouTube";
+  deliverable: string;
+  exclusivity: "" | "None" | "Narrow" | "Broad";
+  exclusivityMonths: string;
+  usage: "" | "Organic only" | "Includes paid usage or whitelisting";
 }
 
 // ── Brand database ─────────────────────────────────────────────────────────────
@@ -38,6 +46,30 @@ const ACTIVITY_CONTEXT: Record<string, string> = {
   "Native Instruments":  "Last activity 11 days ago",
   "Red Bull":            "Last activity today",
   "GoPro":              "Pitched today",
+};
+
+// ── Deal context data ──────────────────────────────────────────────────────────
+
+const DEAL_PLATFORMS = ["Instagram", "TikTok", "YouTube"] as const;
+
+const DELIVERABLES_BY_PLATFORM: Record<string, string[]> = {
+  "":          ["Reel", "TikTok video", "Story", "YouTube integration", "Static post"],
+  "Instagram": ["Reel", "Story", "Static post"],
+  "TikTok":    ["TikTok video"],
+  "YouTube":   ["YouTube integration"],
+};
+
+// Maps a deal context deliverable → the nearest Rate Intelligence platform+format
+const RATE_CONTEXT_MAP: Record<string, { platform: RatePlatform; format: string } | null> = {
+  "Reel":                { platform: "Instagram", format: "Reel" },
+  "Story":               { platform: "Instagram", format: "Story set" },
+  "TikTok video":        { platform: "TikTok",   format: "TikTok video" },
+  "YouTube integration": { platform: "YouTube",  format: "Integration / mention" },
+  "Static post":         null,
+};
+
+const EMPTY_DEAL_CONTEXT: DealContext = {
+  platform: "", deliverable: "", exclusivity: "", exclusivityMonths: "", usage: "",
 };
 
 // ── Rate data ──────────────────────────────────────────────────────────────────
@@ -416,9 +448,23 @@ function AccordionCard({ title, description, isOpen, onToggle, children }: {
 
 // ── Rate Intelligence ──────────────────────────────────────────────────────────
 
-function RateEstimator() {
+function RateEstimator({ dealContext }: { dealContext: DealContext }) {
   const [platform, setPlatform] = useState<RatePlatform | "">("");
   const [format, setFormat]     = useState("");
+
+  // Sync from shared deal context whenever it changes
+  useEffect(() => {
+    const ctxPlatform = dealContext.platform as RatePlatform | "";
+    const mapped = dealContext.deliverable ? RATE_CONTEXT_MAP[dealContext.deliverable] : null;
+    if (ctxPlatform) {
+      setPlatform(ctxPlatform);
+      if (mapped && mapped.platform === ctxPlatform) setFormat(mapped.format);
+      else setFormat("");
+    } else if (mapped) {
+      setPlatform(mapped.platform);
+      setFormat(mapped.format);
+    }
+  }, [dealContext.platform, dealContext.deliverable]);
 
   const formats = platform ? RATE_FORMATS[platform as RatePlatform] : [];
   const rateKey = platform && format ? `${platform}|${format}` : "";
@@ -481,7 +527,7 @@ function RateEstimator() {
 
 // ── Contract Advice ────────────────────────────────────────────────────────────
 
-function ContractAdvice({ contactType }: { contactType?: "agency" | "in-house" }) {
+function ContractAdvice({ contactType, dealContext }: { contactType?: "agency" | "in-house"; dealContext: DealContext }) {
   const [text, setText]      = useState("");
   const [generating, setGen] = useState(false);
   const [output, setOutput]  = useState<string | null>(null);
@@ -492,7 +538,16 @@ function ContractAdvice({ contactType }: { contactType?: "agency" | "in-house" }
     setGen(true); setOutput(null); setError(null);
     try {
       let full = "";
-      await readStream("/api/pipeline/contract-advice", { contractText: text, contactType }, chunk => { full += chunk; setOutput(full); });
+      await readStream("/api/pipeline/contract-advice", {
+        contractText: text,
+        contactType,
+        dealPlatform:    dealContext.platform    || undefined,
+        dealDeliverable: dealContext.deliverable || undefined,
+        dealExclusivity: dealContext.exclusivity
+          ? dealContext.exclusivity + (dealContext.exclusivityMonths ? ` (${dealContext.exclusivityMonths} months)` : "")
+          : undefined,
+        dealUsage: dealContext.usage || undefined,
+      }, chunk => { full += chunk; setOutput(full); });
     } catch { setError("Something went wrong. Please try again."); }
     finally { setGen(false); }
   };
@@ -589,6 +644,95 @@ function MediaKit({ brandName, brandCategory }: { brandName?: string; brandCateg
   );
 }
 
+// ── Deal Context Panel ─────────────────────────────────────────────────────────
+
+function PillGroup<T extends string>({
+  options, value, onChange, label,
+}: { options: readonly T[] | T[]; value: T | ""; onChange: (v: T | "") => void; label: string }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-white/60 mb-2">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map(opt => (
+          <button key={opt} onClick={() => onChange(value === opt ? "" : opt)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${value === opt ? "bg-primary/15 border-primary/40 text-primary" : "border-border text-muted-foreground hover:border-white/30 hover:text-white"}`}>
+            {opt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DealContextPanel({ value, onChange }: { value: DealContext; onChange: (ctx: DealContext) => void }) {
+  const set = <K extends keyof DealContext>(key: K, val: DealContext[K]) => {
+    const next = { ...value, [key]: val };
+    if (key === "platform") {
+      const allowed = DELIVERABLES_BY_PLATFORM[val as string] ?? [];
+      if (next.deliverable && !allowed.includes(next.deliverable)) next.deliverable = "";
+    }
+    onChange(next);
+  };
+
+  const deliverableOptions = DELIVERABLES_BY_PLATFORM[value.platform] ?? DELIVERABLES_BY_PLATFORM[""];
+  const showMonths = value.exclusivity === "Narrow" || value.exclusivity === "Broad";
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+      <div>
+        <p className="text-xs font-bold text-white uppercase tracking-wider">Deal context</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Used by Rate Intelligence and Contract Advice below — all optional.</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <PillGroup
+          label="Platform"
+          options={DEAL_PLATFORMS}
+          value={value.platform}
+          onChange={v => set("platform", v as DealContext["platform"])}
+        />
+        <PillGroup
+          label="Deliverable type"
+          options={deliverableOptions}
+          value={value.deliverable as DealContext["deliverable"]}
+          onChange={v => set("deliverable", v)}
+        />
+        <div>
+          <p className="text-xs font-semibold text-white/60 mb-2">Exclusivity</p>
+          <div className="flex flex-wrap gap-1.5">
+            {(["None", "Narrow", "Broad"] as const).map(opt => (
+              <button key={opt} onClick={() => set("exclusivity", value.exclusivity === opt ? "" : opt)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${value.exclusivity === opt ? "bg-primary/15 border-primary/40 text-primary" : "border-border text-muted-foreground hover:border-white/30 hover:text-white"}`}>
+                {opt === "Narrow" ? "Narrow — specific product" : opt === "Broad" ? "Broad — whole category" : opt}
+              </button>
+            ))}
+          </div>
+          <AnimatePresence>
+            {showMonths && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="number" min={1} max={36} placeholder="Duration (months)"
+                    value={value.exclusivityMonths}
+                    onChange={e => set("exclusivityMonths", e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-black/40 border border-border text-white text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 transition-all"
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+        <PillGroup
+          label="Usage"
+          options={["Organic only", "Includes paid usage or whitelisting"]}
+          value={value.usage}
+          onChange={v => set("usage", v as DealContext["usage"])}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── Deal Maker Tab ─────────────────────────────────────────────────────────────
 
 function DealMakerTab({
@@ -598,8 +742,9 @@ function DealMakerTab({
   selectedBrand: string;
   onSelectBrand: (b: string) => void;
 }) {
-  const [custom, setCustom]     = useState("");
-  const [openCard, setOpenCard] = useState<string | null>(null);
+  const [custom, setCustom]         = useState("");
+  const [openCard, setOpenCard]     = useState<string | null>(null);
+  const [dealContext, setDealContext] = useState<DealContext>(EMPTY_DEAL_CONTEXT);
 
   const toggle = (id: string) => setOpenCard(prev => prev === id ? null : id);
 
@@ -665,6 +810,9 @@ function DealMakerTab({
         </AnimatePresence>
       </div>
 
+      {/* Deal context */}
+      <DealContextPanel value={dealContext} onChange={setDealContext} />
+
       {/* Tool cards */}
       <AccordionCard
         title="Rate Intelligence"
@@ -672,7 +820,7 @@ function DealMakerTab({
         isOpen={openCard === "rate"}
         onToggle={() => toggle("rate")}
       >
-        <RateEstimator />
+        <RateEstimator dealContext={dealContext} />
       </AccordionCard>
 
       <AccordionCard
@@ -681,7 +829,7 @@ function DealMakerTab({
         isOpen={openCard === "contract"}
         onToggle={() => toggle("contract")}
       >
-        <ContractAdvice contactType={brandInfo?.type} />
+        <ContractAdvice contactType={brandInfo?.type} dealContext={dealContext} />
       </AccordionCard>
 
       <AccordionCard

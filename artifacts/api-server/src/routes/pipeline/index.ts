@@ -248,24 +248,39 @@ Output only the media kit content. No preamble, no explanation, no title line th
 // ── Contract advice ───────────────────────────────────────────────────────────
 
 const ContractAdviceSchema = z.object({
-  contractText: z.string().min(1).max(12000),
-  contactType:  z.enum(["agency", "in-house"]).optional(),
-  brandName:    z.string().max(MAX).optional(),
+  contractText:    z.string().min(1).max(12000),
+  contactType:     z.enum(["agency", "in-house"]).optional(),
+  brandName:       z.string().max(MAX).optional(),
+  dealPlatform:    z.string().max(MAX).optional(),
+  dealDeliverable: z.string().max(MAX).optional(),
+  dealExclusivity: z.string().max(MAX).optional(),
+  dealUsage:       z.string().max(MAX).optional(),
 });
 
 router.post("/pipeline/contract-advice", async (req, res) => {
   const parsed = ContractAdviceSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
-  const { contractText, contactType, brandName } = parsed.data;
+  const { contractText, contactType, brandName, dealPlatform, dealDeliverable, dealExclusivity, dealUsage } = parsed.data;
 
   const agencyNote = contactType === "agency"
     ? "\nImportant: This is an agency-managed contract. Flag any broad usage rights, whitelisting provisions, or indemnification clauses with particular care — agency contracts tend to be more aggressive in these areas."
     : "";
 
+  const dealContextLines = [
+    dealPlatform    && `Platform: ${dealPlatform}`,
+    dealDeliverable && `Deliverable: ${dealDeliverable}`,
+    dealExclusivity && `Exclusivity agreed: ${dealExclusivity}`,
+    dealUsage       && `Usage scope: ${dealUsage}`,
+  ].filter(Boolean).join("\n");
+
+  const dealContextNote = dealContextLines
+    ? `\nDeal context provided by the creator:\n${dealContextLines}\nWhen reviewing the contract, pay particular attention to how the contract terms align with or differ from this context — especially around usage, exclusivity scope, and deliverable definitions.`
+    : "";
+
   const prompt = `You are a contract educator reviewing a sponsorship or brand deal contract on behalf of an independent content creator. Your only job is to identify terms that commonly matter to creators and explain — in plain English — what each term means and why creators typically pay attention to it. You must not recommend any action, suggest edits, propose replacement language or numbers, tell the creator to accept or reject anything, or say anything like "you should," "push back," "reject," "change this to," or "negotiate for."
 
-${brandName ? `Brand: ${brandName}\n` : ""}${agencyNote}
+${brandName ? `Brand: ${brandName}\n` : ""}${agencyNote}${dealContextNote}
 
 Contract text:
 ---

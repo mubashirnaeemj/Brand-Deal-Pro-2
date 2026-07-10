@@ -133,6 +133,17 @@ function readCreatorFollowers(platform: string): number | null {
   } catch { return null; }
 }
 
+function readCreatorRate(platform: string, deliverable: string): { amount: string; includesExclusivity: boolean; includesPaidUsage: boolean } | null {
+  try {
+    const raw = localStorage.getItem("mavlit_creator_profile");
+    if (!raw) return null;
+    const profile = JSON.parse(raw) as { rates?: Record<string, { amount?: string; includesExclusivity?: boolean; includesPaidUsage?: boolean }> };
+    const entry = profile.rates?.[`${platform}|${deliverable}`];
+    if (!entry?.amount?.trim()) return null;
+    return { amount: entry.amount.trim(), includesExclusivity: !!entry.includesExclusivity, includesPaidUsage: !!entry.includesPaidUsage };
+  } catch { return null; }
+}
+
 // ── Creator profile (demo) ─────────────────────────────────────────────────────
 
 const CREATOR_PROFILE = {
@@ -494,21 +505,51 @@ function RateEstimator({ dealContext }: { dealContext: DealContext }) {
   const { platform, deliverable, exclusivity, usage } = dealContext;
   const hasContext = !!(platform && deliverable);
 
-  const followerCount   = hasContext ? readCreatorFollowers(platform) : null;
-  const followerTier    = followerCount !== null ? getFollowerTier(followerCount) : null;
-  const benchmarkKey    = hasContext && followerTier ? `${platform}|${deliverable}|${followerTier}` : null;
-  const benchmark       = benchmarkKey ? BENCHMARK_DATA[benchmarkKey] ?? null : null;
+  const followerCount = hasContext ? readCreatorFollowers(platform) : null;
+  const followerTier  = followerCount !== null ? getFollowerTier(followerCount) : null;
+  const benchmarkKey  = hasContext && followerTier ? `${platform}|${deliverable}|${followerTier}` : null;
+  const benchmark     = benchmarkKey ? BENCHMARK_DATA[benchmarkKey] ?? null : null;
 
-  // Dynamic "what moves this range" callouts
+  // Creator's own rate for this platform × deliverable
+  const creatorRate   = hasContext ? readCreatorRate(platform, deliverable) : null;
+  const hasRate       = !!creatorRate;
+  // "specified" = creator deliberately toggled at least one flag
+  const hasSpecified  = !!(creatorRate?.includesExclusivity || creatorRate?.includesPaidUsage);
+
+  const dealHasExclusivity = exclusivity === "Narrow" || exclusivity === "Broad";
+  const dealHasPaidUsage   = usage === "Includes paid usage or whitelisting";
+
+  // ── Dynamic modifier notes — adapt to how much rate data the creator provided ──
   const modifierNotes: string[] = [];
-  if (exclusivity === "Narrow")
-    modifierNotes.push("Narrow exclusivity typically pushes deals toward the upper portion of the range.");
-  if (exclusivity === "Broad")
-    modifierNotes.push("Broad category exclusivity often sits noticeably higher in the range — sometimes above it.");
-  if (usage === "Includes paid usage or whitelisting")
-    modifierNotes.push("Paid usage or whitelisting rights commonly add a meaningful premium on top of the base range.");
-  if (!exclusivity && !usage)
-    modifierNotes.push("With no exclusivity and organic-only usage, deals typically sit in the lower to middle of the range.");
+
+  if (!hasRate) {
+    // Case 1: no rate entered — generic guidance
+    if (exclusivity === "Narrow")
+      modifierNotes.push("Narrow exclusivity typically pushes deals toward the upper portion of the range.");
+    if (exclusivity === "Broad")
+      modifierNotes.push("Broad category exclusivity often sits noticeably higher in the range — sometimes above it.");
+    if (dealHasPaidUsage)
+      modifierNotes.push("Paid usage or whitelisting rights commonly add a meaningful premium on top of the base range.");
+    if (!exclusivity && !usage)
+      modifierNotes.push("With no exclusivity and organic-only usage, deals typically sit in the lower to middle of the range.");
+  } else if (hasRate && hasSpecified) {
+    // Case 3: rate + flags set — precise comparison only
+    if (dealHasExclusivity && !creatorRate.includesExclusivity)
+      modifierNotes.push(
+        exclusivity === "Broad"
+          ? "Broad category exclusivity isn't included in your typical rate for this deliverable — deals with it tend to sit noticeably higher in this range."
+          : "Narrow exclusivity isn't included in your typical rate — it typically pushes deals toward the upper portion of the range."
+      );
+    if (dealHasPaidUsage && !creatorRate.includesPaidUsage)
+      modifierNotes.push("Paid usage rights aren't in your typical rate for this deliverable. Usage rights commonly add a meaningful premium.");
+    if (dealHasExclusivity && creatorRate.includesExclusivity)
+      modifierNotes.push("Your typical rate for this deliverable already accounts for exclusivity — no additional adjustment needed for that term.");
+    if (dealHasPaidUsage && creatorRate.includesPaidUsage)
+      modifierNotes.push("Your typical rate already includes paid usage rights — that term is already priced in.");
+    if (!dealHasExclusivity && !dealHasPaidUsage)
+      modifierNotes.push("No exclusivity or paid usage in this deal — your typical rate is a solid reference point.");
+  }
+  // Case 2 (hasRate && !hasSpecified): no dynamic modifier bullets — neutral note shown separately below range cards
 
   return (
     <div className="space-y-4">
@@ -549,6 +590,31 @@ function RateEstimator({ dealContext }: { dealContext: DealContext }) {
               )}
             </div>
 
+            {/* Your rate row — shown when creator entered a rate for this deliverable */}
+            {hasRate && (
+              <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-primary/8 border border-primary/20">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/70 mb-0.5">Your typical rate</p>
+                  <p className="text-lg font-extrabold text-white">
+                    ${creatorRate.amount.replace(/^\$/, "")}
+                  </p>
+                  {hasSpecified && (
+                    <p className="text-[10px] text-white/40 mt-0.5 leading-tight">
+                      Includes:{" "}
+                      {[creatorRate.includesExclusivity && "exclusivity", creatorRate.includesPaidUsage && "paid usage rights"].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Benchmark range</p>
+                  {benchmark
+                    ? <p className="text-xs font-bold text-white/70">{benchmark.low} – {benchmark.high}</p>
+                    : <p className="text-xs text-muted-foreground italic">No data for this tier</p>
+                  }
+                </div>
+              </div>
+            )}
+
             {/* Range cards */}
             {benchmark ? (
               <>
@@ -567,6 +633,16 @@ function RateEstimator({ dealContext }: { dealContext: DealContext }) {
                 <p className="text-xs text-muted-foreground text-center">
                   {benchmark.sampleNote} · MAVLIT Rate Index · <span className="text-amber-400/80">sample data</span>
                 </p>
+
+                {/* Case 2: rate entered but no flags specified — neutral note */}
+                {hasRate && !hasSpecified && (
+                  <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-amber-500/8 border border-amber-500/20">
+                    <AlertTriangle size={12} className="text-amber-400/80 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-200/70 leading-relaxed">
+                      Consider whether your usual rate already accounts for this deal's exclusivity and usage terms.
+                    </p>
+                  </div>
+                )}
               </>
             ) : (
               /* No data for this combo yet */

@@ -414,7 +414,7 @@ function AccordionCard({ title, description, isOpen, onToggle, children }: {
   );
 }
 
-// ── Rate Estimator ─────────────────────────────────────────────────────────────
+// ── Rate Intelligence ──────────────────────────────────────────────────────────
 
 function RateEstimator() {
   const [platform, setPlatform] = useState<RatePlatform | "">("");
@@ -667,8 +667,8 @@ function DealMakerTab({
 
       {/* Tool cards */}
       <AccordionCard
-        title="Rate Estimator"
-        description="See observed deal ranges for your niche and deliverable type"
+        title="Rate Intelligence"
+        description="See observed deal ranges for your niche and deliverables, and what moves them."
         isOpen={openCard === "rate"}
         onToggle={() => toggle("rate")}
       >

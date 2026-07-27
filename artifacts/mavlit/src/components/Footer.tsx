@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { Link } from "wouter";
 
 export default function Footer() {
   return (
@@ -34,8 +35,8 @@ export default function Footer() {
             </div>
             <div className="flex flex-col gap-3">
               <h4 className="text-white font-medium text-sm">Legal</h4>
-              <a href="#" className="text-sm text-muted-foreground hover:text-white transition-colors">Privacy Policy</a>
-              <a href="#" className="text-sm text-muted-foreground hover:text-white transition-colors">Terms of Service</a>
+              <Link href="/privacy" className="text-sm text-muted-foreground hover:text-white transition-colors">Privacy Policy</Link>
+              <Link href="/terms" className="text-sm text-muted-foreground hover:text-white transition-colors">Terms of Service</Link>
             </div>
           </div>
         </div>

@@ -12,6 +12,8 @@ import Dashboard from "@/pages/Dashboard";
 import ProfileSettings from "@/pages/ProfileSettings";
 import Negotiator from "@/pages/Negotiator";
 import Pipeline from "@/pages/Pipeline";
+import Privacy from "@/pages/Privacy";
+import Terms from "@/pages/Terms";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,8 @@ function Router() {
       <Route path="/profile" component={ProfileSettings} />
       <Route path="/rate-calculator" component={Negotiator} />
       <Route path="/deals" component={Pipeline} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
       <Route component={NotFound} />
     </Switch>
   );

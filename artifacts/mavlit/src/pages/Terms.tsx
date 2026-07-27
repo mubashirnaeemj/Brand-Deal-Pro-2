@@ -1,7 +1,10 @@
+import Navbar from "@/components/Navbar";
+
 export default function Terms() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="container mx-auto px-6 py-20 max-w-3xl">
+      <Navbar />
+      <div className="container mx-auto px-6 pt-28 pb-20 max-w-3xl">
         <h1 className="text-3xl font-bold text-white mb-2">MAVLIT Terms of Service — Private Beta</h1>
         <p className="text-sm text-muted-foreground mb-12">Effective Date: July 27, 2026</p>
 

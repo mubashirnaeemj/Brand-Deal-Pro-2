@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Headphones, Music, Cpu, Camera, ShoppingBag, Zap,
-  ChevronDown, ChevronUp, Copy, Check, Sparkles, AlertTriangle, Building2, Users, BookOpen,
+  ChevronDown, ChevronUp, Copy, Check, Sparkles, AlertTriangle, Building2, Users, BookOpen, Plus,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -371,6 +371,67 @@ function CloseDealModal({
   );
 }
 
+// ── Add Pitch Modal ────────────────────────────────────────────────────────────
+
+function AddPitchModal({ onAdd, onCancel }: { onAdd: (brand: string) => void; onCancel: () => void }) {
+  const [brand, setBrand] = useState("");
+  const [, setLocation] = useLocation();
+
+  const handleSubmit = () => { if (brand.trim()) onAdd(brand.trim()); };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 8 }}
+        transition={{ duration: 0.18 }}
+        className="relative w-full max-w-sm bg-card border border-border rounded-2xl p-6 shadow-2xl space-y-5"
+      >
+        <div>
+          <h3 className="text-white font-bold text-base">Add a pitch</h3>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            Enter the brand name to track it in your pipeline.
+          </p>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-white/70 mb-1.5">Brand name</label>
+          <input
+            autoFocus
+            value={brand}
+            onChange={e => setBrand(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleSubmit()}
+            placeholder="e.g. Sennheiser"
+            className="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 transition-all"
+          />
+        </div>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Want to generate the email too?{" "}
+          <button
+            onClick={() => { onCancel(); setLocation("/pitch?brand=" + encodeURIComponent(brand)); }}
+            className="text-primary hover:underline font-medium"
+          >
+            Go to Pitch page →
+          </button>
+        </p>
+        <div className="flex gap-2 pt-1">
+          <button onClick={onCancel} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-white transition-all">
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!brand.trim()}
+            className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-40 transition-all"
+          >
+            Add pitch
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ── My Pitches Tab ─────────────────────────────────────────────────────────────
 
 function MyPitchesTab({
@@ -380,9 +441,10 @@ function MyPitchesTab({
   onUpdate: (p: PitchRecord[]) => void;
   onUseDealMaker: (brand: string) => void;
 }) {
-  const [closingId, setClosingId] = useState<string | null>(null);
+  const [closingId, setClosingId]     = useState<string | null>(null);
+  const [statusEditId, setStatusEditId] = useState<string | null>(null);
+  const [addingPitch, setAddingPitch] = useState(false);
 
-  const openClose   = (id: string) => setClosingId(id);
   const cancelClose = () => setClosingId(null);
 
   const confirmClose = (outcome: CloseOutcome, rate: string) => {
@@ -391,80 +453,115 @@ function MyPitchesTab({
       ? (rate.trim().startsWith("$") ? rate.trim() : `$${rate.trim()}`)
       : undefined;
     const updated = pitches.map(p =>
-      p.id === closingId
-        ? { ...p, status: "closed" as const, agreedRate: finalRate }
-        : p
+      p.id === closingId ? { ...p, status: "closed" as const, agreedRate: finalRate } : p
     );
     onUpdate(updated);
     cancelClose();
   };
 
-  const closingBrand = pitches.find(p => p.id === closingId)?.brand ?? "";
+  const changeStatus = (id: string, newStatus: PitchRecord["status"]) => {
+    if (newStatus === "closed") { setClosingId(id); return; }
+    onUpdate(pitches.map(p => p.id === id ? { ...p, status: newStatus, agreedRate: undefined } : p));
+  };
 
-  if (pitches.length === 0) {
-    return (
-      <div className="text-center py-20">
-        <p className="text-muted-foreground text-sm">No pitches yet. Head to the Pitch page to send your first one.</p>
-      </div>
-    );
-  }
+  const addPitch = (brand: string) => {
+    const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const newPitch: PitchRecord = { id: `pitch-${Date.now()}`, brand, date: today, status: "waiting" };
+    onUpdate([newPitch, ...pitches]);
+    setAddingPitch(false);
+  };
+
+  const closingBrand = pitches.find(p => p.id === closingId)?.brand ?? "";
 
   return (
     <>
-      {/* Modal */}
       <AnimatePresence>
-        {closingId && (
-          <CloseDealModal
-            brand={closingBrand}
-            onConfirm={confirmClose}
-            onCancel={cancelClose}
-          />
-        )}
+        {closingId && <CloseDealModal brand={closingBrand} onConfirm={confirmClose} onCancel={cancelClose} />}
+        {addingPitch && <AddPitchModal onAdd={addPitch} onCancel={() => setAddingPitch(false)} />}
       </AnimatePresence>
 
-      <div className="space-y-2">
-        {pitches.map(deal => (
-          <div key={deal.id} className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-card border border-border">
-            <BrandAvatar brand={deal.brand} />
+      {/* Header row */}
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => setAddingPitch(true)}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all shadow-sm shadow-primary/20"
+        >
+          <Plus size={13} />
+          Add pitch
+        </button>
+      </div>
 
-            {/* Brand name + date + activity context */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white truncate">{deal.brand}</p>
-              <p className="text-xs text-muted-foreground">{deal.date}</p>
-              {deal.status !== "closed" && ACTIVITY_CONTEXT[deal.brand] && (
-                <p className="text-xs text-muted-foreground/60">{ACTIVITY_CONTEXT[deal.brand]}</p>
-              )}
-            </div>
+      {pitches.length === 0 ? (
+        <div className="text-center py-20">
+          <p className="text-muted-foreground text-sm">No pitches yet. Head to the Pitch page to send your first one.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {pitches.map(deal => (
+            <div key={deal.id} className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-card border border-border">
+              <BrandAvatar brand={deal.brand} />
 
-            <StatusBadge status={deal.status} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-white truncate">{deal.brand}</p>
+                <p className="text-xs text-muted-foreground">{deal.date}</p>
+                {deal.status !== "closed" && ACTIVITY_CONTEXT[deal.brand] && (
+                  <p className="text-xs text-muted-foreground/60">{ACTIVITY_CONTEXT[deal.brand]}</p>
+                )}
+              </div>
 
-            {/* Non-closed actions */}
-            {deal.status !== "closed" && (
-              <>
+              {/* Clickable status badge with dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setStatusEditId(statusEditId === deal.id ? null : deal.id)}
+                  className="flex items-center gap-1"
+                >
+                  <StatusBadge status={deal.status} />
+                  <ChevronDown size={11} className="text-muted-foreground" />
+                </button>
+                <AnimatePresence>
+                  {statusEditId === deal.id && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setStatusEditId(null)} />
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                        transition={{ duration: 0.12 }}
+                        className="absolute right-0 top-full mt-1.5 z-20 bg-card border border-border rounded-xl overflow-hidden shadow-2xl min-w-[170px]"
+                      >
+                        {(["waiting", "conversation", "closed"] as const).map(s => (
+                          <button
+                            key={s}
+                            onClick={() => { changeStatus(deal.id, s); setStatusEditId(null); }}
+                            className={`w-full text-left px-3.5 py-2.5 text-xs font-medium transition-colors hover:bg-secondary/60 ${deal.status === s ? "text-white bg-secondary/40" : "text-muted-foreground"}`}
+                          >
+                            {s === "waiting" ? "Waiting for reply" : s === "conversation" ? "In conversation" : "Closed"}
+                          </button>
+                        ))}
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {deal.status !== "closed" && (
                 <button
                   onClick={() => onUseDealMaker(deal.brand)}
                   className="shrink-0 text-xs text-primary font-semibold hover:text-primary/80 transition-colors whitespace-nowrap"
                 >
                   Use Deal Tools →
                 </button>
-                <button
-                  onClick={() => openClose(deal.id)}
-                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border text-muted-foreground hover:text-white hover:border-white/30 transition-all whitespace-nowrap"
-                >
-                  Mark as closed
-                </button>
-              </>
-            )}
+              )}
 
-            {/* Closed rate */}
-            {deal.status === "closed" && deal.agreedRate && (
-              <span className="shrink-0 text-xs text-emerald-400 font-semibold">
-                {formatRate(deal.agreedRate)}
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
+              {deal.status === "closed" && deal.agreedRate && (
+                <span className="shrink-0 text-xs text-emerald-400 font-semibold">
+                  {formatRate(deal.agreedRate)}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
@@ -809,44 +906,6 @@ function ContractAdvice({ contactType, dealContext }: { contactType?: "agency" |
   );
 }
 
-// ── Media Kit ─────────────────────────────────────────────────────────────────
-
-function MediaKit({ brandName, brandCategory }: { brandName?: string; brandCategory?: string }) {
-  const [generating, setGen] = useState(false);
-  const [output, setOutput]  = useState<string | null>(null);
-  const [error, setError]    = useState<string | null>(null);
-
-  const generate = async () => {
-    setGen(true); setOutput(null); setError(null);
-    try {
-      let full = "";
-      await readStream("/api/pipeline/media-kit", {
-        ...CREATOR_PROFILE,
-        brandContext: brandName ? `This media kit is being prepared for ${brandName}${brandCategory ? ` (${brandCategory})` : ""}.` : undefined,
-      }, chunk => { full += chunk; setOutput(full); });
-    } catch { setError("Something went wrong. Please try again."); }
-    finally { setGen(false); }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="px-4 py-3.5 rounded-xl bg-secondary/60 border border-border">
-        <p className="text-xs text-white/80 leading-relaxed">
-          This is a quick stats summary — not a formal pitch deck. Use your own judgment about what to include or adjust based on your specific conversations with this brand.
-        </p>
-      </div>
-
-      <button onClick={generate} disabled={generating}
-        className="w-full py-3 rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 text-white transition-all flex items-center justify-center gap-2">
-        {generating ? <><Spin />Generating…</> : <><Sparkles size={13} />✦ Generate my media kit</>}
-      </button>
-
-      {error && <p className="text-xs text-red-400">{error}</p>}
-      {output && <OutputBox text={output} />}
-    </div>
-  );
-}
-
 // ── Deal Context Panel ─────────────────────────────────────────────────────────
 
 function PillGroup<T extends string>({
@@ -1035,14 +1094,6 @@ function DealMakerTab({
         <ContractAdvice contactType={brandInfo?.type} dealContext={dealContext} />
       </AccordionCard>
 
-      <AccordionCard
-        title="Media Kit"
-        description="Generate a quick stats summary to share with brands"
-        isOpen={openCard === "media"}
-        onToggle={() => toggle("media")}
-      >
-        <MediaKit brandName={brandName || undefined} brandCategory={brandInfo?.category} />
-      </AccordionCard>
     </div>
   );
 }

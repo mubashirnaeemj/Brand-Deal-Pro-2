@@ -78,7 +78,7 @@ const BRANDS: Record<string, BrandData> = {
     platformSignals: {
       youtube:   { level: "Strong" },
       instagram: { level: "Moderate" },
-      tiktok:    { level: "Limited", note: "TikTok campaign data is based on limited public sources — Instagram signal is more reliable for this brand." },
+      tiktok:    { level: "Limited" },
     },
     reviews: [
       {
@@ -183,7 +183,7 @@ const BRANDS: Record<string, BrandData> = {
     platformSignals: {
       youtube:   { level: "Strong" },
       instagram: { level: "Moderate" },
-      tiktok:    { level: "Limited", note: "TikTok campaign data is based on limited public sources — Instagram signal is more reliable for this brand." },
+      tiktok:    { level: "Limited" },
     },
     reviews: [
       {
@@ -282,7 +282,7 @@ const BRANDS: Record<string, BrandData> = {
     platformSignals: {
       youtube:   { level: "Strong" },
       instagram: { level: "Moderate" },
-      tiktok:    { level: "Limited", note: "TikTok campaign data is based on limited public sources — Instagram signal is more reliable for this brand." },
+      tiktok:    { level: "Limited" },
     },
     reviews: [
       {
@@ -451,12 +451,7 @@ function CreatorTierFitCard({ tier, creatorFollowers }: { tier: BrandData["creat
 
   let banner: React.ReactNode;
   if (creatorFollowers === null) {
-    banner = (
-      <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/5 border border-border">
-        <Info size={12} className="text-muted-foreground shrink-0" />
-        <span className="text-xs text-muted-foreground">Complete your profile to see how you compare</span>
-      </div>
-    );
+    banner = null;
   } else if (creatorFollowers >= min && creatorFollowers <= max) {
     banner = (
       <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
@@ -621,20 +616,6 @@ export default function BrandDetail() {
                 <PlatformSignalBreakdown signals={brand.platformSignals} />
               </motion.div>
 
-              {brand.recentLaunches && (
-                <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.12 }}
-                  className="bg-card border border-border rounded-2xl p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Sparkles size={13} className="text-primary shrink-0" />
-                    <span className="text-xs font-bold text-white uppercase tracking-wider">Recent product launches</span>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    {brand.recentLaunches.map(launch => (
-                      <span key={launch} className="text-xs text-muted-foreground">{launch}</span>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
 
 
             </div>

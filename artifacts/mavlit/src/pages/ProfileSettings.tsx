@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import {
   User,
   Instagram,
@@ -18,10 +19,28 @@ import {
   Newspaper,
   BarChart3,
   DollarSign,
+  Check,
+  ChevronsUpDown,
+  X,
+  Users,
 } from "lucide-react";
 import { SiTiktok, SiFacebook } from "react-icons/si";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandItem,
+  CommandEmpty,
+} from "@/components/ui/command";
+
+const API_BASE = "https://api.mavlit.com";
 
 const NICHES = [
   { value: "music",         label: "Music",                   Icon: Music      },
@@ -42,19 +61,25 @@ const PLATFORMS = [
   { key: "facebook",  label: "Facebook",   Icon: SiFacebook,  color: "#1877f2", placeholder: "facebook.com/yourpage"     },
 ];
 
-type PlatformStat = { followers: string; engagement: string; watchTime: string; avgViews: string };
+const AGE_BRACKETS = ["13–17", "18–24", "25–34", "35–44", "45–54", "55+"];
 
-type RateEntry = { amount: string; includesExclusivity: boolean; includesPaidUsage: boolean; };
+type SubNiche = { id: number; name: string };
+type PlatformStat = { followers: string; engagement: string; watchTime: string; avgViews: string };
+type RateEntry = { amount: string; includesExclusivity: boolean; includesPaidUsage: boolean };
 
 type ProfileForm = {
   name: string;
   handle: string;
   bio: string;
   niche: string;
+  subNiches: number[];
   location: string;
   links: Record<string, string>;
   stats: Record<string, PlatformStat>;
   rates: Record<string, RateEntry>;
+  audienceGenderMalePct: string;
+  audienceGenderFemalePct: string;
+  audienceAgeBrackets: string[];
 };
 
 const RATE_DELIVERABLES: { platform: string; Icon: React.ElementType; color: string; deliverables: string[] }[] = [
@@ -80,6 +105,7 @@ const DEFAULT: ProfileForm = {
   handle: "",
   bio: "",
   niche: "music",
+  subNiches: [],
   location: "",
   links: { instagram: "", tiktok: "", youtube: "", facebook: "" },
   stats: {
@@ -90,23 +116,16 @@ const DEFAULT: ProfileForm = {
     substack:  { followers: "12,000", engagement: "", watchTime: "", avgViews: "" },
   },
   rates: {},
+  audienceGenderMalePct: "",
+  audienceGenderFemalePct: "",
+  audienceAgeBrackets: [],
 };
 
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between">
-        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {label}
-        </label>
+        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</label>
         {hint && <span className="text-xs text-muted-foreground/60">{hint}</span>}
       </div>
       {children}
@@ -117,17 +136,136 @@ function Field({
 const inputCls =
   "w-full px-4 py-2.5 rounded-xl bg-secondary border border-border text-white placeholder:text-muted-foreground/50 text-sm font-medium focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all";
 
+// ── Sub-niche combobox ───────────────────────────────────────────────────────
+function SubNicheCombobox({
+  selected,
+  onChange,
+  options,
+  loading,
+}: {
+  selected: number[];
+  onChange: (ids: number[]) => void;
+  options: SubNiche[];
+  loading: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    if (triggerRef.current) setWidth(triggerRef.current.offsetWidth);
+  }, [open]);
+
+  const toggle = (id: number) => {
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  };
+
+  const remove = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(selected.filter((x) => x !== id));
+  };
+
+  const selectedNames = options.filter((o) => selected.includes(o.id));
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          ref={triggerRef}
+          type="button"
+          className="w-full min-h-[42px] px-3 py-2 rounded-xl bg-secondary border border-border text-left text-sm font-medium focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all flex items-start justify-between gap-2"
+        >
+          <div className="flex flex-wrap gap-1.5 flex-1">
+            {selectedNames.length === 0 ? (
+              <span className="text-muted-foreground/50 py-0.5">Search sub-niches…</span>
+            ) : (
+              selectedNames.map((sn) => (
+                <span
+                  key={sn.id}
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-semibold"
+                >
+                  {sn.name}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => remove(sn.id, e as unknown as React.MouseEvent)}
+                    onKeyDown={(e) => e.key === "Enter" && remove(sn.id, e as unknown as React.MouseEvent)}
+                    className="text-primary/60 hover:text-primary cursor-pointer"
+                  >
+                    <X size={10} />
+                  </span>
+                </span>
+              ))
+            )}
+          </div>
+          <ChevronsUpDown size={14} className="text-muted-foreground shrink-0 mt-1" />
+        </button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        style={{ width: width || undefined }}
+        className="p-0 border border-border bg-card shadow-xl rounded-xl overflow-hidden"
+        align="start"
+        sideOffset={6}
+      >
+        <Command className="bg-transparent">
+          <CommandInput
+            placeholder="Search sub-niches…"
+            className="h-10 text-sm border-b border-border bg-transparent text-white placeholder:text-muted-foreground/50"
+          />
+          <CommandList className="max-h-56 overflow-y-auto py-1">
+            {loading && (
+              <div className="px-3 py-4 text-xs text-muted-foreground text-center">Loading…</div>
+            )}
+            <CommandEmpty className="px-3 py-4 text-xs text-muted-foreground text-center">
+              No sub-niches found
+            </CommandEmpty>
+            {options.map((sn) => {
+              const active = selected.includes(sn.id);
+              return (
+                <CommandItem
+                  key={sn.id}
+                  value={sn.name}
+                  onSelect={() => toggle(sn.id)}
+                  className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer text-white/80 hover:text-white hover:bg-secondary aria-selected:bg-secondary"
+                >
+                  <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-all ${active ? "bg-primary border-primary" : "border-border"}`}>
+                    {active && <Check size={10} className="text-white" />}
+                  </div>
+                  {sn.name}
+                </CommandItem>
+              );
+            })}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
 export default function ProfileSettings() {
   const [form, setForm] = useState<ProfileForm>(() => {
     try {
       const raw = localStorage.getItem("mavlit_creator_profile");
-      if (raw) return JSON.parse(raw) as ProfileForm;
+      if (raw) return { ...DEFAULT, ...JSON.parse(raw) } as ProfileForm;
     } catch { /* ignore */ }
     return DEFAULT;
   });
   const [saved, setSaved] = useState(false);
 
-  const set = (field: keyof Omit<ProfileForm, "links">, value: string) =>
+  // Sub-niches from API
+  const { data: subNicheOptions = [], isLoading: subNichesLoading } = useQuery<SubNiche[]>({
+    queryKey: ["sub-niches"],
+    queryFn: () =>
+      fetch(`${API_BASE}/sub-niches`, { credentials: "include" }).then((r) => {
+        if (!r.ok) throw new Error("Failed to load sub-niches");
+        return r.json();
+      }),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const set = (field: keyof Omit<ProfileForm, "links" | "subNiches" | "audienceAgeBrackets">, value: string) =>
     setForm((f) => ({ ...f, [field]: value }));
 
   const setLink = (key: string, value: string) =>
@@ -140,6 +278,33 @@ export default function ProfileSettings() {
     setForm((f) => ({
       ...f,
       rates: { ...f.rates, [key]: { ...EMPTY_RATE, ...f.rates[key], [field]: value } },
+    }));
+
+  // Male % auto-balances female %
+  const setMalePct = (value: string) => {
+    const num = parseFloat(value);
+    setForm((f) => ({
+      ...f,
+      audienceGenderMalePct: value,
+      audienceGenderFemalePct: !isNaN(num) && num >= 0 && num <= 100 ? String(Math.round((100 - num) * 10) / 10) : f.audienceGenderFemalePct,
+    }));
+  };
+
+  const setFemalePct = (value: string) => {
+    const num = parseFloat(value);
+    setForm((f) => ({
+      ...f,
+      audienceGenderFemalePct: value,
+      audienceGenderMalePct: !isNaN(num) && num >= 0 && num <= 100 ? String(Math.round((100 - num) * 10) / 10) : f.audienceGenderMalePct,
+    }));
+  };
+
+  const toggleAgeBracket = (bracket: string) =>
+    setForm((f) => ({
+      ...f,
+      audienceAgeBrackets: f.audienceAgeBrackets.includes(bracket)
+        ? f.audienceAgeBrackets.filter((b) => b !== bracket)
+        : [...f.audienceAgeBrackets, bracket],
     }));
 
   const handleSave = (e: React.FormEvent) => {
@@ -169,9 +334,7 @@ export default function ProfileSettings() {
               <User size={14} className="text-primary" />
               <span className="text-xs font-semibold text-primary uppercase tracking-wider">Creator Profile</span>
             </div>
-            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">
-              Your Profile
-            </h1>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Your Profile</h1>
             <p className="text-muted-foreground text-base leading-relaxed">
               This information auto-fills your pitch decks and outreach emails. The more complete your profile, the more personalized your generated content.
             </p>
@@ -180,7 +343,7 @@ export default function ProfileSettings() {
           <form onSubmit={handleSave} noValidate>
             <div className="flex flex-col gap-6">
 
-              {/* Identity */}
+              {/* ── Identity ─────────────────────────────────────────────── */}
               <motion.div
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -233,14 +396,14 @@ export default function ProfileSettings() {
                       value={form.bio}
                       onChange={(e) => set("bio", e.target.value.slice(0, 200))}
                       rows={3}
-                      placeholder="Describe what you create, who you create it for, and what makes your connection to your niche authentic. A brand reads this — make it specific, not generic."
+                      placeholder="Describe what you create, who you create it for, and what makes your connection to your niche authentic."
                       className={`${inputCls} resize-none leading-relaxed`}
                     />
                   </Field>
                 </div>
               </motion.div>
 
-              {/* Niche */}
+              {/* ── Content Niche ─────────────────────────────────────────── */}
               <motion.div
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -251,7 +414,9 @@ export default function ProfileSettings() {
                   {selectedNiche && <selectedNiche.Icon size={14} className="text-primary" />}
                   <h2 className="text-sm font-bold text-white">Content Niche</h2>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+
+                {/* Primary niche tiles */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                   {NICHES.map(({ value, label, Icon }) => {
                     const active = form.niche === value;
                     return (
@@ -272,9 +437,20 @@ export default function ProfileSettings() {
                     );
                   })}
                 </div>
+
+                {/* Sub-niches */}
+                <div className="h-px bg-border/50 mb-5" />
+                <Field label="Sub-niches" hint="Optional — select all that apply">
+                  <SubNicheCombobox
+                    selected={form.subNiches}
+                    onChange={(ids) => setForm((f) => ({ ...f, subNiches: ids }))}
+                    options={subNicheOptions}
+                    loading={subNichesLoading}
+                  />
+                </Field>
               </motion.div>
 
-              {/* Platform links */}
+              {/* ── Platform Links ────────────────────────────────────────── */}
               <motion.div
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -288,10 +464,7 @@ export default function ProfileSettings() {
                 <div className="flex flex-col gap-4">
                   {PLATFORMS.map(({ key, label, Icon, color, placeholder }) => (
                     <div key={key} className="flex items-center gap-3">
-                      <div
-                        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                        style={{ background: `${color}18` }}
-                      >
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${color}18` }}>
                         <Icon size={16} style={{ color }} />
                       </div>
                       <div className="flex-1">
@@ -311,7 +484,7 @@ export default function ProfileSettings() {
                 </div>
               </motion.div>
 
-              {/* Platform Stats */}
+              {/* ── Platform Stats ────────────────────────────────────────── */}
               <motion.div
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -326,10 +499,7 @@ export default function ProfileSettings() {
                   {STAT_PLATFORMS.map(({ key, label, Icon, color, subscribersOnly }, idx) => (
                     <div key={key}>
                       <div className="flex items-center gap-2 mb-3">
-                        <div
-                          className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ background: `${color}18` }}
-                        >
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${color}18` }}>
                           <Icon size={14} style={{ color }} />
                         </div>
                         <p className="text-xs font-bold uppercase tracking-wider text-white/70">{label}</p>
@@ -349,40 +519,16 @@ export default function ProfileSettings() {
                       ) : (
                         <div className="grid grid-cols-2 gap-3">
                           <Field label="Followers / Subscribers">
-                            <input
-                              type="text"
-                              value={form.stats[key]?.followers ?? ""}
-                              onChange={(e) => setStat(key, "followers", e.target.value)}
-                              placeholder="e.g. 45,000"
-                              className={inputCls}
-                            />
+                            <input type="text" value={form.stats[key]?.followers ?? ""} onChange={(e) => setStat(key, "followers", e.target.value)} placeholder="e.g. 45,000" className={inputCls} />
                           </Field>
                           <Field label="Engagement Rate (%)">
-                            <input
-                              type="text"
-                              value={form.stats[key]?.engagement ?? ""}
-                              onChange={(e) => setStat(key, "engagement", e.target.value)}
-                              placeholder="e.g. 4.2"
-                              className={inputCls}
-                            />
+                            <input type="text" value={form.stats[key]?.engagement ?? ""} onChange={(e) => setStat(key, "engagement", e.target.value)} placeholder="e.g. 4.2" className={inputCls} />
                           </Field>
                           <Field label="Avg. Video Watch Time">
-                            <input
-                              type="text"
-                              value={form.stats[key]?.watchTime ?? ""}
-                              onChange={(e) => setStat(key, "watchTime", e.target.value)}
-                              placeholder="e.g. 2:35 or 155s"
-                              className={inputCls}
-                            />
+                            <input type="text" value={form.stats[key]?.watchTime ?? ""} onChange={(e) => setStat(key, "watchTime", e.target.value)} placeholder="e.g. 2:35 or 155s" className={inputCls} />
                           </Field>
                           <Field label="Avg. Views per Post">
-                            <input
-                              type="text"
-                              value={form.stats[key]?.avgViews ?? ""}
-                              onChange={(e) => setStat(key, "avgViews", e.target.value)}
-                              placeholder="e.g. 8,200"
-                              className={inputCls}
-                            />
+                            <input type="text" value={form.stats[key]?.avgViews ?? ""} onChange={(e) => setStat(key, "avgViews", e.target.value)} placeholder="e.g. 8,200" className={inputCls} />
                           </Field>
                         </div>
                       )}
@@ -392,12 +538,108 @@ export default function ProfileSettings() {
                 </div>
               </motion.div>
 
-              {/* Typical Rates */}
+              {/* ── Audience Demographics ─────────────────────────────────── */}
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.25 }}
+                className="bg-card border border-border rounded-2xl p-6"
+              >
+                <div className="flex items-start justify-between gap-3 mb-1">
+                  <div className="flex items-center gap-2">
+                    <Users size={14} className="text-primary" />
+                    <h2 className="text-sm font-bold text-white">Audience Demographics</h2>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-md text-xs font-semibold border border-border text-muted-foreground">Optional</span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-6 leading-relaxed">
+                  Helps brands understand your audience fit. Use data from your platform analytics.
+                </p>
+
+                {/* Gender split */}
+                <div className="mb-6">
+                  <p className="text-xs font-bold uppercase tracking-wider text-white/70 mb-3">Gender Split</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Male %" hint="Auto-balances">
+                      <div className="relative">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          max={100}
+                          step={0.1}
+                          value={form.audienceGenderMalePct}
+                          onChange={(e) => setMalePct(e.target.value)}
+                          placeholder="e.g. 60"
+                          className={inputCls}
+                        />
+                      </div>
+                    </Field>
+                    <Field label="Female %" hint="Auto-balances">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        value={form.audienceGenderFemalePct}
+                        onChange={(e) => setFemalePct(e.target.value)}
+                        placeholder="e.g. 40"
+                        className={inputCls}
+                      />
+                    </Field>
+                  </div>
+                  {/* Visual bar */}
+                  {(form.audienceGenderMalePct || form.audienceGenderFemalePct) && (() => {
+                    const m = parseFloat(form.audienceGenderMalePct) || 0;
+                    const f = parseFloat(form.audienceGenderFemalePct) || 0;
+                    const total = m + f;
+                    if (total === 0) return null;
+                    const mPct = Math.round((m / total) * 100);
+                    return (
+                      <div className="mt-3 flex rounded-full overflow-hidden h-2">
+                        <div className="bg-blue-500 transition-all" style={{ width: `${mPct}%` }} />
+                        <div className="bg-pink-500 flex-1 transition-all" />
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div className="h-px bg-border/50 mb-6" />
+
+                {/* Age brackets */}
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-white/70 mb-3">Age Brackets</p>
+                  <p className="text-xs text-muted-foreground mb-3">Select all that represent a significant portion of your audience.</p>
+                  <div className="flex flex-wrap gap-2">
+                    {AGE_BRACKETS.map((bracket) => {
+                      const active = form.audienceAgeBrackets.includes(bracket);
+                      return (
+                        <button
+                          key={bracket}
+                          type="button"
+                          onClick={() => toggleAgeBracket(bracket)}
+                          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-semibold transition-all ${
+                            active
+                              ? "bg-primary/15 border-primary/60 text-primary"
+                              : "border-border text-muted-foreground hover:border-primary/30 hover:text-white"
+                          }`}
+                        >
+                          {active && <Check size={12} />}
+                          {bracket}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* ── Typical Rates ─────────────────────────────────────────── */}
               <motion.div
                 id="typical-rates"
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.26 }}
+                transition={{ duration: 0.4, delay: 0.28 }}
                 className="bg-card border border-border rounded-2xl p-6"
               >
                 <div className="flex items-start justify-between gap-3 mb-1">
@@ -410,7 +652,6 @@ export default function ProfileSettings() {
                 <p className="text-xs text-muted-foreground mb-5 leading-relaxed">
                   Adding your typical rates personalizes your Rate Intelligence. Enter just the number — the toggles below each rate are optional.
                 </p>
-
                 <div className="flex flex-col gap-6">
                   {RATE_DELIVERABLES.map(({ platform, Icon, color, deliverables }, pIdx) => (
                     <div key={platform}>
@@ -420,7 +661,6 @@ export default function ProfileSettings() {
                         </div>
                         <p className="text-xs font-bold uppercase tracking-wider text-white/70">{platform}</p>
                       </div>
-
                       <div className="flex flex-col gap-4">
                         {deliverables.map((deliverable, dIdx) => {
                           const rateKey = `${platform}|${deliverable}`;
@@ -436,7 +676,7 @@ export default function ProfileSettings() {
                                       type="text"
                                       inputMode="numeric"
                                       value={entry.amount}
-                                      onChange={e => setRate(rateKey, "amount", e.target.value)}
+                                      onChange={(e) => setRate(rateKey, "amount", e.target.value)}
                                       placeholder="e.g. 1,200"
                                       className={`${inputCls} pl-7`}
                                     />
@@ -464,18 +704,17 @@ export default function ProfileSettings() {
                           );
                         })}
                       </div>
-
                       {pIdx < RATE_DELIVERABLES.length - 1 && <div className="mt-5 h-px bg-border/50" />}
                     </div>
                   ))}
                 </div>
               </motion.div>
 
-              {/* Save */}
+              {/* ── Save ──────────────────────────────────────────────────── */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35, delay: 0.28 }}
+                transition={{ duration: 0.35, delay: 0.3 }}
                 className="flex items-center justify-between gap-4"
               >
                 <p className="text-xs text-muted-foreground">
@@ -490,6 +729,7 @@ export default function ProfileSettings() {
                   Save Profile
                 </button>
               </motion.div>
+
             </div>
           </form>
         </div>

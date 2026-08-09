@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, Users, Zap, UserCircle, Briefcase } from "lucide-react";
+import { LayoutDashboard, Users, Zap, UserCircle, Briefcase, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const NAV_LINKS = [
   { label: "Dashboard", href: "/dashboard",     Icon: LayoutDashboard },
@@ -13,7 +14,8 @@ const NAV_LINKS = [
 
 export default function Navbar() {
   const [location] = useLocation();
-  const isApp = location !== "/";
+  const { user, logout } = useAuth();
+  const isApp = location !== "/" && location !== "/login";
 
   return (
     <motion.nav
@@ -63,22 +65,35 @@ export default function Navbar() {
 
         <div className="flex items-center gap-3 shrink-0">
           {!isApp && (
-            <Button variant="ghost" className="text-muted-foreground hover:text-white hidden md:inline-flex">
-              Sign In
-            </Button>
+            <Link href="/login">
+              <Button variant="ghost" className="text-muted-foreground hover:text-white hidden md:inline-flex">
+                Sign In
+              </Button>
+            </Link>
           )}
-          {isApp ? (
-            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/30 select-none">
-              Founding Creator
-            </span>
-          ) : (
-            <Button
-              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_20px_rgba(124,58,237,0.3)] transition-all text-sm"
-              onClick={() => {}}
-            >
-              Get Early Access
-            </Button>
-          )}
+          {isApp && user ? (
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/30 select-none">
+                Founding Creator
+              </span>
+              <button
+                onClick={logout}
+                title="Sign out"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-white transition-colors"
+              >
+                <LogOut size={13} />
+                <span className="hidden md:inline">Sign out</span>
+              </button>
+            </div>
+          ) : !isApp ? (
+            <Link href="/login">
+              <Button
+                className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_20px_rgba(124,58,237,0.3)] transition-all text-sm"
+              >
+                Get Early Access
+              </Button>
+            </Link>
+          ) : null}
         </div>
       </div>
     </motion.nav>

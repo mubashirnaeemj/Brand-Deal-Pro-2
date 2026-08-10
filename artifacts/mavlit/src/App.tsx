@@ -20,8 +20,27 @@ import { AuthProvider, useAuth, isProfileComplete } from "@/contexts/AuthContext
 
 const queryClient = new QueryClient();
 
-/** Wraps any app route — auth redirects temporarily disabled for testing */
+/** Wraps any app route — redirects to /login if not authed, /profile-setup if identity incomplete */
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isLoading } = useAuth();
+  const [location] = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Redirect to="/login" />;
+  }
+
+  if (!isProfileComplete(user) && location !== "/profile-setup") {
+    return <Redirect to="/profile-setup" />;
+  }
+
   return <Component />;
 }
 

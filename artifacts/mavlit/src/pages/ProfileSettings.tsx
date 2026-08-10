@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -40,7 +40,7 @@ import {
   CommandEmpty,
 } from "@/components/ui/command";
 
-const API_BASE = "https://api.mavlit.com";
+import { useAuth } from "@/contexts/AuthContext";
 
 const NICHES = [
   { value: "music",         label: "Music",                   Icon: Music      },
@@ -245,6 +245,8 @@ function SubNicheCombobox({
 
 // ── Main component ───────────────────────────────────────────────────────────
 export default function ProfileSettings() {
+  const { user, updateProfile } = useAuth();
+
   const [form, setForm] = useState<ProfileForm>(() => {
     try {
       const raw = localStorage.getItem("mavlit_creator_profile");
@@ -253,12 +255,30 @@ export default function ProfileSettings() {
     return DEFAULT;
   });
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Seed form from auth user when it loads (prefer API data over stale localStorage)
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (!user || seededRef.current) return;
+    seededRef.current = true;
+    setForm(prev => ({
+      ...prev,
+      name:     user.full_name      ?? prev.name,
+      handle:   user.creator_handle ?? prev.handle,
+      location: [user.location_city, user.location_country].filter(Boolean).join(", ") || prev.location,
+      bio:      user.bio_tagline     ?? prev.bio,
+      niche:    user.content_niche   ? (NICHES.find(n => n.value === user.content_niche || n.label === user.content_niche)?.value ?? prev.niche) : prev.niche,
+      audienceGenderMalePct:    user.audience_gender_male_pct    != null ? String(user.audience_gender_male_pct)   : prev.audienceGenderMalePct,
+      audienceGenderFemalePct:  user.audience_gender_female_pct  != null ? String(user.audience_gender_female_pct) : prev.audienceGenderFemalePct,
+    }));
+  }, [user]);
 
   // Sub-niches from API
   const { data: subNicheOptions = [], isLoading: subNichesLoading } = useQuery<SubNiche[]>({
     queryKey: ["sub-niches"],
     queryFn: () =>
-      fetch(`${API_BASE}/sub-niches`, { credentials: "include" }).then((r) => {
+      fetch("https://api.mavlit.com/sub-niches", { credentials: "include" }).then((r) => {
         if (!r.ok) throw new Error("Failed to load sub-niches");
         return r.json();
       }),
@@ -307,12 +327,37 @@ export default function ProfileSettings() {
         : [...f.audienceAgeBrackets, bracket],
     }));
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaveError(null);
+    // Always save to localStorage for offline-friendly fields
     try { localStorage.setItem("mavlit_creator_profile", JSON.stringify(form)); } catch { /* ignore */ }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
-  };
+
+    // Map form → API fields
+    const parts = form.location.split(",").map(s => s.trim());
+    const subNicheNames = subNicheOptions
+      .filter(sn => form.subNiches.includes(sn.id))
+      .map(sn => sn.name);
+
+    try {
+      await updateProfile({
+        full_name:                  form.name.trim()   || null,
+        creator_handle:             form.handle.trim() || null,
+        location_city:              parts[0]           || null,
+        location_country:           parts[1]           || null,
+        bio_tagline:                form.bio.trim()    || null,
+        content_niche:              form.niche         || null,
+        sub_niches:                 subNicheNames.length ? subNicheNames : null,
+        audience_gender_male_pct:   form.audienceGenderMalePct   ? parseFloat(form.audienceGenderMalePct)   : null,
+        audience_gender_female_pct: form.audienceGenderFemalePct ? parseFloat(form.audienceGenderFemalePct) : null,
+        audience_age_bracket:       form.audienceAgeBrackets.length ? form.audienceAgeBrackets.join(", ") : null,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save profile");
+    }
+  }, [form, subNicheOptions, updateProfile]);
 
   const selectedNiche = NICHES.find((n) => n.value === form.niche);
 
@@ -715,19 +760,26 @@ export default function ProfileSettings() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35, delay: 0.3 }}
-                className="flex items-center justify-between gap-4"
+                className="flex flex-col gap-3"
               >
-                <p className="text-xs text-muted-foreground">
-                  Profile data is used locally to personalize your generated content.
-                </p>
-                <button
-                  type="submit"
-                  data-testid="button-save-profile"
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-sm shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 active:translate-y-0 shrink-0"
-                >
-                  <Save size={15} />
-                  Save Profile
-                </button>
+                {saveError && (
+                  <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                    {saveError}
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-xs text-muted-foreground">
+                    Profile data is saved to your MAVLIT account and used to personalize your generated content.
+                  </p>
+                  <button
+                    type="submit"
+                    data-testid="button-save-profile"
+                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-sm shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 active:translate-y-0 shrink-0"
+                  >
+                    <Save size={15} />
+                    Save Profile
+                  </button>
+                </div>
               </motion.div>
 
             </div>

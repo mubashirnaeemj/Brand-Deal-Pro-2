@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api, type ApiPitch } from "@/lib/api";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -1102,12 +1104,61 @@ function DealMakerTab({
 
 export default function Pipeline() {
   const [tab, setTab]               = useState<"pitches" | "dealmaker">("pitches");
-  const [pitches, setPitches]       = useState<PitchRecord[]>(() => loadPitches());
   const [dealmakerBrand, setDealmakerBrand] = useState("");
 
+  // Fetch pitches from API (primary source)
+  const { data: apiPitches } = useQuery<ApiPitch[]>({
+    queryKey: ["pitches"],
+    queryFn: () => api.get("/pitches/me"),
+    staleTime: 60_000,
+  });
+
+  // Status overrides for API pitches stored in localStorage
+  const [overrides, setOverrides] = useState<Record<string, { status: PitchRecord["status"]; agreedRate?: string }>>(() => {
+    try { return JSON.parse(localStorage.getItem("mavlit_pitch_overrides") ?? "{}"); } catch { return {}; }
+  });
+
+  // Manually-added local pitches (via AddPitchModal, prefix "pitch-")
+  const [localPitches, setLocalPitches] = useState<PitchRecord[]>(() => {
+    try {
+      const all = JSON.parse(localStorage.getItem("mavlit_pitches") ?? "[]") as PitchRecord[];
+      return all.filter(p => p.id.startsWith("pitch-"));
+    } catch { return []; }
+  });
+
+  // Convert API pitches → PitchRecord format, applying any local overrides
+  const apiPitchRecords: PitchRecord[] = (apiPitches ?? []).map(p => {
+    const id = `api-${p.id}`;
+    const ov = overrides[id];
+    return {
+      id,
+      brand: p.brand_name,
+      date: new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      status: ov?.status ?? "waiting",
+      agreedRate: ov?.agreedRate,
+    };
+  });
+
+  // Merged list: API pitches first, then manually-added local ones
+  const pitches = apiPitches !== undefined
+    ? [...apiPitchRecords, ...localPitches]
+    : loadPitches(); // show demo data while API is loading
+
   const updatePitches = (updated: PitchRecord[]) => {
-    setPitches(updated);
-    savePitches(updated);
+    const updatedApi   = updated.filter(p => p.id.startsWith("api-"));
+    const updatedLocal = updated.filter(p => !p.id.startsWith("api-"));
+
+    // Save overrides for API pitches
+    const newOverrides: typeof overrides = {};
+    for (const p of updatedApi) {
+      newOverrides[p.id] = { status: p.status, agreedRate: p.agreedRate };
+    }
+    setOverrides(newOverrides);
+    try { localStorage.setItem("mavlit_pitch_overrides", JSON.stringify(newOverrides)); } catch { /* ignore */ }
+
+    // Save local pitches
+    setLocalPitches(updatedLocal);
+    try { localStorage.setItem("mavlit_pitches", JSON.stringify(updatedLocal)); } catch { /* ignore */ }
   };
 
   const goToDealMaker = (brand: string) => {

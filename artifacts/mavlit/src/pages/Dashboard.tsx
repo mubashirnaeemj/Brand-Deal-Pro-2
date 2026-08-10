@@ -1,113 +1,87 @@
-import { useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useMemo } from "react";
+import { motion } from "framer-motion";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import {
   Users, Zap, Bookmark, ShieldCheck,
-  Headphones, Music, Cpu, ChevronRight, Wrench, UserCircle,
+  Headphones, Music, Cpu, Camera, ShoppingBag,
+  ChevronRight, Wrench, UserCircle, Loader2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import ReplyLoggerModal from "@/components/ReplyLoggerModal";
+import { api, type DashboardStats, type ApiPitch } from "@/lib/api";
 
-// ── Verified contacts count — all 6 matched brands have a verified contact ────
-const VERIFIED_CONTACTS = 6;
+// ── Mini brand lookup for icons/colors ────────────────────────────────────────
 
-// ── Deals ─────────────────────────────────────────────────────────────────────
+const BRAND_ICONS: Record<string, { Icon: React.ElementType; color: string }> = {
+  "Sennheiser":          { Icon: Headphones,  color: "#7c3aed" },
+  "Spotify for Artists": { Icon: Music,        color: "#1db954" },
+  "Native Instruments":  { Icon: Cpu,          color: "#f59e0b" },
+  "GoPro":               { Icon: Camera,       color: "#0ea5e9" },
+  "Sweetwater":          { Icon: ShoppingBag,  color: "#ec4899" },
+  "Red Bull":            { Icon: Zap,          color: "#ef4444" },
+};
 
-type DealAction = "navigate" | "modal";
-
-interface Deal {
-  id: number;
-  brand: string;
-  pipelineId?: string;
-  Icon: React.ElementType;
-  color: string;
-  contact: string;
-  stage: string;
-  stageBg: string;
-  stageText: string;
-  time: string;
-  actionLabel: string;
-  actionType: DealAction;
-  actionHref?: string;
-  pipelineExpand?: string;
+function statusLabel(status: string) {
+  if (status === "proposal_sent" || status === "waiting") return { label: "Sent",        bg: "bg-violet-500/15", text: "text-violet-400" };
+  if (status === "conversation")                           return { label: "Replied",     bg: "bg-sky-500/15",    text: "text-sky-400"    };
+  if (status === "closed_won")                             return { label: "Closed ✓",    bg: "bg-emerald-500/15",text: "text-emerald-400" };
+  if (status === "closed_lost" || status === "declined")   return { label: "Closed",      bg: "bg-zinc-500/15",   text: "text-zinc-400"   };
+  return { label: status, bg: "bg-zinc-500/15", text: "text-zinc-400" };
 }
 
-const DEALS: Deal[] = [
-  {
-    id: 1,
-    brand: "Sennheiser",
-    pipelineId: "sennheiser",
-    Icon: Headphones,
-    color: "#7c3aed",
-    contact: "Sarah Chen",
-    stage: "Sent",
-    stageBg: "bg-violet-500/15",
-    stageText: "text-violet-400",
-    time: "6 days ago",
-    actionLabel: "Open deal →",
-    actionType: "navigate",
-    actionHref: "/deals",
-    pipelineExpand: "sennheiser",
-  },
-  {
-    id: 2,
-    brand: "Spotify for Artists",
-    pipelineId: "spotify",
-    Icon: Music,
-    color: "#1db954",
-    contact: "Marcus Williams",
-    stage: "Replied",
-    stageBg: "bg-sky-500/15",
-    stageText: "text-sky-400",
-    time: "2 days ago",
-    actionLabel: "Log their reply →",
-    actionType: "modal",
-  },
-  {
-    id: 3,
-    brand: "Native Instruments",
-    pipelineId: "native-instruments",
-    Icon: Cpu,
-    color: "#f59e0b",
-    contact: "Priya Sharma",
-    stage: "Negotiating",
-    stageBg: "bg-amber-500/15",
-    stageText: "text-amber-400",
-    time: "1 day ago",
-    actionLabel: "Open deal →",
-    actionType: "navigate",
-    actionHref: "/deals",
-  },
-];
+function relativeDate(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / 86_400_000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7)  return `${days} days ago`;
+  if (days < 30) return `${Math.floor(days / 7)} week${Math.floor(days / 7) > 1 ? "s" : ""} ago`;
+  return `${Math.floor(days / 30)} month${Math.floor(days / 30) > 1 ? "s" : ""} ago`;
+}
+
+function BrandDot({ name }: { name: string }) {
+  const db = BRAND_ICONS[name];
+  if (db) {
+    const Icon = db.Icon;
+    return (
+      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${db.color}25` }}>
+        <Icon size={15} style={{ color: db.color }} />
+      </div>
+    );
+  }
+  return (
+    <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-secondary border border-border">
+      <span className="text-sm font-bold text-white">{name.charAt(0).toUpperCase()}</span>
+    </div>
+  );
+}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
-  const [replyDeal, setReplyDeal] = useState<Deal | null>(null);
 
-  const stats = useMemo(() => {
-    let pitches: Array<{ status: string }> = [];
-    try {
-      const raw = localStorage.getItem("mavlit_pitches");
-      if (raw) pitches = JSON.parse(raw) as Array<{ status: string }>;
-    } catch { /* ignore */ }
-    const activeDeals  = pitches.filter(p => p.status === "waiting" || p.status === "conversation").length;
+  const { data: dashStats, isLoading: statsLoading } = useQuery<DashboardStats>({
+    queryKey: ["dashboard"],
+    queryFn: () => api.get("/dashboard/me"),
+    staleTime: 30_000,
+  });
 
-    let savedCount = 0;
-    try {
-      const raw = localStorage.getItem("mavlit_saved_brands");
-      savedCount = raw ? (JSON.parse(raw) as string[]).length : 0;
-    } catch { /* ignore */ }
+  const { data: apiPitches, isLoading: pitchesLoading } = useQuery<ApiPitch[]>({
+    queryKey: ["pitches"],
+    queryFn: () => api.get("/pitches/me"),
+    staleTime: 60_000,
+  });
 
-    return [
-      { label: "Brand Matches",  value: "6",                      sub: "In your niche",         icon: Users,       color: "#7c3aed" },
-      { label: "Active Deals",   value: String(activeDeals),       sub: "In your pipeline",      icon: Zap,         color: "#0ea5e9" },
-      { label: "Saved Brands",   value: String(savedCount),        sub: "On your shortlist",     icon: Bookmark,    color: "#10b981" },
-      { label: "Verified Contacts", value: String(VERIFIED_CONTACTS), sub: "Across matched brands", icon: ShieldCheck, color: "#f59e0b" },
-    ];
-  }, []);
+  const statCards = useMemo(() => [
+    { label: "Brand Matches",     value: statsLoading ? null : (dashStats?.brand_matches     ?? 0), sub: "In your niche",            icon: Users,       color: "#7c3aed" },
+    { label: "Active Deals",      value: statsLoading ? null : (dashStats?.active_deals      ?? 0), sub: "In your pipeline",         icon: Zap,         color: "#0ea5e9" },
+    { label: "Saved Brands",      value: statsLoading ? null : (dashStats?.saved_brands      ?? 0), sub: "On your shortlist",        icon: Bookmark,    color: "#10b981" },
+    { label: "Verified Contacts", value: statsLoading ? null : (dashStats?.verified_contacts ?? 0), sub: "Across saved/pitched brands", icon: ShieldCheck, color: "#f59e0b" },
+  ], [dashStats, statsLoading]);
+
+  const recentDeals = (apiPitches ?? []).slice(0, 3);
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -118,7 +92,7 @@ export default function Dashboard() {
 
           {/* Stats row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {stats.map((s, i) => {
+            {statCards.map((s, i) => {
               const Icon = s.icon;
               return (
                 <motion.div
@@ -135,7 +109,10 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-3xl font-extrabold text-white tracking-tight">{s.value}</p>
+                    {s.value === null
+                      ? <div className="h-8 w-12 bg-secondary/60 rounded-lg animate-pulse" />
+                      : <p className="text-3xl font-extrabold text-white tracking-tight">{s.value}</p>
+                    }
                     <p className="text-xs text-muted-foreground mt-1">{s.sub}</p>
                   </div>
                 </motion.div>
@@ -213,63 +190,63 @@ export default function Dashboard() {
               </button>
             </div>
 
-            <div className="flex flex-col gap-2">
-              {DEALS.map((deal, i) => {
-                const Icon = deal.Icon;
-                return (
-                  <motion.div
-                    key={deal.id}
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3, delay: 0.28 + i * 0.06 }}
-                    className="flex items-center gap-3 p-3.5 rounded-xl bg-secondary/40 border border-border"
-                  >
-                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${deal.color}25` }}>
-                      <Icon size={15} style={{ color: deal.color }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-white leading-tight truncate">{deal.brand}</p>
-                      <p className="text-xs text-muted-foreground truncate">{deal.contact}</p>
-                    </div>
-                    <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold ${deal.stageBg} ${deal.stageText}`}>
-                      {deal.stage}
-                    </span>
-                    <span className="shrink-0 text-xs text-muted-foreground hidden sm:block">{deal.time}</span>
-                    <button
-                      onClick={() => {
-                        if (deal.actionType === "modal") {
-                          setReplyDeal(deal);
-                        } else if (deal.pipelineExpand) {
-                          sessionStorage.setItem("mavlit_expand_deal", deal.pipelineExpand);
-                          setLocation(deal.actionHref!);
-                        } else if (deal.actionHref) {
-                          setLocation(deal.actionHref);
-                        }
-                      }}
-                      className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border text-white/70 hover:text-white hover:border-primary/50 hover:bg-primary/10 transition-all whitespace-nowrap"
+            {pitchesLoading && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 size={18} className="text-muted-foreground animate-spin" />
+              </div>
+            )}
+
+            {!pitchesLoading && recentDeals.length === 0 && (
+              <p className="text-xs text-muted-foreground py-6 text-center">
+                No pitches yet.{" "}
+                <button onClick={() => setLocation("/pitch")} className="text-primary hover:underline">
+                  Send your first pitch →
+                </button>
+              </p>
+            )}
+
+            {!pitchesLoading && recentDeals.length > 0 && (
+              <div className="flex flex-col gap-2">
+                {recentDeals.map((pitch, i) => {
+                  const { label, bg, text } = statusLabel(pitch.status);
+                  return (
+                    <motion.div
+                      key={pitch.id}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: 0.28 + i * 0.06 }}
+                      className="flex items-center gap-3 p-3.5 rounded-xl bg-secondary/40 border border-border"
                     >
-                      {deal.actionLabel}
-                    </button>
-                  </motion.div>
-                );
-              })}
-            </div>
+                      <BrandDot name={pitch.brand_name} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-white leading-tight truncate">{pitch.brand_name}</p>
+                        {pitch.contact_name && (
+                          <p className="text-xs text-muted-foreground truncate">{pitch.contact_name}</p>
+                        )}
+                      </div>
+                      <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold ${bg} ${text}`}>
+                        {label}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground hidden sm:block">
+                        {relativeDate(pitch.created_at)}
+                      </span>
+                      <button
+                        onClick={() => setLocation("/deals")}
+                        className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border text-white/70 hover:text-white hover:border-primary/50 hover:bg-primary/10 transition-all whitespace-nowrap"
+                      >
+                        Open deal →
+                      </button>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
           </motion.div>
 
         </div>
       </main>
 
       <Footer />
-
-      <AnimatePresence>
-        {replyDeal && (
-          <ReplyLoggerModal
-            brandName={replyDeal.brand}
-            dealId={replyDeal.pipelineId}
-            onClose={() => setReplyDeal(null)}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }

@@ -6,7 +6,6 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { useAuth } from "@workspace/replit-auth-web";
 
 // ── Rate data ─────────────────────────────────────────────────────────────────
 
@@ -170,7 +169,6 @@ function MetricCard({ icon: Icon, label, value, accent }: {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Negotiator() {
-  const { isAuthenticated, isLoading, login } = useAuth();
   const [niche, setNiche] = useState("");
   const [dealType, setDealType] = useState("");
 
@@ -240,26 +238,6 @@ export default function Negotiator() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  if (!isLoading && !isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-        <Navbar />
-        <main className="pt-28 pb-24 px-4 flex items-center justify-center">
-          <div className="text-center space-y-4 max-w-sm">
-            <h2 className="text-2xl font-bold text-white">Sign in to use Negotiator</h2>
-            <p className="text-muted-foreground text-sm">You need to be signed in to get negotiation advice.</p>
-            <button
-              onClick={login}
-              className="w-full px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition"
-            >
-              Log in
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">

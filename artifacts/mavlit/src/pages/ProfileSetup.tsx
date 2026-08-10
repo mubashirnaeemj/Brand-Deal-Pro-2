@@ -92,27 +92,27 @@ export default function ProfileSetup() {
     if (!validate()) return;
 
     setSaving(true);
+    try {
+      const parts = form.location.split(",").map((s) => s.trim());
+      const city = parts[0] ?? null;
+      const country = parts[1] ?? null;
 
-    // Parse location into city/country
-    const parts = form.location.split(",").map((s) => s.trim());
-    const city = parts[0] ?? null;
-    const country = parts[1] ?? null;
+      await updateProfile({
+        full_name: form.name.trim() || null,
+        creator_handle: form.handle.trim() || null,
+        location_city: city || null,
+        location_country: country || null,
+        bio_tagline: form.bio.trim() || null,
+        content_niche: form.niche || null,
+      });
 
-    updateProfile({
-      full_name: form.name.trim() || null,
-      creator_handle: form.handle.trim() || null,
-      location_city: city || null,
-      location_country: country || null,
-      bio_tagline: form.bio.trim() || null,
-      content_niche: form.niche || null,
-    });
-
-    setSaved(true);
-    setSaving(false);
-
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 900);
+      setSaved(true);
+      setTimeout(() => { navigate("/dashboard"); }, 900);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to save profile. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const selectedNiche = NICHES.find((n) => n.value === form.niche);

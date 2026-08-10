@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { isDemoMode } from "@/components/DemoBar";
+import { api, type ApiPitch } from "@/lib/api";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -37,6 +37,16 @@ const BRAND_LAUNCHES: Record<string, string[]> = {
   "GoPro":               ["HERO13 Black", "MAX 2 camera", "Quik app redesign"],
   "Sweetwater":          ["SweetCare Pro support tier", "Sweetwater Studios expansion", "Musician financing upgrades"],
   "Red Bull":            ["Red Bull Organics range", "Red Bull Basement 2025", "Team Red Bull creator roster"],
+};
+
+// Maps matched brand names to their API IDs
+const BRAND_NAME_TO_ID: Record<string, number> = {
+  "Sennheiser":          1,
+  "Spotify for Artists": 2,
+  "Native Instruments":  3,
+  "GoPro":               4,
+  "Sweetwater":          5,
+  "Red Bull":            6,
 };
 
 const NICHES    = ["Music Production","Music Performance","Audio Engineering","Gear Reviews","Lifestyle & Music","Electronic Music","Hip-Hop / Beats","Singer-Songwriter","Studio Vlogging","DJ / Live Sets","Music Education","Other"];
@@ -130,30 +140,6 @@ function ContactTypeBadge({ type }: { type: "agency"|"in-house" }) {
   );
 }
 
-async function readStream(endpoint: string, body: Record<string, unknown>, onChunk: (t: string) => void) {
-  const res = await fetch(endpoint, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!res.ok) throw new Error("Server error");
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error("No stream");
-  const decoder = new TextDecoder();
-  let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      try {
-        const p = JSON.parse(line.slice(6));
-        if (p.done) return;
-        if (p.error) throw new Error(p.error);
-        if (p.content) onChunk(p.content);
-      } catch { /* skip bad frames */ }
-    }
-  }
-}
 
 // ── Outbound Mode ──────────────────────────────────────────────────────────────
 
@@ -182,20 +168,33 @@ function OutboundMode() {
   const canGenerate  = brandName.trim() && form.creatorName.trim() && form.handle.trim() && form.followers.trim() && form.engagementRate.trim() && form.story.trim();
 
   const generate = async () => {
-    if (isDemoMode()) { setLocation("/deals"); return; }
     if (!canGenerate) return;
     setGenerating(true); setEmail(null); setError(null); setHasCopied(false); setPitchLogged(false);
     try {
-      let full = "";
-      await readStream("/api/pitch/generate", {
-        brandName, creatorName: form.creatorName, handle: form.handle, platform: form.platform,
-        followers: form.followers, engagementRate: form.engagementRate, niche: form.niche,
-        story: form.story, recentProductLaunch: form.recentProductLaunch,
-        pastDeals: form.pastDeals, contentLink: form.contentLink,
-        contactName: activeContact?.name, contactEmail: activeContact?.email,
-      }, chunk => { full += chunk; setEmail(full); });
+      const body = form.brandSource === "matched" && BRAND_NAME_TO_ID[form.selectedBrand]
+        ? {
+            is_custom: false,
+            brand_id: BRAND_NAME_TO_ID[form.selectedBrand],
+            story: form.story,
+            product_reference: form.recentProductLaunch || undefined,
+            past_brand_partnership: form.pastDeals || undefined,
+            content_link: form.contentLink || undefined,
+          }
+        : {
+            is_custom: true,
+            custom_brand_name: brandName,
+            story: form.story,
+            product_reference: form.recentProductLaunch || undefined,
+            past_brand_partnership: form.pastDeals || undefined,
+            content_link: form.contentLink || undefined,
+          };
+      const data = await api.post<ApiPitch>("/pitches", body);
+      setEmail(data.pitch_text);
+      setPitchLogged(true); // API auto-saves the pitch
       setTimeout(() => emailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    } catch { setError("Something went wrong generating your email. Please try again."); }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong generating your email. Please try again.");
+    }
     finally { setGenerating(false); }
   };
 
@@ -207,19 +206,6 @@ function OutboundMode() {
     });
   };
 
-  const markSent = () => {
-    const existing = JSON.parse(localStorage.getItem("mavlit_pitches") ?? "[]") as unknown[];
-    const now = new Date();
-    const newEntry = {
-      id: String(Date.now()),
-      brand: brandName,
-      date: now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-      status: "waiting",
-    };
-    localStorage.setItem("mavlit_pitches", JSON.stringify([newEntry, ...existing]));
-    setPitchLogged(true);
-    setTimeout(() => setLocation("/deals"), 1500);
-  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8 items-start">
@@ -328,7 +314,7 @@ function OutboundMode() {
         </div>
 
         {/* Generate */}
-        <button onClick={generate} disabled={!isDemoMode() && (!canGenerate || generating)}
+        <button onClick={generate} disabled={!canGenerate || generating}
           className="w-full py-4 rounded-2xl text-base font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-lg shadow-primary/30 transition-all flex items-center justify-center gap-2">
           {generating
             ? (<><motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />Generating your pitch email…</>)
@@ -369,22 +355,19 @@ function OutboundMode() {
               </div>
 
               <AnimatePresence>
-                {hasCopied && !pitchLogged && (
-                  <motion.button initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                    onClick={markSent}
-                    className="w-full py-3.5 rounded-2xl text-sm font-bold border border-primary/50 text-primary hover:bg-primary hover:text-white transition-all flex items-center justify-center gap-2">
-                    <CheckCircle2 size={15} />
-                    Mark pitch as sent →
-                  </motion.button>
-                )}
-              </AnimatePresence>
-
-              <AnimatePresence>
                 {pitchLogged && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                    className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                    <CheckCircle2 size={15} className="text-emerald-400 mt-0.5 shrink-0" />
-                    <p className="text-sm text-emerald-300 leading-relaxed">Pitch logged. Taking you to your pipeline…</p>
+                    className="flex items-start justify-between gap-3 px-4 py-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                    <div className="flex items-start gap-2.5">
+                      <CheckCircle2 size={15} className="text-emerald-400 mt-0.5 shrink-0" />
+                      <p className="text-sm text-emerald-300 leading-relaxed">Pitch saved to your Pipeline automatically.</p>
+                    </div>
+                    <button
+                      onClick={() => setLocation("/deals")}
+                      className="shrink-0 text-sm font-bold text-emerald-300 hover:text-emerald-200 whitespace-nowrap transition-colors"
+                    >
+                      View in Pipeline →
+                    </button>
                   </motion.div>
                 )}
               </AnimatePresence>

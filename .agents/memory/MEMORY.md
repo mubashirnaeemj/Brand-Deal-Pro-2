@@ -1,0 +1,1 @@
+- [MAVLIT API integration](mavlit-api-integration.md) — all pages wired to api.mavlit.com; cookie auth only; key patterns for each page

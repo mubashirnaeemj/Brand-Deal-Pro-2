@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Mail, Linkedin, Zap, DollarSign, Star, TrendingUp,
   Activity, CheckCircle2, Copy, ChevronRight, MessageSquare,
@@ -9,6 +10,17 @@ import {
 import { useLocation, useParams } from "wouter";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { api, type ApiBrand, type SavedBrand } from "@/lib/api";
+
+// Slug → brand ID mapping for API calls
+const SLUG_TO_BRAND_ID: Record<string, number> = {
+  "sennheiser":          1,
+  "spotify":             2,
+  "native-instruments":  3,
+  "gopro":               4,
+  "sweetwater":          5,
+  "red-bull":            6,
+};
 
 // ── Brand database ─────────────────────────────────────────────────────────────
 
@@ -491,31 +503,67 @@ function CreatorTierFitCard({ tier, creatorFollowers }: { tier: BrandData["creat
 
 export default function BrandDetail() {
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const params = useParams<{ slug: string }>();
-  const brand = BRANDS[params.slug ?? ""];
+  const slug = params.slug ?? "";
+  const brand = BRANDS[slug];
+  const brandId = SLUG_TO_BRAND_ID[slug] ?? null;
 
-  const [saved, setSaved] = useState<boolean>(() => {
-    try {
-      const raw = localStorage.getItem("mavlit_saved_brands");
-      const list = raw ? (JSON.parse(raw) as string[]) : [];
-      return brand ? list.includes(brand.name) : false;
-    } catch { return false; }
+  // Fetch live API data for this brand (overlay on hardcoded base)
+  const { data: apiBrand } = useQuery<ApiBrand>({
+    queryKey: ["brand", brandId],
+    queryFn: () => api.get(`/brands/${brandId}`),
+    enabled: brandId !== null,
+    staleTime: 5 * 60_000,
   });
 
-  const toggleSave = () => {
-    setSaved(prev => {
-      const next = !prev;
-      try {
-        const raw = localStorage.getItem("mavlit_saved_brands");
-        const list = raw ? (JSON.parse(raw) as string[]) : [];
-        const updated = next
-          ? [...list.filter(n => n !== brand.name), brand.name]
-          : list.filter(n => n !== brand.name);
-        localStorage.setItem("mavlit_saved_brands", JSON.stringify(updated));
-      } catch { /* ignore */ }
-      return next;
-    });
+  // Saved brands list from API
+  const { data: savedBrandsList = [] } = useQuery<SavedBrand[]>({
+    queryKey: ["saved-brands"],
+    queryFn: () => api.get("/saved-brands/me"),
+    staleTime: 60_000,
+  });
+
+  const saved = brandId !== null && savedBrandsList.some(sb => sb.brand_id === brandId);
+
+  const toggleSave = async () => {
+    if (!brandId || !brand) return;
+    if (saved) {
+      queryClient.setQueryData<SavedBrand[]>(["saved-brands"], prev =>
+        (prev ?? []).filter(sb => sb.brand_id !== brandId)
+      );
+      try { await api.delete(`/saved-brands/${brandId}`); }
+      catch { queryClient.invalidateQueries({ queryKey: ["saved-brands"] }); }
+    } else {
+      queryClient.setQueryData<SavedBrand[]>(["saved-brands"], prev => [
+        ...(prev ?? []),
+        { brand_id: brandId, name: brand.name, niche: "", short_bio: null, saved_at: new Date().toISOString() },
+      ]);
+      try { await api.post("/saved-brands", { brand_id: brandId }); }
+      catch { queryClient.invalidateQueries({ queryKey: ["saved-brands"] }); }
+    }
   };
+
+  // Overlay API data on the hardcoded base — keeps match scores, reviews, deal ranges hardcoded
+  const effectiveBrand = brand && apiBrand ? {
+    ...brand,
+    description:      apiBrand.description      ?? brand.description,
+    activityScore:    apiBrand.sponsorship_activity_score ?? brand.activityScore,
+    lastPartnership:  apiBrand.last_partnership_date
+      ? `${Math.round((Date.now() - new Date(apiBrand.last_partnership_date).getTime()) / 86_400_000)} days ago`
+      : brand.lastPartnership,
+    metaAdsActive:    apiBrand.meta_ads_active   ?? brand.metaAdsActive,
+    platformSignals:  apiBrand.platform_signals
+      ? {
+          instagram: { level: (apiBrand.platform_signals["instagram"] ?? "Unknown") as SignalLevel },
+          tiktok:    { level: (apiBrand.platform_signals["tiktok"]    ?? "Unknown") as SignalLevel },
+          youtube:   { level: (apiBrand.platform_signals["youtube"]   ?? "Unknown") as SignalLevel },
+        }
+      : brand.platformSignals,
+    contact: apiBrand.top_contact
+      ? { ...brand.contact, email: apiBrand.top_contact.email }
+      : brand.contact,
+  } : brand;
 
   const creatorFollowers = useMemo((): number | null => {
     try {
@@ -548,7 +596,9 @@ export default function BrandDetail() {
     );
   }
 
-  const Icon = brand.Icon;
+  // Alias: use API-enriched data where available, fall back to hardcoded base
+  const b = effectiveBrand ?? brand;
+  const Icon = b.Icon;
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -574,16 +624,16 @@ export default function BrandDetail() {
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}
                 className="bg-card border border-border rounded-2xl p-7">
                 <div className="flex items-start gap-5 mb-6">
-                  <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${brand.iconBg} flex items-center justify-center shadow-lg shrink-0`}>
+                  <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${b.iconBg} flex items-center justify-center shadow-lg shrink-0`}>
                     <Icon size={28} className="text-white" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-3 flex-wrap">
                       <h1 className="text-3xl font-extrabold text-white tracking-tight" data-testid="text-brand-name">
-                        {brand.name}
+                        {b.name}
                       </h1>
                       <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/30">
-                        {brand.category}
+                        {b.category}
                       </span>
                       <button
                         onClick={toggleSave}
@@ -594,9 +644,9 @@ export default function BrandDetail() {
                         {saved ? "Saved" : "Save"}
                       </button>
                     </div>
-                    <p className="text-muted-foreground text-sm mt-1.5 leading-relaxed">{brand.tagline}</p>
+                    <p className="text-muted-foreground text-sm mt-1.5 leading-relaxed">{b.tagline}</p>
                     <div className="flex flex-wrap gap-2 mt-3">
-                      {brand.tags.map(tag => (
+                      {b.tags.map(tag => (
                         <span key={tag} className="px-2 py-0.5 text-xs font-medium rounded-md bg-secondary text-muted-foreground border border-border">{tag}</span>
                       ))}
                     </div>
@@ -604,7 +654,7 @@ export default function BrandDetail() {
                 </div>
 
                 <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-brand-description">
-                  {brand.description}
+                  {b.description}
                 </p>
 
               </motion.div>
@@ -613,7 +663,7 @@ export default function BrandDetail() {
               <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.08 }}
                 className="bg-card border border-border rounded-2xl p-6">
                 <h3 className="text-sm font-bold text-white mb-4">Platform Signal</h3>
-                <PlatformSignalBreakdown signals={brand.platformSignals} />
+                <PlatformSignalBreakdown signals={b.platformSignals} />
               </motion.div>
 
 
@@ -630,19 +680,19 @@ export default function BrandDetail() {
                   <Activity size={15} className="text-primary" />
                   <h3 className="text-sm font-bold text-white">Sponsorship Score</h3>
                 </div>
-                <ActivityGauge score={brand.activityScore} />
-                {(brand.lastPartnership !== undefined || brand.metaAdsActive !== undefined) && (
+                <ActivityGauge score={b.activityScore} />
+                {(b.lastPartnership !== undefined || b.metaAdsActive !== undefined) && (
                   <div className="mt-4 pt-4 border-t border-border flex flex-col gap-2.5">
-                    {brand.lastPartnership && (
+                    {b.lastPartnership && (
                       <div className="flex items-center gap-2">
                         <Clock size={12} className="text-muted-foreground shrink-0" />
-                        <span className="text-xs text-muted-foreground">Last partnership <span className="text-white font-medium">{brand.lastPartnership}</span></span>
+                        <span className="text-xs text-muted-foreground">Last partnership <span className="text-white font-medium">{b.lastPartnership}</span></span>
                       </div>
                     )}
-                    {brand.metaAdsActive !== undefined && (
+                    {b.metaAdsActive !== undefined && (
                       <div className="flex items-center gap-2">
                         <BarChart2 size={12} className="text-muted-foreground shrink-0" />
-                        <span className="text-xs text-muted-foreground">Meta ads active: <span className={brand.metaAdsActive ? "text-emerald-400 font-medium" : "text-zinc-400 font-medium"}>{brand.metaAdsActive ? "Yes" : "No"}</span></span>
+                        <span className="text-xs text-muted-foreground">Meta ads active: <span className={b.metaAdsActive ? "text-emerald-400 font-medium" : "text-zinc-400 font-medium"}>{b.metaAdsActive ? "Yes" : "No"}</span></span>
                       </div>
                     )}
                   </div>
@@ -656,7 +706,7 @@ export default function BrandDetail() {
                   <Users size={15} className="text-primary" />
                   <h3 className="text-sm font-bold text-white">Creator tier fit</h3>
                 </div>
-                <CreatorTierFitCard tier={brand.creatorTier} creatorFollowers={creatorFollowers} />
+                <CreatorTierFitCard tier={b.creatorTier} creatorFollowers={creatorFollowers} />
               </motion.div>
 
               {/* Contact bundle */}
@@ -664,7 +714,7 @@ export default function BrandDetail() {
                 className="bg-card border border-border rounded-2xl p-6" data-testid="card-contact">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-bold text-white">Contact Bundle</h3>
-                  {brand.contactType === "agency"
+                  {b.contactType === "agency"
                     ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/30"><Building2 size={10} />Agency-side</span>
                     : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"><Users size={10} />In-house</span>
                   }
@@ -674,23 +724,23 @@ export default function BrandDetail() {
                     <Mail size={15} className="text-primary shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground mb-0.5">Email</p>
-                      <p className="text-sm font-semibold text-white truncate" data-testid="text-contact-email">{brand.contact.email}</p>
+                      <p className="text-sm font-semibold text-white truncate" data-testid="text-contact-email">{b.contact.email}</p>
                       <p className="text-xs text-muted-foreground/60 mt-0.5">
-                        {brand.contact.verifiedAt ? `Verified ${fmtVerifiedDate(brand.contact.verifiedAt)}` : "Verification pending"}
+                        {b.contact.verifiedAt ? `Verified ${fmtVerifiedDate(b.contact.verifiedAt)}` : "Verification pending"}
                       </p>
                     </div>
-                    <CopyButton value={brand.contact.email} />
+                    <CopyButton value={b.contact.email} />
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary border border-border">
                     <Linkedin size={15} className="text-[#0a66c2] shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground mb-0.5">LinkedIn</p>
-                      <p className="text-sm font-semibold text-white truncate" data-testid="text-contact-linkedin">{brand.contact.linkedin}</p>
+                      <p className="text-sm font-semibold text-white truncate" data-testid="text-contact-linkedin">{b.contact.linkedin}</p>
                       <p className="text-xs text-muted-foreground/60 mt-0.5">
-                        {brand.contact.verifiedAt ? `Verified ${fmtVerifiedDate(brand.contact.verifiedAt)}` : "Verification pending"}
+                        {b.contact.verifiedAt ? `Verified ${fmtVerifiedDate(b.contact.verifiedAt)}` : "Verification pending"}
                       </p>
                     </div>
-                    <CopyButton value={brand.contact.linkedin} />
+                    <CopyButton value={b.contact.linkedin} />
                   </div>
                 </div>
               </motion.div>
@@ -699,7 +749,7 @@ export default function BrandDetail() {
               <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, delay: 0.24 }}>
                 <button
                   data-testid="button-pitch-sidebar"
-                  onClick={() => setLocation(`/pitch?brand=${encodeURIComponent(brand.name)}`)}
+                  onClick={() => setLocation(`/pitch?brand=${encodeURIComponent(b.name)}`)}
                   className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-sm shadow-lg shadow-primary/30 transition-all hover:shadow-primary/50 flex items-center justify-center gap-2"
                 >
                   <Zap size={15} />

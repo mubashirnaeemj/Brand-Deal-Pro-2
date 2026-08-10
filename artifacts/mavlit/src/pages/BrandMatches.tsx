@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2, SlidersHorizontal, Music, Headphones, Zap, Camera,
   ShoppingBag, Cpu, Copy, Check, Linkedin, ChevronDown, ChevronUp,
@@ -8,6 +9,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { api, type SavedBrand } from "@/lib/api";
 
 const CATEGORIES = ["All", "Audio", "Streaming", "Lifestyle", "Software", "Retail", "Beverage"];
 
@@ -544,24 +546,37 @@ function BrandCard({ brand, index, onOpen, saved, onToggleSave }: {
 
 /* ─── Page ───────────────────────────────────────────────── */
 export default function BrandMatches() {
+  const queryClient = useQueryClient();
   const [activeCategory, setActiveCategory] = useState("All");
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
-  const [savedBrands, setSavedBrands] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem("mavlit_saved_brands");
-      return raw ? (JSON.parse(raw) as string[]) : [];
-    } catch { return []; }
+
+  // Load saved brand IDs from API
+  const { data: savedBrandsList = [] } = useQuery<SavedBrand[]>({
+    queryKey: ["saved-brands"],
+    queryFn: () => api.get("/saved-brands/me"),
+    staleTime: 60_000,
   });
 
-  const toggleSave = (brandName: string) => {
-    setSavedBrands(prev => {
-      const next = prev.includes(brandName)
-        ? prev.filter(n => n !== brandName)
-        : [...prev, brandName];
-      localStorage.setItem("mavlit_saved_brands", JSON.stringify(next));
-      return next;
-    });
-  };
+  const savedBrandIds = new Set(savedBrandsList.map(sb => sb.brand_id));
+
+  const toggleSave = useCallback(async (brandId: number, brandName: string) => {
+    if (savedBrandIds.has(brandId)) {
+      // Optimistic remove
+      queryClient.setQueryData<SavedBrand[]>(["saved-brands"], prev =>
+        (prev ?? []).filter(sb => sb.brand_id !== brandId)
+      );
+      try { await api.delete(`/saved-brands/${brandId}`); }
+      catch { queryClient.invalidateQueries({ queryKey: ["saved-brands"] }); }
+    } else {
+      // Optimistic add
+      queryClient.setQueryData<SavedBrand[]>(["saved-brands"], prev => [
+        ...(prev ?? []),
+        { brand_id: brandId, name: brandName, niche: "", short_bio: null, saved_at: new Date().toISOString() },
+      ]);
+      try { await api.post("/saved-brands", { brand_id: brandId }); }
+      catch { queryClient.invalidateQueries({ queryKey: ["saved-brands"] }); }
+    }
+  }, [savedBrandIds, queryClient]);
 
   const filtered =
     activeCategory === "All" ? BRANDS : BRANDS.filter((b) => b.category === activeCategory);
@@ -628,8 +643,8 @@ export default function BrandMatches() {
               <motion.div key="grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filtered.map((brand, i) => (
                   <BrandCard key={brand.id} brand={brand} index={i} onOpen={() => setSelectedBrand(brand)}
-                    saved={savedBrands.includes(brand.name)}
-                    onToggleSave={(e) => { e.stopPropagation(); toggleSave(brand.name); }} />
+                    saved={savedBrandIds.has(brand.id)}
+                    onToggleSave={(e) => { e.stopPropagation(); toggleSave(brand.id, brand.name); }} />
                 ))}
               </motion.div>
             ) : (

@@ -1,0 +1,81 @@
+Add a "Brand Catalog" page/tab to this app that browses brands from an existing external API and shows example Meta Ads per brand.
+
+API base URL: https://api.mavlit.com
+No authentication is required for these endpoints.
+
+Endpoints:
+
+1. GET https://api.mavlit.com/api/brand-catalog?q=&niche=&limit=&offset=
+   - q: optional case-insensitive substring search on brand name
+   - niche: optional exact niche match
+   - limit: default 50, max 200
+   - offset: default 0
+   Response:
+   {
+     "total": number,
+     "limit": number,
+     "offset": number,
+     "brands": [
+       { "id": number, "name": string, "niche": string|null, "website": string|null, "domain": string|null, "country": string|null }
+     ]
+   }
+
+2. GET https://api.mavlit.com/api/brand-catalog/niches
+   Response: { "niches": [string, ...] }   — distinct niche values, for a filter dropdown.
+
+3. GET https://api.mavlit.com/api/brand-catalog/{brand_id}
+   Response:
+   {
+     "id": number,
+     "name": string,
+     "niche": string|null,
+     "description": string|null,
+     "website": string|null,
+     "domain": string|null,
+     "country": string|null,
+     "headquarters": string|null,
+     "instagram_handle": string|null,
+     "youtube_channel_id": string|null,
+     "facebook_page": string|null,
+     "brand_tier": string|null,
+     "geo_reach_score": number|null,
+     "geo_reach_label": string|null,
+     "meta_ads_total": number,
+     "meta_ads": [
+       {
+         "id": number,
+         "page_name": string,
+         "ad_creative_bodies": [string],
+         "publisher_platforms": [string],
+         "start_date": string,
+         "end_date": string,
+         "impressions": { "lower_bound": string, "upper_bound": string|null },
+         "spend": { "lower_bound": string, "upper_bound": string|null },
+         "currency": string
+       }
+     ]
+   }
+   Returns 404 if brand_id doesn't exist.
+
+Build the page with two views:
+
+LIST VIEW (default):
+- Title "Brand Catalog" with a short subtitle.
+- A search row: a text input (debounced ~300ms) searching by name, and a niche dropdown populated from endpoint #2 ("All niches" as the default option).
+- A vertical list of brand rows, each showing: brand name, domain (fallback to website, fallback "no website"), and a niche pill on the right if present.
+- Clicking a row opens the detail view for that brand's id and pushes ?id={id} into the URL (support browser back/forward via popstate to toggle views).
+- Pagination: 30 per page, Prev/Next buttons, showing "X-Y of Z", disabled appropriately at the start/end. Reset to offset 0 whenever search or niche filter changes.
+- Empty state when no brands match.
+
+DETAIL VIEW:
+- Back link to return to the list (and clear ?id from the URL).
+- Brand name as a heading, with website as a link (opens in new tab) under it.
+- A row of pills for whichever of these are present: niche, country, brand_tier, geo_reach_label (with geo_reach_score), instagram_handle.
+- Description paragraph if present.
+- "Meta Ad Examples" section header showing "(showing N of meta_ads_total)".
+- A responsive grid of ad cards, each showing: page_name, "start_date → end_date", platform pills (publisher_platforms), the first ad_creative_bodies entry (clamped to ~6 lines with a "Show more/less" toggle), and two stats: Impressions and Spend (format each as "lower-upper" or "lower+" if no upper bound, using the currency field for spend's label). If meta_ads is empty, show a "No Meta Ads found for this brand yet" placeholder instead of the grid.
+- If the fetch 404s, show an inline error with the back link still available.
+
+Styling: dark theme (slate background, light slate text, sky-blue accent for links/active states) to match the rest of the app; responsive down to mobile widths.
+
+Always call the API with the full absolute URL (https://api.mavlit.com/...), not a relative path — this frontend is a separate origin from the API.

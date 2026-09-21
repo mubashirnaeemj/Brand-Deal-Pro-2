@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, Users, Zap, UserCircle, Briefcase, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Zap, UserCircle, Briefcase, LogOut, Library } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const NAV_LINKS = [
@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { label: "Pitch",     href: "/pitch",         Icon: Zap             },
   { label: "Pipeline",  href: "/deals",         Icon: Briefcase       },
   { label: "Profile",   href: "/profile",       Icon: UserCircle      },
+  { label: "Catalog",   href: "/brand-catalog",  Icon: Library         },
 ];
 
 export default function Navbar() {
@@ -64,7 +65,7 @@ export default function Navbar() {
         )}
 
         <div className="flex items-center gap-3 shrink-0">
-          {!isApp && (
+          {(!isApp || location === "/brand-catalog") && !user && (
             <Link href="/login">
               <Button variant="ghost" className="text-muted-foreground hover:text-white hidden md:inline-flex">
                 Sign In

@@ -16,6 +16,7 @@ import Pipeline from "@/pages/Pipeline";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
 import Login from "@/pages/Login";
+import BrandCatalog from "@/pages/BrandCatalog";
 import { AuthProvider, useAuth, isProfileComplete } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
+      <Route path="/brand-catalog" component={BrandCatalog} />
 
       {/* Profile setup — authed but not yet complete */}
       <Route path="/profile-setup">

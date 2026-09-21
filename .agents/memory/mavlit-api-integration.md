@@ -65,3 +65,11 @@ description: All pages in the MAVLIT frontend wired to api.mavlit.com; cookie-ba
 - Negotiator itself calls local API server `/api/negotiator/advise` (not api.mavlit.com)
 
 **Why:** cookie-based auth; no bearer tokens; localStorage used only as cache/fallback, not as auth signal.
+
+## External API CORS requirement
+
+Direct server-to-server requests to `api.mavlit.com` work, but as of September 21, 2026 its responses do not include `Access-Control-Allow-Origin`, including for the public Brand Catalog endpoints.
+
+**Why:** Browser requests from the Replit preview, localhost, `mavlit.com`, `www.mavlit.com`, and `app.mavlit.com` are blocked by CORS even though `curl` receives valid catalog data.
+
+**How to apply:** Keep frontend URLs absolute as required, but do not treat `Failed to fetch` as a frontend regression until the external API enables the actual frontend origins and handles OPTIONS requests.

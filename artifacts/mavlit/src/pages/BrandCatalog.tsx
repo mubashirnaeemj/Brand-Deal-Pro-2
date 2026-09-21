@@ -12,6 +12,14 @@ import {
 
 const PAGE_SIZE = 30;
 
+function errorMessage(reason: unknown, fallback: string) {
+  if (!(reason instanceof Error)) return fallback;
+  if (reason.message === "Failed to fetch") {
+    return "The Brand Catalog API could not be reached from this browser. Please try again shortly.";
+  }
+  return reason.message;
+}
+
 function readBrandId() {
   const value = new URLSearchParams(window.location.search).get("id");
   if (!value) return null;
@@ -133,7 +141,7 @@ function BrandDetailView({ brandId, onBack }: { brandId: number; onBack: () => v
         if (!cancelled) setBrand(result);
       })
       .catch((reason) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : "Unable to load this brand.");
+        if (!cancelled) setError(errorMessage(reason, "Unable to load this brand."));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -231,6 +239,12 @@ export default function BrandCatalog() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const previousTitle = document.title;
+    document.title = "Brand Catalog | MAVLIT";
+    return () => { document.title = previousTitle; };
+  }, []);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
     return () => window.clearTimeout(timer);
   }, [search]);
@@ -267,7 +281,7 @@ export default function BrandCatalog() {
         if (!cancelled) setResult(response);
       })
       .catch((reason) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : "Unable to load the brand catalog.");
+        if (!cancelled) setError(errorMessage(reason, "Unable to load the brand catalog."));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

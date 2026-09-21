@@ -62,24 +62,26 @@ function BrandDot({ name }: { name: string }) {
 export default function Dashboard() {
   const [, setLocation] = useLocation();
 
-  const { data: dashStats, isLoading: statsLoading } = useQuery<DashboardStats>({
+  const { data: dashStats, isLoading: statsLoading, isError: statsError } = useQuery<DashboardStats>({
     queryKey: ["dashboard"],
     queryFn: () => api.get("/dashboard/me"),
     staleTime: 30_000,
+    retry: 1,
   });
 
   const { data: apiPitches, isLoading: pitchesLoading } = useQuery<ApiPitch[]>({
     queryKey: ["pitches"],
     queryFn: () => api.get("/pitches/me"),
     staleTime: 60_000,
+    retry: 1,
   });
 
   const statCards = useMemo(() => [
-    { label: "Brand Matches",     value: statsLoading ? null : (dashStats?.brand_matches     ?? 0), sub: "In your niche",            icon: Users,       color: "#7c3aed" },
-    { label: "Active Deals",      value: statsLoading ? null : (dashStats?.active_deals      ?? 0), sub: "In your pipeline",         icon: Zap,         color: "#0ea5e9" },
-    { label: "Saved Brands",      value: statsLoading ? null : (dashStats?.saved_brands      ?? 0), sub: "On your shortlist",        icon: Bookmark,    color: "#10b981" },
-    { label: "Verified Contacts", value: statsLoading ? null : (dashStats?.verified_contacts ?? 0), sub: "Across saved/pitched brands", icon: ShieldCheck, color: "#f59e0b" },
-  ], [dashStats, statsLoading]);
+    { label: "Brand Matches",     value: statsLoading ? null : statsError ? "—" : (dashStats?.brand_matches     ?? 0), sub: "In your niche",            icon: Users,       color: "#7c3aed" },
+    { label: "Active Deals",      value: statsLoading ? null : statsError ? "—" : (dashStats?.active_deals      ?? 0), sub: "In your pipeline",         icon: Zap,         color: "#0ea5e9" },
+    { label: "Saved Brands",      value: statsLoading ? null : statsError ? "—" : (dashStats?.saved_brands      ?? 0), sub: "On your shortlist",        icon: Bookmark,    color: "#10b981" },
+    { label: "Verified Contacts", value: statsLoading ? null : statsError ? "—" : (dashStats?.verified_contacts ?? 0), sub: "Across saved/pitched brands", icon: ShieldCheck, color: "#f59e0b" },
+  ], [dashStats, statsLoading, statsError]);
 
   const recentDeals = (apiPitches ?? []).slice(0, 3);
 

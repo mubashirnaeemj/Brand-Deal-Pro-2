@@ -10,6 +10,7 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { api, type SavedBrand } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 const CATEGORIES = ["All", "Audio", "Streaming", "Lifestyle", "Software", "Retail", "Beverage"];
 
@@ -547,6 +548,7 @@ function BrandCard({ brand, index, onOpen, saved, onToggleSave }: {
 /* ─── Page ───────────────────────────────────────────────── */
 export default function BrandMatches() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [activeCategory, setActiveCategory] = useState("All");
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
 
@@ -555,6 +557,7 @@ export default function BrandMatches() {
     queryKey: ["saved-brands"],
     queryFn: () => api.get("/saved-brands/me"),
     staleTime: 60_000,
+    retry: 1,
   });
 
   const savedBrandIds = new Set(savedBrandsList.map(sb => sb.brand_id));
@@ -566,7 +569,10 @@ export default function BrandMatches() {
         (prev ?? []).filter(sb => sb.brand_id !== brandId)
       );
       try { await api.delete(`/saved-brands/${brandId}`); }
-      catch { queryClient.invalidateQueries({ queryKey: ["saved-brands"] }); }
+      catch {
+        queryClient.invalidateQueries({ queryKey: ["saved-brands"] });
+        toast({ title: "Couldn't remove bookmark", description: `Failed to unsave ${brandName}. Please try again.`, variant: "destructive" });
+      }
     } else {
       // Optimistic add
       queryClient.setQueryData<SavedBrand[]>(["saved-brands"], prev => [
@@ -574,9 +580,12 @@ export default function BrandMatches() {
         { brand_id: brandId, name: brandName, niche: "", short_bio: null, saved_at: new Date().toISOString() },
       ]);
       try { await api.post("/saved-brands", { brand_id: brandId }); }
-      catch { queryClient.invalidateQueries({ queryKey: ["saved-brands"] }); }
+      catch {
+        queryClient.invalidateQueries({ queryKey: ["saved-brands"] });
+        toast({ title: "Couldn't save brand", description: `Failed to bookmark ${brandName}. Please try again.`, variant: "destructive" });
+      }
     }
-  }, [savedBrandIds, queryClient]);
+  }, [savedBrandIds, queryClient, toast]);
 
   const filtered =
     activeCategory === "All" ? BRANDS : BRANDS.filter((b) => b.category === activeCategory);

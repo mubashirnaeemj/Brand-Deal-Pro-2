@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useLocation, useSearch } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, Copy, Check, ChevronDown, AlertTriangle, Lightbulb,
   Headphones, Music, Cpu, Camera, ShoppingBag, Zap, User, ArrowRight,
@@ -146,6 +147,7 @@ function ContactTypeBadge({ type }: { type: "agency"|"in-house" }) {
 function OutboundMode() {
   const [, setLocation] = useLocation();
   const search = useSearch();
+  const queryClient = useQueryClient();
   const [prefillBrand] = useState(() => new URLSearchParams(search).get("brand") ?? "");
   const [form, setFormState] = useState<OutboundForm>(() => {
     if (prefillBrand && MATCHED_BRANDS.some(b => b.name === prefillBrand)) {
@@ -191,6 +193,9 @@ function OutboundMode() {
       const data = await api.post<ApiPitch>("/pitches", body);
       setEmail(data.pitch_text);
       setPitchLogged(true); // API auto-saves the pitch
+      // Invalidate cached pitches and dashboard stats so Pipeline + Dashboard reflect the new pitch immediately
+      queryClient.invalidateQueries({ queryKey: ["pitches"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       setTimeout(() => emailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong generating your email. Please try again.");

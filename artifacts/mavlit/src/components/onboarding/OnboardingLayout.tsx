@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Loader2, LogOut } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { Link } from "wouter";
 import ProgressStepper from "./ProgressStepper";
 import type { StepKey } from "./types";
 
@@ -9,7 +10,6 @@ export default function OnboardingLayout({
   children,
   onPrevious,
   onContinue,
-  onLogout,
   continueLabel = "Continue",
   showPrevious = true,
   showContinue = true,
@@ -21,7 +21,6 @@ export default function OnboardingLayout({
   children: ReactNode;
   onPrevious?: () => void;
   onContinue?: () => void;
-  onLogout: () => void;
   continueLabel?: string;
   showPrevious?: boolean;
   showContinue?: boolean;
@@ -40,9 +39,7 @@ export default function OnboardingLayout({
             </div>
             <span className="text-lg font-bold tracking-tight text-white">MAVLIT</span>
           </div>
-          <button type="button" onClick={onLogout} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-white">
-            <LogOut size={13} /> Sign out
-          </button>
+          <Link href="/" className="text-xs text-muted-foreground hover:text-white">Back to MAVLIT</Link>
         </div>
       </header>
 

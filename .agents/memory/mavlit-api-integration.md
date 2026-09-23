@@ -13,8 +13,7 @@ description: All pages in the MAVLIT frontend wired to api.mavlit.com; cookie-ba
 - AuthContext (`artifacts/mavlit/src/contexts/AuthContext.tsx`) is the single source of truth for user state; caches to `mavlit_profile_cache` in localStorage as a loading fallback
 
 ## ProtectedRoute
-- Defined in `App.tsx`; redirects to `/login` if no user, to `/profile-setup` if `isProfileComplete()` returns false
-- `isProfileComplete()` = full_name + creator_handle + content_niche all non-null
+- Authenticated app pages require login. Profile setup is a separate public frontend-only preview and does not gate dashboard access.
 
 ## Shared API wrapper
 - `artifacts/mavlit/src/lib/api.ts` — `api.get/post/put/delete` all targeting `https://api.mavlit.com`
@@ -50,10 +49,6 @@ description: All pages in the MAVLIT frontend wired to api.mavlit.com; cookie-ba
 - Match scores, reviews, deal ranges remain hardcoded (not in API)
 - Same saved-brands API pattern as BrandMatches (shared `["saved-brands"]` query key)
 
-### ProfileSetup (`artifacts/mavlit/src/pages/ProfileSetup.tsx`)
-- `handleSave` calls `await updateProfile(...)` → `PUT /creator-profile/me`
-- Only identity + niche fields (full_name, creator_handle, location_city, location_country, bio_tagline, content_niche)
-
 ### ProfileSettings (`artifacts/mavlit/src/pages/ProfileSettings.tsx`)
 - Seeds form from `auth.user` on first load (via `seededRef` guard)
 - `handleSave` calls `PUT /creator-profile/me` with identity + niche + sub_niches + audience_gender + audience_age_bracket
@@ -74,10 +69,10 @@ Direct server-to-server requests to `api.mavlit.com` work, but as of September 2
 
 **How to apply:** Keep frontend URLs absolute as required, but do not treat `Failed to fetch` as a frontend regression until the external API enables the actual frontend origins and handles OPTIONS requests.
 
-## Onboarding schema boundary
+## Frontend-only onboarding
 
-The live creator-profile API supports identity, location, content, platform handles, follower counts, niches, exclusions, and audience analytics, but not creator age, personal gender, or an explicit onboarding-complete field.
+Keep `/profile-setup` independent of authentication and the backend API. Draft and completed answers are stored only on the visitor's device; completing this preview does not update their account or unlock the dashboard.
 
-**Why:** The multi-step onboarding needs those inputs, but sending undocumented properties would not provide reliable server persistence.
+**Why:** The user explicitly requested a frontend-only page, and the external API does not support every field in the onboarding form. A forced server-completeness gate would strand users in a form that cannot update server state.
 
-**How to apply:** Save supported fields through the profile API. Keep unsupported onboarding-only fields in the completed local snapshot until the external API schema adds dedicated properties; profile completeness remains derived from required profile fields.
+**How to apply:** Do not reintroduce API submission or auth gating on this page without a new request. Be clear in UI copy that local answers do not create a server profile.

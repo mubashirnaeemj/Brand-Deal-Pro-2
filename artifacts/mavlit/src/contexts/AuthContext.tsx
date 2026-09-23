@@ -53,7 +53,7 @@ export function isProfileComplete(profile: CreatorProfile): boolean {
 interface AuthContextValue {
   user: CreatorProfile | null;
   isLoading: boolean;
-  login: (email: string, password: string, returnToOnboarding?: boolean) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   updateProfile: (patch: Partial<CreatorProfile>) => Promise<void>;
 }
@@ -94,17 +94,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, []);
 
-  const login = useCallback(async (email: string, password: string, returnToOnboarding = false) => {
+  const login = useCallback(async (email: string, password: string) => {
     // Login sets the httpOnly cookie on the server; we receive the profile in the response
     const profile = await api.post<CreatorProfile>("/auth/login", { email, password });
     setUser(profile);
     try { localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile)); } catch { /* ignore */ }
 
-    if (returnToOnboarding || !isProfileComplete(profile)) {
-      navigate("/profile-setup");
-    } else {
-      navigate("/dashboard");
-    }
+    navigate("/dashboard");
   }, [navigate]);
 
   const logout = useCallback(async () => {

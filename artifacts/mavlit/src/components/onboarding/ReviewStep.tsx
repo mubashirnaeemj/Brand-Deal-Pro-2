@@ -50,7 +50,7 @@ export default function ReviewStep({ data }: { data: OnboardingData }) {
       </div>
       <div className="mt-5 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/10 p-4">
         <MapPin size={16} className="mt-0.5 shrink-0 text-primary" />
-        <p className="text-xs leading-5 text-slate-300">Submitting creates your creator profile and takes you to your personalized dashboard. You can update these details later from Profile.</p>
+        <p className="text-xs leading-5 text-slate-300">This is a frontend-only preview. Saving keeps your answers on this device; it does not create an account or update your MAVLIT profile.</p>
       </div>
     </div>
   );

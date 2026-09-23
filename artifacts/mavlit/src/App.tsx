@@ -17,14 +17,13 @@ import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
 import Login from "@/pages/Login";
 import BrandCatalog from "@/pages/BrandCatalog";
-import { AuthProvider, useAuth, isProfileComplete } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
-/** Wraps any app route — redirects to /login if not authed, /profile-setup if identity incomplete */
+/** Wraps authenticated app routes. The standalone onboarding preview is public. */
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
-  const [location] = useLocation();
 
   if (isLoading) {
     return (
@@ -36,10 +35,6 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
   if (!user) {
     return <Redirect to="/login" />;
-  }
-
-  if (!isProfileComplete(user) && location !== "/profile-setup") {
-    return <Redirect to="/profile-setup" />;
   }
 
   return <Component />;
@@ -55,16 +50,6 @@ function Router() {
       <Route path="/terms" component={Terms} />
       <Route path="/brand-catalog" component={BrandCatalog} />
 
-      {/* Profile setup — authed but not yet complete */}
-      <Route path="/profile-setup">
-        {() => {
-          const { user, isLoading } = useAuth();
-          if (isLoading) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
-          if (!user) return <Redirect to="/login?next=%2Fprofile-setup" />;
-          return <OnboardingPage />;
-        }}
-      </Route>
-
       {/* Protected app routes */}
       <Route path="/brand-matches"   component={() => <ProtectedRoute component={BrandMatches}    />} />
       <Route path="/brands/:slug"    component={() => <ProtectedRoute component={BrandDetail}      />} />
@@ -79,15 +64,23 @@ function Router() {
   );
 }
 
+function RoutedApp() {
+  const [location] = useLocation();
+  if (location === "/profile-setup") return <OnboardingPage />;
+  return (
+    <AuthProvider>
+      <Router />
+      <DemoBar />
+    </AuthProvider>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AuthProvider>
-            <Router />
-            <DemoBar />
-          </AuthProvider>
+          <RoutedApp />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

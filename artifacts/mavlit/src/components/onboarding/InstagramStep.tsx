@@ -1,16 +1,21 @@
 import { Instagram } from "lucide-react";
 import AudienceDemographicsForm from "./AudienceDemographicsForm";
+import DescriptionModeSelector from "./DescriptionModeSelector";
 import MultiSelectDropdown from "./MultiSelectDropdown";
-import type { FieldErrors, InstagramProfile } from "./types";
+import type { DescriptionMode, FieldErrors, InstagramProfile } from "./types";
 import { INPUT_CLASS, NICHE_OPTIONS, SUB_NICHE_OPTIONS } from "./types";
 
 export default function InstagramStep({
   value,
   onChange,
+  descriptionMode,
+  onDescriptionModeChange,
   errors,
 }: {
   value: InstagramProfile;
   onChange: (value: InstagramProfile) => void;
+  descriptionMode: DescriptionMode;
+  onDescriptionModeChange: (mode: DescriptionMode) => void;
   errors: FieldErrors;
 }) {
   const set = <K extends keyof InstagramProfile>(key: K, next: InstagramProfile[K]) => onChange({ ...value, [key]: next });
@@ -39,9 +44,11 @@ export default function InstagramStep({
       </div>
 
       <div className="mt-5">
-        <Field label="Describe your Instagram content" error={errors.contentDescription}>
-          <textarea rows={4} value={value.contentDescription} onChange={(event) => set("contentDescription", event.target.value)} placeholder="Describe the content you publish on Instagram." className={`${INPUT_CLASS} resize-none leading-6 ${errors.contentDescription ? "border-red-500/60" : ""}`} />
-        </Field>
+        <DescriptionModeSelector platform="instagram" mode={descriptionMode} onChange={onDescriptionModeChange}>
+          <Field label="Describe your Instagram content" error={errors.contentDescription}>
+            <textarea rows={4} value={value.contentDescription} onChange={(event) => set("contentDescription", event.target.value)} placeholder="Describe the content you publish on Instagram." className={`${INPUT_CLASS} resize-none leading-6 ${errors.contentDescription ? "border-red-500/60" : ""}`} />
+          </Field>
+        </DescriptionModeSelector>
       </div>
       <div className="mt-5">
         <Field label="Brand categories to avoid">

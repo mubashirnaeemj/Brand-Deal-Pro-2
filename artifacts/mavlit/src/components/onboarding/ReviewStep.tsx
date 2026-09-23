@@ -24,7 +24,8 @@ export default function ReviewStep({ data }: { data: OnboardingData }) {
               ["Username", `@${data.instagram.username}`],
               ["Followers", formatNumber(data.instagram.followers)],
               ["Niches", [...data.instagram.niches, ...data.instagram.subNiches].join(", ")],
-              ["Content", data.instagram.contentDescription],
+              ["Description method", modeLabel(data.instagramDescriptionMode)],
+              ...(data.instagramDescriptionMode === "manual" ? [["Content", data.instagram.contentDescription] as [string, string]] : []),
               ["Audience", audienceLabel(data.instagram.audience)],
               ["Avoid", data.instagram.excludedCategories || "None specified"],
             ]} />
@@ -37,7 +38,8 @@ export default function ReviewStep({ data }: { data: OnboardingData }) {
               ["Channel", data.youtube.channelName],
               ["Subscribers", formatNumber(data.youtube.subscribers)],
               ["Niches", [...data.youtube.niches, ...data.youtube.subNiches].join(", ")],
-              ["Content", data.youtube.contentDescription],
+              ["Description method", modeLabel(data.youtubeDescriptionMode)],
+              ...(data.youtubeDescriptionMode === "manual" ? [["Content", data.youtube.contentDescription] as [string, string]] : []),
               ["Audience", audienceLabel(data.youtube.audience)],
               ["Avoid", data.youtube.excludedCategories || "None specified"],
             ]} />
@@ -75,4 +77,8 @@ function formatNumber(value: string) {
 
 function audienceLabel(value: { malePct: string; femalePct: string }) {
   return `${value.malePct || "0"}% male · ${value.femalePct || "0"}% female`;
+}
+
+function modeLabel(mode: "manual" | "generate") {
+  return mode === "generate" ? "Let MAVLIT generate it from my content" : "Write it myself";
 }

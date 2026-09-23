@@ -121,6 +121,8 @@ export default function OnboardingPage() {
       <InstagramStep
         value={data.instagram}
         onChange={(instagram) => setData((current) => ({ ...current, instagram }))}
+        descriptionMode={data.instagramDescriptionMode}
+        onDescriptionModeChange={(instagramDescriptionMode) => setData((current) => ({ ...current, instagramDescriptionMode }))}
         errors={errors}
       />
     ),
@@ -128,6 +130,8 @@ export default function OnboardingPage() {
       <YouTubeStep
         value={data.youtube}
         onChange={(youtube) => setData((current) => ({ ...current, youtube }))}
+        descriptionMode={data.youtubeDescriptionMode}
+        onDescriptionModeChange={(youtubeDescriptionMode) => setData((current) => ({ ...current, youtubeDescriptionMode }))}
         errors={errors}
       />
     ),
@@ -197,6 +201,8 @@ function loadDraft(): SavedDraft {
 
 function currentFields(data: OnboardingData): OnboardingData {
   return {
+    instagramDescriptionMode: data.instagramDescriptionMode === "generate" ? "generate" : "manual",
+    youtubeDescriptionMode: data.youtubeDescriptionMode === "generate" ? "generate" : "manual",
     creator: {
       fullName: data.creator.fullName ?? "",
       age: data.creator.age ?? "",
@@ -245,7 +251,7 @@ function validateStep(step: StepKey, data: OnboardingData): FieldErrors {
     if (!data.instagram.username.trim()) errors.username = "Instagram username is required.";
     if (data.instagram.followers === "" || Number(data.instagram.followers) < 0) errors.followers = "Enter a valid follower count.";
     if (!data.instagram.niches.length) errors.niches = "Select at least one primary niche.";
-    if (!data.instagram.contentDescription.trim()) errors.contentDescription = "Describe your Instagram content.";
+    if (data.instagramDescriptionMode === "manual" && !data.instagram.contentDescription.trim()) errors.contentDescription = "Describe your Instagram content.";
     if (audienceTotal(data.instagram.audience) > 100) errors.audience = "Male and female percentages cannot exceed 100% combined.";
     return errors;
   }
@@ -254,7 +260,7 @@ function validateStep(step: StepKey, data: OnboardingData): FieldErrors {
     if (!data.youtube.channelName.trim()) errors.channelName = "Channel name is required.";
     if (data.youtube.subscribers === "" || Number(data.youtube.subscribers) < 0) errors.subscribers = "Enter a valid subscriber count.";
     if (!data.youtube.niches.length) errors.niches = "Select at least one primary niche.";
-    if (!data.youtube.contentDescription.trim()) errors.contentDescription = "Describe your YouTube content.";
+    if (data.youtubeDescriptionMode === "manual" && !data.youtube.contentDescription.trim()) errors.contentDescription = "Describe your YouTube content.";
     if (audienceTotal(data.youtube.audience) > 100) errors.audience = "Male and female percentages cannot exceed 100% combined.";
     return errors;
   }

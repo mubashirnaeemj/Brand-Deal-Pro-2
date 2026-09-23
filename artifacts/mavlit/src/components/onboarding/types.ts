@@ -1,4 +1,5 @@
 export type PlatformKey = "instagram" | "youtube";
+export type DescriptionMode = "manual" | "generate";
 
 export type AudienceDemographics = {
   malePct: string;
@@ -26,6 +27,8 @@ export type YouTubeProfile = {
 };
 
 export type OnboardingData = {
+  instagramDescriptionMode: DescriptionMode;
+  youtubeDescriptionMode: DescriptionMode;
   creator: {
     fullName: string;
     age: string;
@@ -56,6 +59,8 @@ export const SUB_NICHE_OPTIONS = [
 ];
 
 export const EMPTY_ONBOARDING: OnboardingData = {
+  instagramDescriptionMode: "manual",
+  youtubeDescriptionMode: "manual",
   creator: {
     fullName: "",
     age: "",

@@ -73,3 +73,11 @@ Direct server-to-server requests to `api.mavlit.com` work, but as of September 2
 **Why:** Browser requests from the Replit preview, localhost, `mavlit.com`, `www.mavlit.com`, and `app.mavlit.com` are blocked by CORS even though `curl` receives valid catalog data.
 
 **How to apply:** Keep frontend URLs absolute as required, but do not treat `Failed to fetch` as a frontend regression until the external API enables the actual frontend origins and handles OPTIONS requests.
+
+## Onboarding schema boundary
+
+The live creator-profile API supports identity, location, content, platform handles, follower counts, niches, exclusions, and audience analytics, but not creator age, personal gender, or an explicit onboarding-complete field.
+
+**Why:** The multi-step onboarding needs those inputs, but sending undocumented properties would not provide reliable server persistence.
+
+**How to apply:** Save supported fields through the profile API. Keep unsupported onboarding-only fields in the completed local snapshot until the external API schema adds dedicated properties; profile completeness remains derived from required profile fields.

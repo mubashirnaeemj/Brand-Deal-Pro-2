@@ -10,7 +10,7 @@ import BrandDetail from "@/pages/BrandDetail";
 import Pitch from "@/pages/Pitch";
 import Dashboard from "@/pages/Dashboard";
 import ProfileSettings from "@/pages/ProfileSettings";
-import ProfileSetup from "@/pages/ProfileSetup";
+import OnboardingPage from "@/pages/OnboardingPage";
 import Negotiator from "@/pages/Negotiator";
 import Pipeline from "@/pages/Pipeline";
 import Privacy from "@/pages/Privacy";
@@ -61,7 +61,7 @@ function Router() {
           const { user, isLoading } = useAuth();
           if (isLoading) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
           if (!user) return <Redirect to="/login" />;
-          return <ProfileSetup />;
+          return <OnboardingPage />;
         }}
       </Route>
 

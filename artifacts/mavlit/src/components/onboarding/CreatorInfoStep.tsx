@@ -31,12 +31,6 @@ export default function CreatorInfoStep({
         <Field label="Age" error={errors.age}>
           <input type="number" min="13" max="120" value={value.age} onChange={(event) => set("age", event.target.value)} placeholder="25" className={`${INPUT_CLASS} ${errors.age ? "border-red-500/60" : ""}`} />
         </Field>
-        <Field label="City" error={errors.city}>
-          <input value={value.city} onChange={(event) => set("city", event.target.value)} placeholder="Los Angeles" className={`${INPUT_CLASS} ${errors.city ? "border-red-500/60" : ""}`} />
-        </Field>
-        <Field label="Country" error={errors.country}>
-          <input value={value.country} onChange={(event) => set("country", event.target.value)} placeholder="United States" className={`${INPUT_CLASS} ${errors.country ? "border-red-500/60" : ""}`} />
-        </Field>
       </div>
 
       <div className="mt-5">
@@ -49,18 +43,6 @@ export default function CreatorInfoStep({
             <option>Prefer not to say</option>
             <option>Other</option>
           </select>
-        </Field>
-      </div>
-
-      <div className="mt-5">
-        <Field label="Content description" error={errors.contentDescription}>
-          <textarea
-            rows={4}
-            value={value.contentDescription}
-            onChange={(event) => set("contentDescription", event.target.value)}
-            placeholder="Describe the type of content you create and the audience you serve."
-            className={`${INPUT_CLASS} resize-none leading-6 ${errors.contentDescription ? "border-red-500/60" : ""}`}
-          />
         </Field>
       </div>
 

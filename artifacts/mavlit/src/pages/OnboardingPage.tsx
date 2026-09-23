@@ -11,7 +11,6 @@ import ReviewStep from "@/components/onboarding/ReviewStep";
 import {
   EMPTY_ONBOARDING,
   audienceTotal,
-  isValidUrl,
   type FieldErrors,
   type OnboardingData,
   type StepKey,
@@ -182,12 +181,12 @@ function loadDraft(): SavedDraft {
     const raw = localStorage.getItem(DRAFT_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as SavedDraft;
-      if (parsed.data?.creator && parsed.data.instagram && parsed.data.youtube && ["welcome", "creator", "instagram", "youtube", "review"].includes(parsed.step)) return parsed;
+      if (parsed.data?.creator && parsed.data.instagram && parsed.data.youtube && ["welcome", "creator", "instagram", "youtube", "review"].includes(parsed.step)) return { ...parsed, data: currentFields(parsed.data) };
     }
     const completed = localStorage.getItem(COMPLETED_KEY);
     if (completed) {
       const parsed = JSON.parse(completed) as { data?: OnboardingData };
-      if (parsed.data?.creator && parsed.data.instagram && parsed.data.youtube) return { data: parsed.data, step: "welcome" };
+      if (parsed.data?.creator && parsed.data.instagram && parsed.data.youtube) return { data: currentFields(parsed.data), step: "welcome" };
     }
   } catch {
     localStorage.removeItem(DRAFT_KEY);
@@ -196,39 +195,67 @@ function loadDraft(): SavedDraft {
   return { data: EMPTY_ONBOARDING, step: "welcome" };
 }
 
+function currentFields(data: OnboardingData): OnboardingData {
+  return {
+    creator: {
+      fullName: data.creator.fullName ?? "",
+      age: data.creator.age ?? "",
+      gender: data.creator.gender ?? "",
+      platforms: data.creator.platforms ?? [],
+    },
+    instagram: {
+      username: data.instagram.username ?? "",
+      followers: data.instagram.followers ?? "",
+      niches: data.instagram.niches ?? [],
+      subNiches: data.instagram.subNiches ?? [],
+      contentDescription: data.instagram.contentDescription ?? "",
+      excludedCategories: data.instagram.excludedCategories ?? "",
+      audience: {
+        malePct: data.instagram.audience?.malePct ?? "",
+        femalePct: data.instagram.audience?.femalePct ?? "",
+      },
+    },
+    youtube: {
+      channelName: data.youtube.channelName ?? "",
+      subscribers: data.youtube.subscribers ?? "",
+      niches: data.youtube.niches ?? [],
+      subNiches: data.youtube.subNiches ?? [],
+      contentDescription: data.youtube.contentDescription ?? "",
+      excludedCategories: data.youtube.excludedCategories ?? "",
+      audience: {
+        malePct: data.youtube.audience?.malePct ?? "",
+        femalePct: data.youtube.audience?.femalePct ?? "",
+      },
+    },
+  };
+}
+
 function validateStep(step: StepKey, data: OnboardingData): FieldErrors {
   if (step === "creator") {
     const errors: FieldErrors = {};
     const age = Number(data.creator.age);
     if (!data.creator.fullName.trim()) errors.fullName = "Full name is required.";
-    if (!data.creator.city.trim()) errors.city = "City is required.";
-    if (!data.creator.country.trim()) errors.country = "Country is required.";
     if (!Number.isInteger(age) || age < 13 || age > 120) errors.age = "Enter an age between 13 and 120.";
     if (!data.creator.gender) errors.gender = "Select a gender option.";
-    if (!data.creator.contentDescription.trim()) errors.contentDescription = "Tell us what content you create.";
     if (!data.creator.platforms.length) errors.platforms = "Select at least one primary platform.";
     return errors;
   }
   if (step === "instagram") {
     const errors: FieldErrors = {};
     if (!data.instagram.username.trim()) errors.username = "Instagram username is required.";
-    if (!isValidUrl(data.instagram.profileUrl)) errors.profileUrl = "Enter a valid Instagram profile URL.";
     if (data.instagram.followers === "" || Number(data.instagram.followers) < 0) errors.followers = "Enter a valid follower count.";
     if (!data.instagram.niches.length) errors.niches = "Select at least one primary niche.";
     if (!data.instagram.contentDescription.trim()) errors.contentDescription = "Describe your Instagram content.";
     if (audienceTotal(data.instagram.audience) > 100) errors.audience = "Male and female percentages cannot exceed 100% combined.";
-    if (!data.instagram.audience.topCountry.trim()) errors.topCountry = "Top audience country is required.";
     return errors;
   }
   if (step === "youtube") {
     const errors: FieldErrors = {};
     if (!data.youtube.channelName.trim()) errors.channelName = "Channel name is required.";
-    if (!isValidUrl(data.youtube.channelUrl)) errors.channelUrl = "Enter a valid YouTube channel URL.";
     if (data.youtube.subscribers === "" || Number(data.youtube.subscribers) < 0) errors.subscribers = "Enter a valid subscriber count.";
     if (!data.youtube.niches.length) errors.niches = "Select at least one primary niche.";
     if (!data.youtube.contentDescription.trim()) errors.contentDescription = "Describe your YouTube content.";
     if (audienceTotal(data.youtube.audience) > 100) errors.audience = "Male and female percentages cannot exceed 100% combined.";
-    if (!data.youtube.audience.topCountry.trim()) errors.topCountry = "Top audience country is required.";
     return errors;
   }
   return {};

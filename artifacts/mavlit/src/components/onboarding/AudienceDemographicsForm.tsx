@@ -44,17 +44,8 @@ export default function AudienceDemographicsForm({
           />
         </label>
       </div>
-      <label className="mt-4 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Top audience country
-        <input
-          value={value.topCountry}
-          onChange={(event) => onChange({ ...value, topCountry: event.target.value })}
-          placeholder="e.g. United States"
-          className={`${INPUT_CLASS} mt-1.5 ${errors.topCountry ? "border-red-500/60" : ""}`}
-        />
-      </label>
-      {(errors.audience || errors.topCountry) && (
-        <p className="mt-2 text-xs text-red-400">{errors.audience || errors.topCountry}</p>
+      {errors.audience && (
+        <p className="mt-2 text-xs text-red-400">{errors.audience}</p>
       )}
     </div>
   );

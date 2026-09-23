@@ -6,17 +6,15 @@ export default function ReviewStep({ data }: { data: OnboardingData }) {
     <div>
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">One last check</p>
       <h1 className="mt-2 text-2xl font-extrabold text-white sm:text-3xl">Review your profile</h1>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">Confirm everything looks right before MAVLIT starts building your matches.</p>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">Check your answers before saving them on this device.</p>
 
       <div className="mt-7 space-y-4">
         <ReviewCard icon={<User size={17} />} title="Creator information">
           <Rows rows={[
             ["Name", data.creator.fullName],
-            ["Location", `${data.creator.city}, ${data.creator.country}`],
             ["Age", data.creator.age],
             ["Gender", data.creator.gender],
             ["Platforms", data.creator.platforms.map(capitalize).join(", ")],
-            ["Content", data.creator.contentDescription],
           ]} />
         </ReviewCard>
 
@@ -24,11 +22,10 @@ export default function ReviewStep({ data }: { data: OnboardingData }) {
           <ReviewCard icon={<Instagram size={17} />} title="Instagram information">
             <Rows rows={[
               ["Username", `@${data.instagram.username}`],
-              ["Profile", data.instagram.profileUrl],
               ["Followers", formatNumber(data.instagram.followers)],
               ["Niches", [...data.instagram.niches, ...data.instagram.subNiches].join(", ")],
+              ["Content", data.instagram.contentDescription],
               ["Audience", audienceLabel(data.instagram.audience)],
-              ["Top country", data.instagram.audience.topCountry],
               ["Avoid", data.instagram.excludedCategories || "None specified"],
             ]} />
           </ReviewCard>
@@ -38,11 +35,10 @@ export default function ReviewStep({ data }: { data: OnboardingData }) {
           <ReviewCard icon={<Youtube size={17} />} title="YouTube information">
             <Rows rows={[
               ["Channel", data.youtube.channelName],
-              ["Profile", data.youtube.channelUrl],
               ["Subscribers", formatNumber(data.youtube.subscribers)],
               ["Niches", [...data.youtube.niches, ...data.youtube.subNiches].join(", ")],
+              ["Content", data.youtube.contentDescription],
               ["Audience", audienceLabel(data.youtube.audience)],
-              ["Top country", data.youtube.audience.topCountry],
               ["Avoid", data.youtube.excludedCategories || "None specified"],
             ]} />
           </ReviewCard>

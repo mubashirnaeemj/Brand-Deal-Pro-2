@@ -3,12 +3,10 @@ export type PlatformKey = "instagram" | "youtube";
 export type AudienceDemographics = {
   malePct: string;
   femalePct: string;
-  topCountry: string;
 };
 
 export type InstagramProfile = {
   username: string;
-  profileUrl: string;
   followers: string;
   niches: string[];
   subNiches: string[];
@@ -19,7 +17,6 @@ export type InstagramProfile = {
 
 export type YouTubeProfile = {
   channelName: string;
-  channelUrl: string;
   subscribers: string;
   niches: string[];
   subNiches: string[];
@@ -31,11 +28,8 @@ export type YouTubeProfile = {
 export type OnboardingData = {
   creator: {
     fullName: string;
-    city: string;
-    country: string;
     age: string;
     gender: string;
-    contentDescription: string;
     platforms: PlatformKey[];
   };
   instagram: InstagramProfile;
@@ -64,51 +58,32 @@ export const SUB_NICHE_OPTIONS = [
 export const EMPTY_ONBOARDING: OnboardingData = {
   creator: {
     fullName: "",
-    city: "",
-    country: "",
     age: "",
     gender: "",
-    contentDescription: "",
     platforms: [],
   },
   instagram: {
     username: "",
-    profileUrl: "",
     followers: "",
     niches: [],
     subNiches: [],
     contentDescription: "",
     excludedCategories: "",
-    audience: { malePct: "", femalePct: "", topCountry: "" },
+    audience: { malePct: "", femalePct: "" },
   },
   youtube: {
     channelName: "",
-    channelUrl: "",
     subscribers: "",
     niches: [],
     subNiches: [],
     contentDescription: "",
     excludedCategories: "",
-    audience: { malePct: "", femalePct: "", topCountry: "" },
+    audience: { malePct: "", femalePct: "" },
   },
 };
 
 export const INPUT_CLASS =
   "w-full rounded-xl border border-border bg-secondary/80 px-4 py-3 text-sm text-white outline-none transition placeholder:text-muted-foreground/50 focus:border-primary/70 focus:ring-2 focus:ring-primary/15";
-
-export function isValidUrl(value: string) {
-  if (!value.trim()) return false;
-  try {
-    const url = new URL(value.startsWith("http") ? value : `https://${value}`);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-export function parseList(value: string) {
-  return value.split(",").map((item) => item.trim()).filter(Boolean);
-}
 
 export function audienceTotal(audience: AudienceDemographics) {
   return (Number(audience.malePct) || 0) + (Number(audience.femalePct) || 0);

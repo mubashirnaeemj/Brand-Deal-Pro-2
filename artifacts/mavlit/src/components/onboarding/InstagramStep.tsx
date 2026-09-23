@@ -33,12 +33,6 @@ export default function InstagramStep({
           <input type="number" min="0" value={value.followers} onChange={(event) => set("followers", event.target.value)} placeholder="45000" className={`${INPUT_CLASS} ${errors.followers ? "border-red-500/60" : ""}`} />
         </Field>
       </div>
-      <div className="mt-5">
-        <Field label="Instagram profile URL" error={errors.profileUrl}>
-          <input type="url" value={value.profileUrl} onChange={(event) => set("profileUrl", event.target.value)} placeholder="https://instagram.com/yourhandle" className={`${INPUT_CLASS} ${errors.profileUrl ? "border-red-500/60" : ""}`} />
-        </Field>
-      </div>
-
       <div className="mt-5 grid gap-5 sm:grid-cols-2">
         <MultiSelectDropdown label="Primary niche" options={NICHE_OPTIONS} selected={value.niches} onChange={(items) => set("niches", items)} placeholder="Select one or more" error={errors.niches} />
         <MultiSelectDropdown label="Sub-niches" options={SUB_NICHE_OPTIONS} selected={value.subNiches} onChange={(items) => set("subNiches", items)} placeholder="Select sub-niches" searchable />

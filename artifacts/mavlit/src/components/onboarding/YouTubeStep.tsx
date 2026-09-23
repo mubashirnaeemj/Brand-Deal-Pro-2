@@ -33,12 +33,6 @@ export default function YouTubeStep({
           <input type="number" min="0" value={value.subscribers} onChange={(event) => set("subscribers", event.target.value)} placeholder="12000" className={`${INPUT_CLASS} ${errors.subscribers ? "border-red-500/60" : ""}`} />
         </Field>
       </div>
-      <div className="mt-5">
-        <Field label="Channel URL" error={errors.channelUrl}>
-          <input type="url" value={value.channelUrl} onChange={(event) => set("channelUrl", event.target.value)} placeholder="https://youtube.com/@yourchannel" className={`${INPUT_CLASS} ${errors.channelUrl ? "border-red-500/60" : ""}`} />
-        </Field>
-      </div>
-
       <div className="mt-5 grid gap-5 sm:grid-cols-2">
         <MultiSelectDropdown label="Primary niche" options={NICHE_OPTIONS} selected={value.niches} onChange={(items) => set("niches", items)} placeholder="Select one or more" error={errors.niches} />
         <MultiSelectDropdown label="Sub-niches" options={SUB_NICHE_OPTIONS} selected={value.subNiches} onChange={(items) => set("subNiches", items)} placeholder="Select sub-niches" searchable />

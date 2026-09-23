@@ -1,0 +1,341 @@
+Build a completely new multi-step creator onboarding flow for the MAVLIT web application.
+
+## Goal
+
+Create a modern, professional onboarding experience for first-time creators joining MAVLIT.
+
+The onboarding should feel similar to SaaS products like Notion, Stripe, and HubSpot.
+
+Use a clean card-based UI with:
+
+* Progress indicator at the top
+* Previous / Continue buttons
+* Auto-save form state
+* Smooth slide animations between steps
+* Mobile responsive design
+* Form validation
+* Dark mode support if already available in the app
+
+---
+
+# Step 1: Welcome Screen
+
+Title:
+
+Welcome to MAVLIT
+
+Subtitle:
+
+MAVLIT helps creators discover brands that are actively working with creators in their niche.
+
+We analyze:
+
+* Your content
+* Your niche
+* Brand partnerships
+* Audience fit
+
+to find sponsorship opportunities that match your profile.
+
+Show:
+
+* MAVLIT logo
+* Short explanation
+* "Get Started" button
+
+Clicking Get Started moves to Step 2.
+
+---
+
+# Step 2: Creator Information
+
+Collect:
+
+### Full Name
+
+Text input
+
+### City
+
+Text input
+
+### Country
+
+Text input
+
+### Age
+
+Number input
+
+### Gender
+
+Dropdown
+
+Options:
+
+* Male
+* Female
+* Non-binary
+* Prefer not to say
+* Other
+
+### Content Description
+
+Textarea
+
+Placeholder:
+
+Describe the type of content you create and the audience you serve.
+
+### Primary Platforms
+
+Multi-select dropdown.
+
+Options:
+
+* Instagram
+* YouTube
+
+Validation:
+At least one platform must be selected.
+
+Continue button.
+
+Routing rules:
+
+If only Instagram selected:
+→ Open Instagram Profile Step
+
+If only YouTube selected:
+→ Open YouTube Profile Step
+
+If both selected:
+→ Open Instagram Profile Step first
+→ Then YouTube Profile Step
+
+---
+
+# Instagram Step
+
+Show only when Instagram is selected.
+
+Fields:
+
+### Instagram Username
+
+Text input
+
+### Instagram Profile URL
+
+URL input
+
+### Follower Count
+
+Number input
+
+### Primary Niche
+
+Multi-select dropdown
+
+### Sub-Niches
+
+Multi-select dropdown
+
+### Describe Your Instagram Content
+
+Textarea
+
+Placeholder:
+
+Describe the content you publish on Instagram.
+
+### Brand Categories To Avoid
+
+Text input
+
+Placeholder:
+
+Alcohol, Gambling, Crypto, Politics
+
+Store as comma-separated values.
+
+### Audience Demographics
+
+Audience Male (%)
+
+Number input
+
+Audience Female (%)
+
+Number input
+
+Top Audience Country
+
+Text input
+
+Validation:
+Male + Female percentages should not exceed 100.
+
+Continue button.
+
+If YouTube is also selected:
+→ Go to YouTube Step
+
+Otherwise:
+→ Go to Final Review Step
+
+---
+
+# YouTube Step
+
+Show only when YouTube is selected.
+
+Fields:
+
+### Channel Name
+
+Text input
+
+### Channel URL
+
+URL input
+
+### Subscriber Count
+
+Number input
+
+### Primary Niche
+
+Multi-select dropdown
+
+### Sub-Niches
+
+Multi-select dropdown
+
+### Describe Your YouTube Content
+
+Textarea
+
+Placeholder:
+
+Describe the content you publish on YouTube.
+
+### Brand Categories To Avoid
+
+Text input
+
+Placeholder:
+
+Alcohol, Gambling, Crypto, Politics
+
+Store as comma-separated values.
+
+### Audience Demographics
+
+Audience Male (%)
+
+Number input
+
+Audience Female (%)
+
+Number input
+
+Top Audience Country
+
+Text input
+
+Validation:
+Male + Female percentages should not exceed 100.
+
+Continue button.
+
+Go to Final Review Step.
+
+---
+
+# Niche Selection
+
+Allow selecting multiple values.
+
+Example niches:
+
+* Music
+* Beauty
+* Health
+* Fitness
+* Fashion
+* Finance
+* Business
+* Education
+* Gaming
+* Technology
+* Food
+* Travel
+* Lifestyle
+* Entertainment
+* Sports
+* Parenting
+* Art
+* Photography
+
+Sub-niches should support multiple selections and searchable dropdown behavior.
+
+---
+
+# Final Review Step
+
+Display all information entered.
+
+Sections:
+
+* Creator Information
+* Instagram Information (if provided)
+* YouTube Information (if provided)
+
+Buttons:
+
+Back
+
+Submit Profile
+
+---
+
+# Submission Behavior
+
+When user clicks Submit Profile:
+
+1. Validate all required fields
+2. Save onboarding data
+3. Mark user onboarding_complete = true
+4. Redirect to Creator Dashboard
+5. Show success toast
+
+Profile created successfully.
+
+---
+
+# Technical Requirements
+
+Use the existing MAVLIT design system.
+
+Create:
+
+* OnboardingPage.tsx
+* OnboardingLayout.tsx
+* WelcomeStep.tsx
+* CreatorInfoStep.tsx
+* InstagramStep.tsx
+* YouTubeStep.tsx
+* ReviewStep.tsx
+
+Create reusable components:
+
+* ProgressStepper
+* MultiSelectDropdown
+* AudienceDemographicsForm
+
+Persist onboarding state between page refreshes.
+
+Support future addition of TikTok and other platforms without major refactoring.
+
+Code should be production-ready, strongly typed, clean, and follow existing project architecture.

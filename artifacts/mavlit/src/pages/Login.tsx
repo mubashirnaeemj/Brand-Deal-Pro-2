@@ -8,6 +8,7 @@ const inputCls =
 
 export default function Login() {
   const { login } = useAuth();
+  const returnToOnboarding = new URLSearchParams(window.location.search).get("next") === "/profile-setup";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +20,7 @@ export default function Login() {
     setError(null);
     setLoading(true);
     try {
-      await login(email.trim(), password);
+      await login(email.trim(), password, returnToOnboarding);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {

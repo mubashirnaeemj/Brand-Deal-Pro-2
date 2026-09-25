@@ -1,0 +1,229 @@
+## `POST /pitches`
+
+**Input**
+```json
+{
+  "is_custom": false,
+  "brand_id": 7,
+  "story": "I use Studio Fit equipment in my mobility content.",
+  "product_reference": "Adjustable dumbbells",
+  "past_brand_partnership": null,
+  "content_link": "https://instagram.com/p/example"
+}
+```
+
+**Sample response**
+```json
+{
+  "id": 42,
+  "brand_id": 7,
+  "brand_name": "Studio Fit",
+  "is_custom": false,
+  "story": "I use Studio Fit equipment in my mobility content.",
+  "product_reference": "Adjustable dumbbells",
+  "past_brand_partnership": null,
+  "content_link": "https://instagram.com/p/example",
+  "contact_name": "Jane Doe",
+  "contact_email": "jane@studiofit.com",
+  "pitch_text": "Hi Jane,\n\nI've been a fan of Studio Fit...",
+  "status": "generated",
+  "source": "generated",
+  "sent_at": null,
+  "agreed_rate": null,
+  "created_at": "2026-09-25 12:00:00+00"
+}
+```
+
+## `POST /pitches/manual`
+
+**Input**
+```json
+{
+  "brand_id": 7,
+  "status": "sent",
+  "sent_at": "2026-09-25"
+}
+```
+
+Or for a custom brand:
+
+```json
+{
+  "custom_brand_name": "Example Brand",
+  "status": "sent",
+  "sent_at": "2026-09-25"
+}
+```
+
+**Sample response**
+```json
+{
+  "id": 43,
+  "brand_id": 7,
+  "brand_name": "Studio Fit",
+  "is_custom": false,
+  "story": "",
+  "product_reference": null,
+  "past_brand_partnership": null,
+  "content_link": null,
+  "contact_name": null,
+  "contact_email": null,
+  "pitch_text": null,
+  "status": "sent",
+  "source": "manual",
+  "sent_at": "2026-09-25",
+  "agreed_rate": null,
+  "created_at": "2026-09-25 12:05:00+00"
+}
+```
+
+## `PATCH /pitches/{id}`
+
+**Input**
+```json
+{
+  "status": "sent",
+  "sent_at": "2026-09-25"
+}
+```
+
+Or update the agreed rate:
+
+```json
+{
+  "status": "negotiating",
+  "agreed_rate": 1500
+}
+```
+
+**Sample response**
+```json
+{
+  "id": 42,
+  "brand_id": 7,
+  "brand_name": "Studio Fit",
+  "is_custom": false,
+  "story": "I use Studio Fit equipment in my mobility content.",
+  "product_reference": "Adjustable dumbbells",
+  "past_brand_partnership": null,
+  "content_link": "https://instagram.com/p/example",
+  "contact_name": "Jane Doe",
+  "contact_email": "jane@studiofit.com",
+  "pitch_text": "Hi Jane,\n\nI've been a fan of Studio Fit...",
+  "status": "sent",
+  "source": "generated",
+  "sent_at": "2026-09-25",
+  "agreed_rate": null,
+  "created_at": "2026-09-25 12:00:00+00"
+}
+```
+
+## `GET /pitches/me`
+
+**Input**
+
+Query parameters:
+
+```text
+/pitches/me?limit=20&offset=0
+```
+
+**Sample response**
+```json
+{
+  "pitches": [
+    {
+      "id": 42,
+      "brand_id": 7,
+      "brand_name": "Studio Fit",
+      "is_custom": false,
+      "story": "I use Studio Fit equipment in my mobility content.",
+      "product_reference": "Adjustable dumbbells",
+      "past_brand_partnership": null,
+      "content_link": null,
+      "contact_name": "Jane Doe",
+      "contact_email": "jane@studiofit.com",
+      "pitch_text": "Hi Jane...",
+      "status": "sent",
+      "source": "generated",
+      "sent_at": "2026-09-25",
+      "agreed_rate": 1500,
+      "created_at": "2026-09-25 12:00:00+00"
+    }
+  ],
+  "total": 37,
+  "limit": 20,
+  "offset": 0
+}
+```
+
+## `GET /dashboard/me`
+
+**Input**
+
+No request body.
+
+**Sample response**
+```json
+{
+  "brand_matches": 37,
+  "active_deals": 3,
+  "saved_brands": 8,
+  "verified_contacts": 5
+}
+```
+
+## `GET /matches/me`
+
+**Input**
+
+Query parameters:
+
+```text
+/matches/me?limit=20&offset=0
+```
+
+**Sample response**
+```json
+{
+  "matches": [
+    {
+      "brand_raw_id": 7,
+      "brand_name": "Studio Fit",
+      "niche": "fitness",
+      "total_score": 0.864,
+      "dimensions": {
+        "niche": {
+          "score": 0.9,
+          "weight": 0.4
+        },
+        "audience": {
+          "score": 0.78,
+          "weight": 0.3
+        }
+      },
+      "reasons": [
+        "Niche overlap",
+        "Audience fit"
+      ]
+    }
+  ],
+  "total": 37,
+  "cached": false,
+  "computed_at": "2026-09-25T12:00:00+00:00"
+}
+```
+
+## `POST /matches/me/refresh`
+
+**Input**
+
+Query parameter:
+
+```text
+/matches/me/refresh?limit=20
+```
+
+**Sample response**
+
+Same response shape as `GET /matches/me`, including `matches`, `total`, `cached`, and `computed_at`.

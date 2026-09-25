@@ -10,9 +10,8 @@ description: External API authentication, pitch lifecycle, cookie transport, and
 - `POST /auth/login` → sets `access_token` httpOnly cookie; response body is full CreatorProfile
 - `POST /auth/logout` → clears cookie
 - `GET /creator-profile/me` — session validation on mount in AuthContext
-- AuthContext (`artifacts/mavlit/src/contexts/AuthContext.tsx`) is the single source of truth for user state; caches to `mavlit_profile_cache` in localStorage as a loading fallback
 
-## ProtectedRoute
+## Route gate
 - All app pages require login; an incomplete creator can only access creator onboarding until their account profile is saved with the required fields.
 
 ## Pitch lifecycle

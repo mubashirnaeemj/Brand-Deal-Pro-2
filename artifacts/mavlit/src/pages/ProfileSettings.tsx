@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
 import {
   User,
   Instagram,
@@ -40,7 +39,8 @@ import {
   CommandEmpty,
 } from "@/components/ui/command";
 
-import { useAuth } from "@/contexts/AuthContext";
+import { isProfileComplete, useAuth } from "@/contexts/AuthContext";
+import { NICHE_OPTIONS, SUB_NICHE_OPTIONS, type PlatformKey } from "@/components/onboarding/types";
 
 const NICHES = [
   { value: "music",         label: "Music",                   Icon: Music      },
@@ -53,6 +53,15 @@ const NICHES = [
   { value: "finance",       label: "Finance",                 Icon: TrendingUp },
   { value: "newsletter",    label: "Substack / Newsletter",   Icon: Newspaper  },
 ];
+const NICHE_CHOICES = [
+  ...NICHES.map(({ value, label }) => ({ value, label })),
+  ...NICHE_OPTIONS.filter((name) => !NICHES.some((niche) => niche.label.toLowerCase() === name.toLowerCase()))
+    .map((name) => ({ value: name, label: name })),
+];
+function normalizeNiche(value: string | null | undefined): string {
+  if (!value) return "";
+  return NICHES.find((niche) => niche.value.toLowerCase() === value.toLowerCase() || niche.label.toLowerCase() === value.toLowerCase())?.value ?? value;
+}
 
 const PLATFORMS = [
   { key: "instagram", label: "Instagram",  Icon: Instagram,   color: "#e1306c", placeholder: "instagram.com/yourhandle"  },
@@ -70,6 +79,17 @@ type RateEntry = { amount: string; includesExclusivity: boolean; includesPaidUsa
 type ProfileForm = {
   name: string;
   handle: string;
+  age: string;
+  gender: string;
+  platforms: PlatformKey[];
+  instagramUsername: string;
+  followerCount: string;
+  youtubeChannelName: string;
+  youtubeSubscribers: string;
+  youtubeNiche: string;
+  contentDescription: string;
+  instagramDescription: string;
+  youtubeDescription: string;
   bio: string;
   niche: string;
   subNiches: number[];
@@ -98,13 +118,24 @@ const STAT_PLATFORMS = [
   { key: "substack",  label: "Substack",  Icon: Newspaper,   color: "#ff6719",  subscribersOnly: true  },
 ];
 
-const DEMO_STAT: PlatformStat = { followers: "45,000", engagement: "4.2", watchTime: "2:35", avgViews: "8,200" };
+const DEMO_STAT: PlatformStat = { followers: "", engagement: "", watchTime: "", avgViews: "" };
 
 const DEFAULT: ProfileForm = {
   name: "",
   handle: "",
+  age: "",
+  gender: "",
+  platforms: [],
+  instagramUsername: "",
+  followerCount: "",
+  youtubeChannelName: "",
+  youtubeSubscribers: "",
+  youtubeNiche: "",
+  contentDescription: "",
+  instagramDescription: "",
+  youtubeDescription: "",
   bio: "",
-  niche: "music",
+  niche: "",
   subNiches: [],
   location: "",
   links: { instagram: "", tiktok: "", youtube: "", facebook: "" },
@@ -113,7 +144,7 @@ const DEFAULT: ProfileForm = {
     tiktok:    { ...DEMO_STAT },
     youtube:   { ...DEMO_STAT },
     facebook:  { ...DEMO_STAT },
-    substack:  { followers: "12,000", engagement: "", watchTime: "", avgViews: "" },
+    substack:  { followers: "", engagement: "", watchTime: "", avgViews: "" },
   },
   rates: {},
   audienceGenderMalePct: "",
@@ -121,11 +152,11 @@ const DEFAULT: ProfileForm = {
   audienceAgeBrackets: [],
 };
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, required, children }: { label: string; hint?: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between">
-        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</label>
+        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}{required && <span className="text-primary"> *</span>}</label>
         {hint && <span className="text-xs text-muted-foreground/60">{hint}</span>}
       </div>
       {children}
@@ -149,6 +180,7 @@ function SubNicheCombobox({
   loading: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [width, setWidth] = useState(0);
 
@@ -166,6 +198,9 @@ function SubNicheCombobox({
   };
 
   const selectedNames = options.filter((o) => selected.includes(o.id));
+  const visibleOptions = options
+    .filter((option) => option.name.toLowerCase().includes(query.trim().toLowerCase()))
+    .slice(0, 80);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -208,9 +243,11 @@ function SubNicheCombobox({
         align="start"
         sideOffset={6}
       >
-        <Command className="bg-transparent">
+        <Command shouldFilter={false} className="bg-transparent">
           <CommandInput
             placeholder="Search sub-niches…"
+            value={query}
+            onValueChange={setQuery}
             className="h-10 text-sm border-b border-border bg-transparent text-white placeholder:text-muted-foreground/50"
           />
           <CommandList className="max-h-56 overflow-y-auto py-1">
@@ -220,7 +257,7 @@ function SubNicheCombobox({
             <CommandEmpty className="px-3 py-4 text-xs text-muted-foreground text-center">
               No sub-niches found
             </CommandEmpty>
-            {options.map((sn) => {
+            {visibleOptions.map((sn) => {
               const active = selected.includes(sn.id);
               return (
                 <CommandItem
@@ -236,6 +273,9 @@ function SubNicheCombobox({
                 </CommandItem>
               );
             })}
+            {options.length > 80 && !query.trim() && (
+              <div className="px-3 py-2 text-xs text-muted-foreground">Showing the first 80. Search for more.</div>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
@@ -249,7 +289,7 @@ export default function ProfileSettings() {
 
   const [form, setForm] = useState<ProfileForm>(() => {
     try {
-      const raw = localStorage.getItem("mavlit_creator_profile");
+      const raw = user && localStorage.getItem(`mavlit_creator_profile_${user.id}`);
       if (raw) return { ...DEFAULT, ...JSON.parse(raw) } as ProfileForm;
     } catch { /* ignore */ }
     return DEFAULT;
@@ -265,28 +305,55 @@ export default function ProfileSettings() {
     setForm(prev => ({
       ...prev,
       name:     user.full_name      ?? prev.name,
-      handle:   user.creator_handle ?? prev.handle,
+      handle:   user.creator_handle ?? user.instagram_handle ?? prev.handle,
+      age:      user.age != null ? String(user.age) : prev.age,
+      gender:   user.gender ?? prev.gender,
+      platforms: user.primary_platform === "youtube"
+        ? ["youtube"]
+        : user.primary_platform === "instagram"
+          ? (user.youtube_channel_name ? ["instagram", "youtube"] : ["instagram"])
+          : prev.platforms,
+      instagramUsername: user.instagram_handle ?? prev.instagramUsername,
+      followerCount: user.instagram_followers != null ? String(user.instagram_followers) : user.follower_count != null ? String(user.follower_count) : prev.followerCount,
+      youtubeChannelName: user.youtube_channel_name ?? prev.youtubeChannelName,
+      youtubeSubscribers: user.youtube_subscribers != null ? String(user.youtube_subscribers) : prev.youtubeSubscribers,
+      youtubeNiche: normalizeNiche(user.youtube_primary_niche) || prev.youtubeNiche,
+      contentDescription: user.content_description ?? prev.contentDescription,
+      instagramDescription: user.instagram_description ?? prev.instagramDescription,
+      youtubeDescription: user.youtube_description ?? prev.youtubeDescription,
       location: [user.location_city, user.location_country].filter(Boolean).join(", ") || prev.location,
       bio:      user.bio_tagline     ?? prev.bio,
-      niche:    user.content_niche   ? (NICHES.find(n => n.value === user.content_niche || n.label === user.content_niche)?.value ?? prev.niche) : prev.niche,
+      niche:    normalizeNiche(user.content_niche ?? user.instagram_primary_niche) || prev.niche,
       audienceGenderMalePct:    user.audience_gender_male_pct    != null ? String(user.audience_gender_male_pct)   : prev.audienceGenderMalePct,
       audienceGenderFemalePct:  user.audience_gender_female_pct  != null ? String(user.audience_gender_female_pct) : prev.audienceGenderFemalePct,
     }));
   }, [user]);
 
-  // Sub-niches from API
-  const { data: subNicheOptions = [], isLoading: subNichesLoading } = useQuery<SubNiche[]>({
-    queryKey: ["sub-niches"],
-    queryFn: () =>
-      fetch("/api/mavlit/sub-niches", { credentials: "include" }).then((r) => {
-        if (!r.ok) throw new Error("Failed to load sub-niches");
-        return r.json();
-      }),
-    staleTime: 10 * 60 * 1000,
-  });
+  // Use the same choices as onboarding, while retaining previously saved custom choices.
+  const subNicheOptions = useMemo<SubNiche[]>(
+    () => Array.from(new Set([...SUB_NICHE_OPTIONS, ...(user?.sub_niches ?? [])]))
+      .map((name, index) => ({ id: index + 1, name })),
+    [user?.sub_niches],
+  );
 
-  const set = (field: keyof Omit<ProfileForm, "links" | "subNiches" | "audienceAgeBrackets">, value: string) =>
+  useEffect(() => {
+    if (!user?.sub_niches?.length || !subNicheOptions.length) return;
+    setForm((current) => current.subNiches.length ? current : {
+      ...current,
+      subNiches: subNicheOptions.filter((option) => user.sub_niches?.includes(option.name)).map((option) => option.id),
+    });
+  }, [subNicheOptions, user?.id]);
+
+  const set = (field: keyof Omit<ProfileForm, "links" | "subNiches" | "audienceAgeBrackets" | "platforms" | "stats" | "rates">, value: string) =>
     setForm((f) => ({ ...f, [field]: value }));
+
+  const togglePlatform = (platform: PlatformKey) =>
+    setForm((f) => ({
+      ...f,
+      platforms: f.platforms.includes(platform)
+        ? f.platforms.filter((item) => item !== platform)
+        : [...f.platforms, platform],
+    }));
 
   const setLink = (key: string, value: string) =>
     setForm((f) => ({ ...f, links: { ...f.links, [key]: value } }));
@@ -330,8 +397,22 @@ export default function ProfileSettings() {
   const handleSave = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveError(null);
-    // Always save to localStorage for offline-friendly fields
-    try { localStorage.setItem("mavlit_creator_profile", JSON.stringify(form)); } catch { /* ignore */ }
+    const missing: string[] = [];
+    if (!form.name.trim()) missing.push("full name");
+    if (!Number.isInteger(Number(form.age)) || Number(form.age) < 13 || Number(form.age) > 120) missing.push("age (13–120)");
+    if (!form.gender.trim()) missing.push("gender");
+    if (!form.platforms.length) missing.push("primary platform");
+    if (!form.instagramUsername.trim()) missing.push("Instagram username");
+    if (form.followerCount === "" || !Number.isInteger(Number(form.followerCount)) || Number(form.followerCount) < 0) missing.push("follower count");
+    if (!form.niche.trim()) missing.push("primary niche");
+    if (!form.contentDescription.trim() && !form.instagramDescription.trim() && !form.youtubeDescription.trim()) missing.push("at least one description");
+    if (form.platforms.includes("youtube") && !form.youtubeChannelName.trim()) missing.push("YouTube channel name");
+    if (form.platforms.includes("youtube") && (form.youtubeSubscribers === "" || !Number.isInteger(Number(form.youtubeSubscribers)) || Number(form.youtubeSubscribers) < 0)) missing.push("YouTube subscribers");
+    if (form.platforms.includes("youtube") && !form.youtubeNiche.trim()) missing.push("YouTube primary niche");
+    if (missing.length) {
+      setSaveError(`Complete the required fields: ${missing.join(", ")}.`);
+      return;
+    }
 
     // Map form → API fields
     const parts = form.location.split(",").map(s => s.trim());
@@ -340,26 +421,46 @@ export default function ProfileSettings() {
       .map(sn => sn.name);
 
     try {
-      await updateProfile({
-        full_name:                  form.name.trim()   || null,
-        creator_handle:             form.handle.trim() || null,
+      const updated = await updateProfile({
+        full_name:                  form.name.trim(),
+        creator_handle:             form.handle.trim() || form.instagramUsername.trim().replace(/^@/, ""),
+        age:                        Number(form.age),
+        gender:                     form.gender,
+        primary_platform:           form.platforms[0],
+        instagram_handle:           form.instagramUsername.trim().replace(/^@/, ""),
+        instagram_followers:        Number(form.followerCount),
+        follower_count:             form.platforms[0] === "youtube" ? Number(form.youtubeSubscribers) : Number(form.followerCount),
+        instagram_primary_niche:    form.niche,
+        content_description:        form.contentDescription.trim() || null,
+        instagram_description:      form.instagramDescription.trim() || null,
+        youtube_description:        form.youtubeDescription.trim() || null,
+        youtube_channel_name:       form.platforms.includes("youtube") ? form.youtubeChannelName.trim() || null : user?.youtube_channel_name ?? null,
+        youtube_subscribers:        form.platforms.includes("youtube") ? Number(form.youtubeSubscribers) : user?.youtube_subscribers ?? null,
+        youtube_primary_niche:      form.platforms.includes("youtube") ? form.youtubeNiche : user?.youtube_primary_niche ?? null,
         location_city:              parts[0]           || null,
         location_country:           parts[1]           || null,
         bio_tagline:                form.bio.trim()    || null,
-        content_niche:              form.niche         || null,
-        sub_niches:                 subNicheNames.length ? subNicheNames : null,
+        content_niche:              form.niche,
+        sub_niches:                 subNicheOptions.length ? (subNicheNames.length ? subNicheNames : null) : user?.sub_niches ?? null,
         audience_gender_male_pct:   form.audienceGenderMalePct   ? parseFloat(form.audienceGenderMalePct)   : null,
         audience_gender_female_pct: form.audienceGenderFemalePct ? parseFloat(form.audienceGenderFemalePct) : null,
         audience_age_bracket:       form.audienceAgeBrackets.length ? form.audienceAgeBrackets.join(", ") : null,
       });
+      if (!isProfileComplete(updated)) {
+        setSaveError("Your profile was saved, but it is still incomplete. Check the required fields.");
+        return;
+      }
+      if (user) {
+        try { localStorage.setItem(`mavlit_creator_profile_${user.id}`, JSON.stringify(form)); } catch { /* ignore */ }
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save profile");
     }
-  }, [form, subNicheOptions, updateProfile]);
+  }, [form, subNicheOptions, updateProfile, user]);
 
-  const selectedNiche = NICHES.find((n) => n.value === form.niche);
+  const selectedNiche = NICHES.find((n) => n.value.toLowerCase() === form.niche.toLowerCase() || n.label.toLowerCase() === form.niche.toLowerCase());
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -381,7 +482,7 @@ export default function ProfileSettings() {
             </div>
             <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Your Profile</h1>
             <p className="text-muted-foreground text-base leading-relaxed">
-              This information auto-fills your pitch decks and outreach emails. The more complete your profile, the more personalized your generated content.
+              Keep the same required creator details you entered during onboarding up to date. This information also auto-fills your pitch decks and outreach emails.
             </p>
           </motion.div>
 
@@ -400,7 +501,7 @@ export default function ProfileSettings() {
                   <h2 className="text-sm font-bold text-white">Identity</h2>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Full Name" hint="Used in pitch decks">
+                  <Field label="Full Name" hint="Used in pitch decks" required>
                     <input
                       data-testid="input-name"
                       type="text"
@@ -409,6 +510,16 @@ export default function ProfileSettings() {
                       placeholder="e.g. Jordan Mitchell"
                       className={inputCls}
                     />
+                  </Field>
+                  <Field label="Age" required>
+                    <input type="number" min={13} max={120} value={form.age} onChange={(e) => set("age", e.target.value)} placeholder="25" className={inputCls} />
+                  </Field>
+                  <Field label="Gender" required>
+                    <select value={form.gender} onChange={(e) => set("gender", e.target.value)} className={inputCls}>
+                      <option value="">Select an option</option>
+                      <option>Male</option><option>Female</option><option>Non-binary</option>
+                      <option>Prefer not to say</option><option>Other</option>
+                    </select>
                   </Field>
                   <Field label="Creator Handle" hint="Primary username">
                     <div className="relative">
@@ -433,6 +544,20 @@ export default function ProfileSettings() {
                       className={inputCls}
                     />
                   </Field>
+                </div>
+                <div className="mt-5">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Primary platforms <span className="text-primary">*</span></p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {([
+                      ["instagram", "Instagram", Instagram],
+                      ["youtube", "YouTube", Youtube],
+                    ] as const).map(([key, label, Icon]) => (
+                      <button key={key} type="button" aria-pressed={form.platforms.includes(key)} onClick={() => togglePlatform(key)}
+                        className={`flex items-center gap-3 rounded-xl border p-4 text-left text-sm font-semibold transition ${form.platforms.includes(key) ? "border-primary/70 bg-primary/10 text-white" : "border-border bg-secondary/40 text-muted-foreground hover:border-primary/30"}`}>
+                        <Icon size={18} />{label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="mt-4">
                   <Field label="Bio / Pitch Tagline" hint={`${form.bio.length}/200`}>
@@ -460,7 +585,15 @@ export default function ProfileSettings() {
                   <h2 className="text-sm font-bold text-white">Content Niche</h2>
                 </div>
 
-                {/* Primary niche tiles */}
+                 <div className="mb-4">
+                   <Field label="Primary niche" required>
+                     <select value={form.niche} onChange={(e) => set("niche", e.target.value)} className={inputCls}>
+                       <option value="">Select a niche</option>
+                       {NICHE_CHOICES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                     </select>
+                   </Field>
+                 </div>
+                 {/* Primary niche quick choices */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                   {NICHES.map(({ value, label, Icon }) => {
                     const active = form.niche === value;
@@ -490,9 +623,70 @@ export default function ProfileSettings() {
                     selected={form.subNiches}
                     onChange={(ids) => setForm((f) => ({ ...f, subNiches: ids }))}
                     options={subNicheOptions}
-                    loading={subNichesLoading}
+                      loading={false}
                   />
                 </Field>
+              </motion.div>
+
+              {/* ── Required platform details ─────────────────────────────── */}
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.16 }}
+                className="bg-card border border-border rounded-2xl p-6"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Instagram size={14} className="text-primary" />
+                  <h2 className="text-sm font-bold text-white">Instagram profile</h2>
+                </div>
+                <p className="mb-5 text-xs text-muted-foreground">These details are required even if YouTube is your primary platform.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Instagram username" required>
+                    <input type="text" value={form.instagramUsername} onChange={(e) => set("instagramUsername", e.target.value.replace(/^@/, ""))} placeholder="yourhandle" className={inputCls} />
+                  </Field>
+                  <Field label="Follower count" required>
+                    <input type="number" min={0} value={form.followerCount} onChange={(e) => set("followerCount", e.target.value)} placeholder="45000" className={inputCls} />
+                  </Field>
+                </div>
+                {form.platforms.includes("youtube") && (
+                  <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="YouTube channel name" required>
+                      <input type="text" value={form.youtubeChannelName} onChange={(e) => set("youtubeChannelName", e.target.value)} placeholder="Your channel" className={inputCls} />
+                    </Field>
+                    <Field label="YouTube subscribers" required>
+                      <input type="number" min={0} value={form.youtubeSubscribers} onChange={(e) => set("youtubeSubscribers", e.target.value)} placeholder="1000" className={inputCls} />
+                    </Field>
+                    <Field label="YouTube primary niche" required>
+                      <select value={form.youtubeNiche} onChange={(e) => set("youtubeNiche", e.target.value)} className={inputCls}>
+                        <option value="">Select a niche</option>
+                        {NICHE_CHOICES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                      </select>
+                    </Field>
+                  </div>
+                )}
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.17 }}
+                className="bg-card border border-border rounded-2xl p-6"
+              >
+                <h2 className="text-sm font-bold text-white mb-2">Content descriptions</h2>
+                <p className="text-xs text-muted-foreground mb-5">At least one description is required, just like during onboarding.</p>
+                <div className="space-y-4">
+                  <Field label="Overall content description">
+                    <textarea rows={3} value={form.contentDescription} onChange={(e) => set("contentDescription", e.target.value)} placeholder="Describe the content you create." className={`${inputCls} resize-none`} />
+                  </Field>
+                  <Field label="Instagram description">
+                    <textarea rows={3} value={form.instagramDescription} onChange={(e) => set("instagramDescription", e.target.value)} placeholder="Describe your Instagram content." className={`${inputCls} resize-none`} />
+                  </Field>
+                  {form.platforms.includes("youtube") && (
+                    <Field label="YouTube description">
+                      <textarea rows={3} value={form.youtubeDescription} onChange={(e) => set("youtubeDescription", e.target.value)} placeholder="Describe your YouTube content." className={`${inputCls} resize-none`} />
+                    </Field>
+                  )}
+                </div>
               </motion.div>
 
               {/* ── Platform Links ────────────────────────────────────────── */}

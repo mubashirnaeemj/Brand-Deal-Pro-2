@@ -1,0 +1,535 @@
+You are working on the existing MAVLIT codebase.
+
+Implement the onboarding access-control system described below.
+
+IMPORTANT:
+
+* Do not redesign the application.
+* Do not change the existing matching logic.
+* Do not change brand scoring.
+* Do not change creator matching.
+* Do not remove existing functionality.
+* Build on the existing FastAPI + PostgreSQL + static HTML architecture.
+
+The goal is:
+
+NEW USERS CAN ONLY SEE LOGIN → THEN CREATOR PROFILE → THEN FULL MAVLIT.
+
+---
+
+# REQUIRED USER FLOW
+
+## Visitor
+
+When a visitor opens MAVLIT:
+
+* If not authenticated:
+
+  * Show ONLY login page.
+  * Redirect all protected routes to login.
+
+Examples:
+
+/
+/dashboard
+/matches
+/add-creators
+/brand-catalog
+/creator-profile
+
+must redirect to:
+
+/signin
+
+---
+
+## After Login
+
+When login succeeds:
+
+Check onboarding status.
+
+If:
+
+onboarding_completed = false
+
+then:
+
+* User can ONLY access:
+
+/creator-profile
+
+* Hide ALL navigation except:
+
+  * Creator Profile
+  * Logout
+
+* User must NOT see:
+
+  * Dashboard
+  * Matches
+  * Add Creators
+  * Brand Catalog
+  * Admin links
+  * Any application tabs
+
+If user manually enters:
+
+/matches
+/dashboard
+/add-creators
+/brand-catalog
+
+redirect to:
+
+/creator-profile
+
+---
+
+## Profile Form Requirements
+
+The following fields must be required:
+
+### Required
+
+Full Name
+
+Age
+
+Gender
+
+Primary Platform
+
+Instagram Username
+
+Follower Count
+
+Primary Niche
+
+### Description Requirement
+
+At least ONE of:
+
+* content_description
+* instagram_description
+* youtube_description
+
+must contain text.
+
+---
+
+## Draft Persistence
+
+Current behavior already saves draft data.
+
+Keep draft persistence.
+
+If user:
+
+* logs in
+* starts form
+* closes browser
+
+then:
+
+* JWT cookie keeps them logged in
+* reopening app returns them directly to creator profile
+* draft values reload
+* onboarding remains incomplete
+
+---
+
+## After Successful Profile Submission
+
+When required fields pass validation:
+
+Backend must:
+
+onboarding_completed = true
+
+Then:
+
+* User gains access to entire MAVLIT app.
+* Full navigation becomes visible.
+* All routes become available.
+
+Redirect user to:
+
+/matches
+
+after successful completion.
+
+---
+
+# DATABASE CHANGES
+
+Modify creator_profiles.
+
+Add:
+
+onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE
+
+Create startup migration logic.
+
+Migration must:
+
+1. Add column if missing.
+2. Backfill existing creators.
+
+Backfill rules:
+
+If creator has:
+
+* full_name
+* age
+* gender
+* primary_platform
+* instagram_handle
+* follower_count
+* primary niche
+* at least one description
+
+then:
+
+onboarding_completed = true
+
+otherwise:
+
+onboarding_completed = false
+
+Migration must be idempotent.
+
+---
+
+# BACKEND CHANGES
+
+## auth.py
+
+Create canonical onboarding validator.
+
+Example:
+
+calculate_onboarding_status(profile)
+
+Returns:
+
+{
+completed: bool,
+missing_fields: [...]
+}
+
+Do NOT duplicate logic elsewhere.
+
+Use this everywhere.
+
+---
+
+## Authentication Responses
+
+Modify:
+
+GET /auth/me
+
+Return:
+
+{
+authenticated,
+onboarding_completed,
+missing_fields,
+user
+}
+
+Modify:
+
+POST /auth/login
+
+Return:
+
+{
+authenticated,
+onboarding_completed,
+missing_fields,
+user,
+next_route
+}
+
+next_route should be:
+
+/creator-profile
+
+or
+
+/matches
+
+depending on onboarding status.
+
+---
+
+## Creator Profile APIs
+
+GET /creator-profile/me
+
+Return:
+
+{
+profile,
+onboarding_completed,
+missing_fields
+}
+
+PUT /creator-profile/me
+
+Must:
+
+1. Save profile
+2. Run onboarding validator
+3. Update onboarding_completed
+4. Return onboarding state
+
+Example:
+
+{
+success: true,
+onboarding_completed: true,
+missing_fields: []
+}
+
+---
+
+# AUTHORIZATION
+
+Create dependency:
+
+require_completed_profile
+
+Behavior:
+
+1. Validate JWT.
+2. Load creator.
+3. Check onboarding_completed.
+
+If false:
+
+Return:
+
+403
+
+{
+error: "profile_incomplete",
+redirect: "/creator-profile"
+}
+
+---
+
+Apply require_completed_profile to:
+
+Matches APIs
+
+Dashboard APIs
+
+Saved Brands APIs
+
+Pitch APIs
+
+Rate APIs
+
+Contract APIs
+
+Brand Detail APIs
+
+Brand Catalog APIs
+
+Any creator-facing API that should only be usable after onboarding.
+
+Do NOT apply it to:
+
+/auth/*
+/creator-profile/me
+/creator-profile/me/generate-description
+
+---
+
+# PAGE ROUTE PROTECTION
+
+FastAPI page routes must enforce:
+
+Unauthenticated:
+
+→ /signin
+
+Authenticated + incomplete:
+
+→ /creator-profile
+
+Authenticated + complete:
+
+→ requested page
+
+Only exception:
+
+/creator-profile
+
+must remain accessible to authenticated incomplete users.
+
+---
+
+# FRONTEND CHANGES
+
+Create:
+
+frontend/auth.js
+
+This file becomes the single source of truth.
+
+Responsibilities:
+
+* call /auth/me
+* determine auth state
+* determine onboarding state
+* handle redirects
+* render navigation
+* handle logout
+* handle 401
+* handle profile incomplete 403
+
+Remove duplicated onboarding checks from HTML files.
+
+---
+
+# LOGIN PAGE
+
+Update login.html
+
+After login:
+
+If onboarding incomplete:
+
+redirect:
+
+/creator-profile
+
+If onboarding complete:
+
+redirect:
+
+/matches
+
+Do not recreate onboarding logic in JavaScript.
+
+Use backend response.
+
+---
+
+# CREATOR PROFILE PAGE
+
+Update creator-profile.html
+
+Requirements:
+
+* visually mark required fields
+* display missing required fields returned by backend
+* keep existing draft-saving behavior
+* keep description generation feature
+
+After successful completion:
+
+redirect:
+
+/matches
+
+---
+
+# NAVIGATION
+
+For onboarding incomplete users show only:
+
+Creator Profile
+
+Logout
+
+For onboarding completed users show:
+
+Dashboard
+
+Creator Profile
+
+Matches
+
+Add Creators
+
+Brand Catalog
+
+Logout
+
+Hide navigation until auth state loads.
+
+Avoid flashing unauthorized links.
+
+---
+
+# ERROR HANDLING
+
+401:
+
+redirect to:
+
+/signin
+
+403 with profile_incomplete:
+
+redirect to:
+
+/creator-profile
+
+Use the shared auth.js helper everywhere.
+
+---
+
+# SECURITY FIXES
+
+Protect public operational endpoints:
+
+/seed
+/enrich/signals
+/score/brands
+/content-creator-re/bulk-add
+
+These should require authentication and appropriate authorization.
+
+Also ensure SQLAdmin is NOT exposed when ADMIN_PASSKEY is missing.
+
+If ADMIN_PASSKEY is not configured:
+
+disable admin access entirely.
+
+---
+
+# TESTING
+
+Verify:
+
+1. New visitor only sees login.
+2. Login redirects incomplete user to creator profile.
+3. Incomplete user cannot access matches.
+4. Incomplete user cannot access dashboard.
+5. Incomplete user cannot access brand catalog.
+6. Closing browser keeps login session.
+7. Draft form values persist.
+8. Completing profile unlocks app.
+9. User is redirected to matches after completion.
+10. Existing completed creators remain usable.
+11. Existing incomplete creators remain gated.
+12. Protected APIs return profile_incomplete.
+13. Expired JWT redirects to login.
+14. Navigation updates correctly.
+15. No unauthorized page flash occurs.
+
+Implement all changes and provide:
+
+1. Database migration changes
+2. Backend file changes
+3. Frontend file changes
+4. New auth.js code
+5. Updated API contracts
+6. Manual testing checklist
+7. Any assumptions made

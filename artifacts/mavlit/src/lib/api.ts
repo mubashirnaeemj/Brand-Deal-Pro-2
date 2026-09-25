@@ -1,6 +1,13 @@
 const API_BASE = "https://api.mavlit.com";
 
-type ApiErrorBody = { detail?: string; message?: string };
+type ApiErrorBody = { detail?: unknown; message?: unknown };
+
+export class ApiRequestError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
@@ -14,7 +21,8 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   });
   if (!res.ok) {
     const err: ApiErrorBody = await res.json().catch(() => ({}));
-    throw new Error(err.detail ?? err.message ?? `Request failed (${res.status})`);
+    const detail = typeof err.detail === "string" ? err.detail : typeof err.message === "string" ? err.message : null;
+    throw new ApiRequestError(detail ?? `Request failed (${res.status})`, res.status);
   }
   return res.json() as Promise<T>;
 }

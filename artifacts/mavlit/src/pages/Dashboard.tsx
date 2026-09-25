@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { api, getAllPitches, type DashboardStats } from "@/lib/api";
+import { api, ApiRequestError, getAllPitches, type DashboardStats } from "@/lib/api";
 
 // ── Mini brand lookup for icons/colors ────────────────────────────────────────
 
@@ -75,11 +75,11 @@ export default function Dashboard() {
     refetchOnMount: "always",
   });
 
-  const { data: apiPitches, isLoading: pitchesLoading, isError: pitchesError, refetch: refetchPitches } = useQuery({
+  const { data: apiPitches, isLoading: pitchesLoading, isError: pitchesError, error: pitchesQueryError, refetch: refetchPitches } = useQuery({
     queryKey: ["pitches"],
     queryFn: getAllPitches,
     staleTime: 60_000,
-    retry: 1,
+    retry: (attempt, failure) => !(failure instanceof ApiRequestError && failure.status === 401) && attempt < 1,
     refetchOnMount: "always",
   });
 
@@ -208,7 +208,8 @@ export default function Dashboard() {
 
             {!pitchesLoading && pitchesError && (
               <p className="text-xs text-red-400 py-6 text-center">
-                Couldn't load your pitches. <button onClick={() => refetchPitches()} className="underline">Retry</button>
+                Couldn't load your pitches: {pitchesQueryError instanceof Error ? pitchesQueryError.message : "Unknown error"}.{" "}
+                <button onClick={() => refetchPitches()} className="underline">Retry</button>
               </p>
             )}
 

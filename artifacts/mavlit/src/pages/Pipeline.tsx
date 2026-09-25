@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, getAllPitches, type ApiPitch, type PitchUpdateRequest } from "@/lib/api";
+import { api, ApiRequestError, getAllPitches, type ApiPitch, type PitchUpdateRequest } from "@/lib/api";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -1199,11 +1200,12 @@ export default function Pipeline() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  const { data: apiPitches, isLoading, isError, refetch } = useQuery({
+  const { logout } = useAuth();
+  const { data: apiPitches, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["pitches"],
     queryFn: getAllPitches,
     staleTime: 60_000,
-    retry: 1,
+    retry: (attempt, failure) => !(failure instanceof ApiRequestError && failure.status === 401) && attempt < 1,
   });
 
   const pitches: PitchRecord[] = (apiPitches ?? []).map(p => ({
@@ -1343,10 +1345,15 @@ export default function Pipeline() {
               <motion.div key="pitches" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
                 {isLoading ? (
                   <p className="text-center text-muted-foreground py-16 text-sm">Loading your pitches…</p>
-                ) : isError ? (
-                  <p role="alert" className="text-center text-red-400 py-16 text-sm">
-                    Couldn't load your pitches. <button onClick={() => refetch()} className="underline">Retry</button>
-                  </p>
+                 ) : isError ? (
+                   <div role="alert" className="text-center text-red-400 py-16 text-sm space-y-2">
+                     <p>{error instanceof ApiRequestError && error.status === 401
+                       ? "Your session isn't being accepted by the pitch API. Please sign in again."
+                       : `Couldn't load your pitches: ${error instanceof Error ? error.message : "Unknown error"}`}</p>
+                     {error instanceof ApiRequestError && error.status === 401
+                       ? <button onClick={() => void logout()} className="underline">Sign in again</button>
+                       : <button onClick={() => refetch()} className="underline">Retry</button>}
+                   </div>
                 ) : (
                   <MyPitchesTab pitches={pitches} onUpdate={updatePitch} onAdd={addPitch} onUseDealMaker={goToDealMaker} />
                 )}

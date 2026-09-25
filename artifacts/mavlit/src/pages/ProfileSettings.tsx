@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Instagram, Save, User, Youtube } from "lucide-react";
+import { Save, User } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import { INPUT_CLASS } from "@/components/onboarding/types";
+import PlatformSelector from "@/components/onboarding/PlatformSelector";
+import { INPUT_CLASS, parsePlatforms } from "@/components/onboarding/types";
 import { isProfileComplete, type CreatorProfile, useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { InstagramSection, YoutubeSection } from "./ProfilePlatformSection";
@@ -52,6 +53,12 @@ export default function ProfileSettings() {
     setSaving(true);
     try {
       const updated = await updateProfile(profilePatch(form, profile));
+      if (form.primaryPlatforms.some((platform) => !parsePlatforms(updated.primary_platform).includes(platform))) {
+        setProfile(updated);
+        setForm(profileToForm(updated));
+        setError("The profile API did not keep all selected platforms. Please try again.");
+        return;
+      }
       if (!isProfileComplete(updated)) {
         setError("Your profile was saved, but it is still incomplete. Check the required creator details.");
         return;
@@ -113,28 +120,10 @@ export default function ProfileSettings() {
                   </select>
                 </label>
               </div>
-              <fieldset className="mt-5">
-                <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Primary platforms <span className="text-primary">*</span>
-                </legend>
-                <div className="flex items-center gap-3">
-                  {([
-                    ["instagram", "Instagram", Instagram],
-                    ["youtube", "YouTube", Youtube],
-                  ] as const).map(([platform, label, Icon], index) => (
-                    <div key={platform} className="contents">
-                      {index > 0 && <span className="text-xs text-muted-foreground">or</span>}
-                      <label className={`flex flex-1 cursor-pointer items-center gap-2 rounded-xl border p-3 text-sm font-semibold transition ${
-                        form.primaryPlatform === platform ? "border-primary/70 bg-primary/10 text-white" : "border-border bg-secondary/40 text-muted-foreground"
-                      }`}>
-                        <input type="radio" name="primary-platform" value={platform} checked={form.primaryPlatform === platform}
-                          onChange={() => change({ ...form, primaryPlatform: platform })} className="accent-primary" />
-                        <Icon size={17} /> {label}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </fieldset>
+              <div className="mt-5">
+                <PlatformSelector value={form.primaryPlatforms}
+                  onChange={(primaryPlatforms) => change({ ...form, primaryPlatforms })} />
+              </div>
             </section>
 
             <InstagramSection value={form.instagram} onChange={(instagram) => change({ ...form, instagram })} />

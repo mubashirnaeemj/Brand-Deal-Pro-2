@@ -1,4 +1,8 @@
 export type PlatformKey = "instagram" | "youtube";
+export const parsePlatforms = (value: string | null | undefined): PlatformKey[] =>
+  [...new Set((value ?? "").split(",").map((part) => part.trim().toLowerCase()))]
+    .filter((part): part is PlatformKey => part === "instagram" || part === "youtube");
+export const formatPlatforms = (platforms: PlatformKey[]): string => platforms.join(",");
 export type DescriptionMode = "manual" | "generate";
 
 export type AudienceDemographics = {

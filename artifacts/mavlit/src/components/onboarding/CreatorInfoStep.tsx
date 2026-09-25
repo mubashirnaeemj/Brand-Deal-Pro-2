@@ -1,6 +1,6 @@
-import { Instagram, Youtube } from "lucide-react";
-import type { FieldErrors, OnboardingData, PlatformKey } from "./types";
+import type { FieldErrors, OnboardingData } from "./types";
 import { INPUT_CLASS } from "./types";
+import PlatformSelector from "./PlatformSelector";
 
 export default function CreatorInfoStep({
   value,
@@ -12,11 +12,6 @@ export default function CreatorInfoStep({
   errors: FieldErrors;
 }) {
   const set = <K extends keyof typeof value>(key: K, next: (typeof value)[K]) => onChange({ ...value, [key]: next });
-  const togglePlatform = (platform: PlatformKey) => {
-    set("platforms", value.platforms.includes(platform)
-      ? value.platforms.filter((item) => item !== platform)
-      : [...value.platforms, platform]);
-  };
 
   return (
     <div>
@@ -47,29 +42,7 @@ export default function CreatorInfoStep({
       </div>
 
       <div className="mt-5">
-        <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Primary platforms</label>
-        <div className="grid grid-cols-2 gap-3">
-          {([
-            ["instagram", "Instagram", Instagram],
-            ["youtube", "YouTube", Youtube],
-          ] as const).map(([key, label, Icon]) => {
-            const active = value.platforms.includes(key);
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => togglePlatform(key)}
-                className={`flex items-center gap-3 rounded-xl border p-4 text-left transition ${
-                  active ? "border-primary/70 bg-primary/10 text-white" : "border-border bg-secondary/40 text-muted-foreground hover:border-primary/30 hover:text-white"
-                }`}
-              >
-                <Icon size={18} className={active ? "text-primary" : ""} />
-                <span className="text-sm font-semibold">{label}</span>
-              </button>
-            );
-          })}
-        </div>
-        {errors.platforms && <p className="mt-1.5 text-xs text-red-400">{errors.platforms}</p>}
+        <PlatformSelector value={value.platforms} onChange={(platforms) => set("platforms", platforms)} error={errors.platforms} />
       </div>
       <div className="mt-5">
         <Field label="Overall content description" error={errors.contentDescription}>

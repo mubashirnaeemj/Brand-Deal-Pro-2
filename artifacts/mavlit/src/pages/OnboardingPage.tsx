@@ -12,6 +12,8 @@ import ReviewStep from "@/components/onboarding/ReviewStep";
 import {
   EMPTY_ONBOARDING,
   audienceTotal,
+  formatPlatforms,
+  parsePlatforms,
   type FieldErrors,
   type OnboardingData,
   type StepKey,
@@ -127,7 +129,7 @@ export default function OnboardingPage() {
         creator_handle: data.instagram.username.trim().replace(/^@/, ""),
         age: Number(data.creator.age),
         gender: data.creator.gender,
-        primary_platform: data.creator.platforms[0],
+        primary_platform: formatPlatforms(data.creator.platforms),
         instagram_handle: data.instagram.username.trim().replace(/^@/, ""),
         instagram_followers: Number(data.instagram.followers),
         follower_count: data.creator.platforms[0] === "youtube" ? Number(data.youtube.subscribers) : Number(data.instagram.followers),
@@ -237,7 +239,7 @@ function loadDraft(profile: CreatorProfile | null): SavedDraft {
         fullName: profile.full_name ?? "",
         age: profile.age != null ? String(profile.age) : "",
         gender: profile.gender ?? "",
-        platforms: profile.primary_platform === "youtube" ? ["youtube"] : profile.primary_platform === "instagram" ? ["instagram"] : [],
+        platforms: parsePlatforms(profile.primary_platform),
         contentDescription: profile.content_description ?? "",
       },
       instagram: {

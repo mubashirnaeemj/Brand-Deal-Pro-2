@@ -22,7 +22,7 @@ export default function CreatorInfoStep({
     <div>
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Tell us about yourself</p>
       <h1 className="mt-2 text-2xl font-extrabold text-white sm:text-3xl">Creator information</h1>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">This gives MAVLIT the context it needs to evaluate brand fit.</p>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">Complete your profile to unlock MAVLIT. Your draft saves on this device automatically.</p>
 
       <div className="mt-7 grid gap-5 sm:grid-cols-2">
         <Field label="Full name" error={errors.fullName}>
@@ -70,6 +70,18 @@ export default function CreatorInfoStep({
           })}
         </div>
         {errors.platforms && <p className="mt-1.5 text-xs text-red-400">{errors.platforms}</p>}
+      </div>
+      <div className="mt-5">
+        <Field label="Overall content description" error={errors.contentDescription}>
+          <textarea
+            rows={4}
+            value={value.contentDescription}
+            onChange={(event) => set("contentDescription", event.target.value)}
+            placeholder="Describe the content you create (or add a description on a platform step)."
+            className={`${INPUT_CLASS} resize-none ${errors.contentDescription ? "border-red-500/60" : ""}`}
+          />
+        </Field>
+        <p className="mt-1.5 text-xs text-muted-foreground">At least one overall, Instagram, or YouTube description is required.</p>
       </div>
     </div>
   );

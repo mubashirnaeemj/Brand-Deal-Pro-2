@@ -1,6 +1,6 @@
 const API_BASE = "/api/mavlit";
 
-type ApiErrorBody = { detail?: unknown; message?: unknown };
+type ApiErrorBody = { detail?: unknown; message?: unknown; error?: unknown };
 
 export class ApiRequestError extends Error {
   constructor(message: string, public readonly status: number) {
@@ -21,6 +21,12 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   });
   if (!res.ok) {
     const err: ApiErrorBody = await res.json().catch(() => ({}));
+    if (res.status === 401) window.dispatchEvent(new Event("mavlit:unauthorized"));
+    if (res.status === 403 && (
+      err.error === "profile_incomplete" ||
+      err.detail === "profile_incomplete" ||
+      (typeof err.detail === "object" && err.detail !== null && "error" in err.detail && err.detail.error === "profile_incomplete")
+    )) window.dispatchEvent(new Event("mavlit:profile-incomplete"));
     const detail = typeof err.detail === "string" ? err.detail : typeof err.message === "string" ? err.message : null;
     throw new ApiRequestError(detail ?? `Request failed (${res.status})`, res.status);
   }

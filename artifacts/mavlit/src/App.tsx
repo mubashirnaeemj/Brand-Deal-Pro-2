@@ -17,61 +17,59 @@ import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
 import Login from "@/pages/Login";
 import BrandCatalog from "@/pages/BrandCatalog";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AuthProvider, isProfileComplete, useAuth } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
-/** Wraps authenticated app routes. The standalone onboarding preview is public. */
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Redirect to="/login" />;
-  }
-
-  return <Component />;
-}
-
 function Router() {
+  const [location] = useLocation();
+  const { user, isLoading, authError } = useAuth();
+
+  if (isLoading) return (
+    <div className="min-h-screen bg-background flex items-center justify-center" aria-label="Checking your session">
+      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+  if (authError) return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 text-white">
+      <p role="alert">{authError}</p>
+      <button className="rounded-xl bg-primary px-5 py-2" onClick={() => window.location.reload()}>Retry</button>
+    </div>
+  );
+  if (!user) return location === "/signin" ? <Login /> : <Redirect to="/signin" />;
+  if (!isProfileComplete(user)) {
+    return location === "/creator-profile" ? <OnboardingPage /> : <Redirect to="/creator-profile" />;
+  }
+  if (location === "/signin" || location === "/login" || location === "/matches") return <Redirect to="/brand-matches" />;
+  if (location === "/profile-setup") return <Redirect to="/creator-profile" />;
+  if (location === "/") return <Redirect to="/dashboard" />;
+
   return (
     <Switch>
-      {/* Public */}
-      <Route path="/" component={Home} />
-      <Route path="/login" component={Login} />
+      <Route path="/home" component={Home} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       <Route path="/brand-catalog" component={BrandCatalog} />
-
-      {/* Protected app routes */}
-      <Route path="/brand-matches"   component={() => <ProtectedRoute component={BrandMatches}    />} />
-      <Route path="/brands/:slug"    component={() => <ProtectedRoute component={BrandDetail}      />} />
-      <Route path="/pitch"           component={() => <ProtectedRoute component={Pitch}            />} />
-      <Route path="/dashboard"       component={() => <ProtectedRoute component={Dashboard}        />} />
-      <Route path="/profile"         component={() => <ProtectedRoute component={ProfileSettings}  />} />
-      <Route path="/rate-calculator" component={() => <ProtectedRoute component={Negotiator}       />} />
-      <Route path="/deals"           component={() => <ProtectedRoute component={Pipeline}         />} />
-
+      <Route path="/creator-profile" component={ProfileSettings} />
+      <Route path="/brand-matches" component={BrandMatches} />
+      <Route path="/brands/:slug" component={BrandDetail} />
+      <Route path="/pitch" component={Pitch} />
+      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/profile" component={ProfileSettings} />
+      <Route path="/rate-calculator" component={Negotiator} />
+      <Route path="/deals" component={Pipeline} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
 function RoutedApp() {
-  const [location] = useLocation();
-  if (location === "/profile-setup") return <OnboardingPage />;
+  const { user, isLoading } = useAuth();
   return (
-    <AuthProvider>
+    <>
       <Router />
-      <DemoBar />
-    </AuthProvider>
+      {!isLoading && user && isProfileComplete(user) && <DemoBar />}
+    </>
   );
 }
 
@@ -80,7 +78,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <RoutedApp />
+          <AuthProvider><RoutedApp /></AuthProvider>
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

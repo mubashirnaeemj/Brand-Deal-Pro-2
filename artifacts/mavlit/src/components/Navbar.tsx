@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useLocation, Link } from "wouter";
 import { LayoutDashboard, Users, Zap, UserCircle, Briefcase, LogOut, Library } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { isProfileComplete, useAuth } from "@/contexts/AuthContext";
 
 const NAV_LINKS = [
   { label: "Dashboard", href: "/dashboard",     Icon: LayoutDashboard },
@@ -16,6 +16,7 @@ const NAV_LINKS = [
 export default function Navbar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const profileComplete = user ? isProfileComplete(user) : false;
   const isApp = location !== "/" && location !== "/login";
 
   return (
@@ -26,7 +27,7 @@ export default function Navbar() {
       className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60"
     >
       <div className="container mx-auto px-6 h-16 flex items-center justify-between gap-6">
-        <Link href={isApp ? "/dashboard" : "/"} className="flex items-center gap-2 shrink-0">
+        <Link href={profileComplete ? "/dashboard" : "/creator-profile"} className="flex items-center gap-2 shrink-0">
           <div className="w-8 h-8 rounded bg-primary flex items-center justify-center">
             <svg
               viewBox="0 0 24 24"
@@ -41,7 +42,7 @@ export default function Navbar() {
           <span className="font-bold text-xl tracking-tight text-white">MAVLIT</span>
         </Link>
 
-        {isApp && (
+        {isApp && profileComplete && (
           <div className="hidden md:flex items-center gap-1 flex-1">
             {NAV_LINKS.map(({ label, href, Icon }) => {
               const active = location === href;

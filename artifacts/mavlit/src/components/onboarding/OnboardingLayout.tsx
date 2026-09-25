@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
-import { Link } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 import ProgressStepper from "./ProgressStepper";
 import type { StepKey } from "./types";
 
@@ -27,6 +27,7 @@ export default function OnboardingLayout({
   saving?: boolean;
   continueDisabled?: boolean;
 }) {
+  const { logout } = useAuth();
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-white/5 bg-background/85 backdrop-blur-xl">
@@ -39,7 +40,10 @@ export default function OnboardingLayout({
             </div>
             <span className="text-lg font-bold tracking-tight text-white">MAVLIT</span>
           </div>
-          <Link href="/" className="text-xs text-muted-foreground hover:text-white">Back to MAVLIT</Link>
+          <div className="flex items-center gap-4 text-xs">
+            <span className="font-semibold text-primary">Creator Profile</span>
+            <button type="button" onClick={logout} className="text-muted-foreground hover:text-white">Log out</button>
+          </div>
         </div>
       </header>
 

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
+import { type CreatorProfile, isProfileComplete, useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
 import OnboardingLayout from "@/components/onboarding/OnboardingLayout";
 import WelcomeStep from "@/components/onboarding/WelcomeStep";
 import CreatorInfoStep from "@/components/onboarding/CreatorInfoStep";
@@ -16,24 +17,23 @@ import {
   type StepKey,
 } from "@/components/onboarding/types";
 
-const DRAFT_KEY = "mavlit_onboarding_draft_v1";
-const COMPLETED_KEY = "mavlit_onboarding_profile_v1";
+const draftKey = (id: number) => `mavlit_onboarding_draft_${id}`;
 
 type SavedDraft = { data: OnboardingData; step: StepKey };
 
 export default function OnboardingPage() {
-  const { toast } = useToast();
-  const [initial] = useState(loadDraft);
+  const { user, updateProfile } = useAuth();
+  const [, navigate] = useLocation();
+  const [initial] = useState(() => loadDraft(user));
   const [data, setData] = useState<OnboardingData>(initial.data);
   const [currentStep, setCurrentStep] = useState<StepKey>(initial.step);
   const [direction, setDirection] = useState(1);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [completed, setCompleted] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const steps = useMemo<StepKey[]>(() => {
-    const next: StepKey[] = ["welcome", "creator"];
-    if (data.creator.platforms.includes("instagram")) next.push("instagram");
+    const next: StepKey[] = ["creator", "instagram"];
     if (data.creator.platforms.includes("youtube")) next.push("youtube");
     next.push("review");
     return next;
@@ -46,14 +46,14 @@ export default function OnboardingPage() {
   }, [currentStep, steps]);
 
   useEffect(() => {
-    if (completed) return;
+    if (!user) return;
     const draft: SavedDraft = { data, step: currentStep };
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      localStorage.setItem(draftKey(user.id), JSON.stringify(draft));
     } catch {
       setSubmitError("Your browser could not save this draft. Check your browser storage settings.");
     }
-  }, [currentStep, data, completed]);
+  }, [currentStep, data, user?.id]);
 
   useEffect(() => {
     document.title = "Creator Onboarding | MAVLIT";
@@ -78,8 +78,8 @@ export default function OnboardingPage() {
 
   const previous = () => goTo(currentIndex - 1, -1);
 
-  const submit = () => {
-    const validationOrder = steps.filter((step) => step !== "welcome" && step !== "review");
+  const submit = async () => {
+    const validationOrder = steps.filter((step) => step !== "review");
     for (const step of validationOrder) {
       const stepErrors = validateStep(step, data);
       if (Object.keys(stepErrors).length) {
@@ -89,22 +89,68 @@ export default function OnboardingPage() {
         return;
       }
     }
-
     setSubmitError(null);
+    setSaving(true);
     try {
-      localStorage.setItem(COMPLETED_KEY, JSON.stringify({
-        onboarding_complete: true,
-        completed_at: new Date().toISOString(),
-        data,
-      }));
-      localStorage.removeItem(DRAFT_KEY);
-      setCompleted(true);
-      toast({
-        title: "Saved on this device.",
-        description: "No data was sent to the MAVLIT API.",
+      let instagramDescription = data.instagram.contentDescription.trim();
+      let youtubeDescription = data.youtube.contentDescription.trim();
+      if (!data.creator.contentDescription.trim() && !instagramDescription && !youtubeDescription) {
+        const platform = data.instagramDescriptionMode === "generate"
+          ? "instagram"
+          : data.creator.platforms.includes("youtube") && data.youtubeDescriptionMode === "generate"
+            ? "youtube"
+            : null;
+        if (platform) {
+          const generated = await api.post<{ description: string }>("/creator-profile/me/generate-description", {
+            platform,
+            username: platform === "instagram" ? data.instagram.username.trim() : data.youtube.channelName.trim(),
+            niche: platform === "instagram" ? data.instagram.niches[0] : data.youtube.niches[0],
+          });
+          if (platform === "instagram") instagramDescription = generated.description?.trim() ?? "";
+          else youtubeDescription = generated.description?.trim() ?? "";
+          if (instagramDescription || youtubeDescription) {
+            setData((current) => ({
+              ...current,
+              instagram: { ...current.instagram, contentDescription: instagramDescription },
+              youtube: { ...current.youtube, contentDescription: youtubeDescription },
+            }));
+          }
+        }
+        if (!instagramDescription && !youtubeDescription) {
+          setErrors({ contentDescription: "Add at least one overall, Instagram, or YouTube description." });
+          setCurrentStep("creator");
+          return;
+        }
+      }
+      const updated = await updateProfile({
+        full_name: data.creator.fullName.trim(),
+        creator_handle: data.instagram.username.trim().replace(/^@/, ""),
+        age: Number(data.creator.age),
+        gender: data.creator.gender,
+        primary_platform: data.creator.platforms[0],
+        instagram_handle: data.instagram.username.trim().replace(/^@/, ""),
+        instagram_followers: Number(data.instagram.followers),
+        follower_count: data.creator.platforms[0] === "youtube" ? Number(data.youtube.subscribers) : Number(data.instagram.followers),
+        content_niche: data.instagram.niches[0],
+        instagram_primary_niche: data.instagram.niches[0],
+        content_description: data.creator.contentDescription.trim() || null,
+        instagram_description: instagramDescription || null,
+        youtube_description: youtubeDescription || null,
+        instagram_sub_niches: data.instagram.subNiches,
+        youtube_channel_name: data.youtube.channelName.trim() || null,
+        youtube_subscribers: data.youtube.subscribers ? Number(data.youtube.subscribers) : null,
+        youtube_primary_niche: data.youtube.niches[0] || null,
       });
-    } catch (reason) {
-      setSubmitError("Your browser could not save these details. Check your storage settings and try again.");
+      if (!isProfileComplete(updated)) {
+        setSubmitError("Your profile was saved, but onboarding is still incomplete. Check your details and try again.");
+        return;
+      }
+      if (user) localStorage.removeItem(draftKey(user.id));
+      navigate("/brand-matches");
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Couldn't save your profile. Please try again.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -144,9 +190,10 @@ export default function OnboardingPage() {
       currentIndex={currentIndex}
       onPrevious={previous}
       onContinue={currentStep === "review" ? submit : continueFlow}
-      continueLabel={currentStep === "review" ? "Save on this device" : "Continue"}
-      showPrevious={!completed && currentStep !== "welcome"}
-      showContinue={!completed && currentStep !== "welcome"}
+      continueLabel={currentStep === "review" ? "Complete Profile" : "Continue"}
+      showPrevious={currentStep !== "creator"}
+      showContinue
+      saving={saving}
     >
       <AnimatePresence mode="wait" custom={direction}>
         <motion.div
@@ -157,18 +204,7 @@ export default function OnboardingPage() {
           exit={{ opacity: 0, x: direction > 0 ? -28 : 28 }}
           transition={{ duration: 0.24, ease: "easeOut" }}
         >
-          {completed ? (
-            <div className="py-8 text-center">
-              <CheckCircle2 className="mx-auto h-14 w-14 text-primary" />
-              <h1 className="mt-5 text-2xl font-extrabold text-white sm:text-3xl">Preview complete</h1>
-              <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
-                Your answers were saved in this browser only. Nothing was sent to the MAVLIT API or added to your account.
-              </p>
-              <button type="button" onClick={() => { setCompleted(false); goTo(steps.length - 1, -1); }} className="mt-7 rounded-xl border border-border bg-secondary px-5 py-3 text-sm font-semibold text-white hover:bg-secondary/70">
-                Edit your answers
-              </button>
-            </div>
-          ) : stepContent[currentStep]}
+          {stepContent[currentStep]}
           {submitError && (
             <div className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
               {submitError}
@@ -180,23 +216,46 @@ export default function OnboardingPage() {
   );
 }
 
-function loadDraft(): SavedDraft {
+function loadDraft(profile: CreatorProfile | null): SavedDraft {
   try {
-    const raw = localStorage.getItem(DRAFT_KEY);
+    const raw = profile && localStorage.getItem(draftKey(profile.id));
     if (raw) {
       const parsed = JSON.parse(raw) as SavedDraft;
-      if (parsed.data?.creator && parsed.data.instagram && parsed.data.youtube && ["welcome", "creator", "instagram", "youtube", "review"].includes(parsed.step)) return { ...parsed, data: currentFields(parsed.data) };
-    }
-    const completed = localStorage.getItem(COMPLETED_KEY);
-    if (completed) {
-      const parsed = JSON.parse(completed) as { data?: OnboardingData };
-      if (parsed.data?.creator && parsed.data.instagram && parsed.data.youtube) return { data: currentFields(parsed.data), step: "welcome" };
+      if (parsed.data?.creator && parsed.data.instagram && parsed.data.youtube) {
+        return { data: currentFields(parsed.data), step: parsed.step === "welcome" ? "creator" : parsed.step };
+      }
     }
   } catch {
-    localStorage.removeItem(DRAFT_KEY);
+    if (profile) localStorage.removeItem(draftKey(profile.id));
   }
-
-  return { data: EMPTY_ONBOARDING, step: "welcome" };
+  if (!profile) return { data: EMPTY_ONBOARDING, step: "creator" };
+  return {
+    step: "creator",
+    data: currentFields({
+      ...EMPTY_ONBOARDING,
+      creator: {
+        fullName: profile.full_name ?? "",
+        age: profile.age != null ? String(profile.age) : "",
+        gender: profile.gender ?? "",
+        platforms: profile.primary_platform === "youtube" ? ["youtube"] : profile.primary_platform === "instagram" ? ["instagram"] : [],
+        contentDescription: profile.content_description ?? "",
+      },
+      instagram: {
+        ...EMPTY_ONBOARDING.instagram,
+        username: profile.instagram_handle ?? profile.creator_handle ?? "",
+        followers: profile.follower_count != null ? String(profile.follower_count) : "",
+        niches: profile.instagram_primary_niche ? [profile.instagram_primary_niche] : profile.content_niche ? [profile.content_niche] : [],
+        contentDescription: profile.instagram_description ?? "",
+      },
+      youtube: {
+        ...EMPTY_ONBOARDING.youtube,
+        channelName: profile.youtube_channel_name ?? "",
+        subscribers: profile.youtube_subscribers != null ? String(profile.youtube_subscribers) : "",
+        niches: profile.youtube_primary_niche ? [profile.youtube_primary_niche] : [],
+        contentDescription: profile.youtube_description ?? "",
+      },
+    }),
+  };
 }
 
 function currentFields(data: OnboardingData): OnboardingData {
@@ -208,6 +267,7 @@ function currentFields(data: OnboardingData): OnboardingData {
       age: data.creator.age ?? "",
       gender: data.creator.gender ?? "",
       platforms: data.creator.platforms ?? [],
+      contentDescription: data.creator.contentDescription ?? "",
     },
     instagram: {
       username: data.instagram.username ?? "",
@@ -249,9 +309,8 @@ function validateStep(step: StepKey, data: OnboardingData): FieldErrors {
   if (step === "instagram") {
     const errors: FieldErrors = {};
     if (!data.instagram.username.trim()) errors.username = "Instagram username is required.";
-    if (data.instagram.followers === "" || Number(data.instagram.followers) < 0) errors.followers = "Enter a valid follower count.";
+    if (data.instagram.followers === "" || !Number.isInteger(Number(data.instagram.followers)) || Number(data.instagram.followers) < 0) errors.followers = "Enter a valid follower count.";
     if (!data.instagram.niches.length) errors.niches = "Select at least one primary niche.";
-    if (data.instagramDescriptionMode === "manual" && !data.instagram.contentDescription.trim()) errors.contentDescription = "Describe your Instagram content.";
     if (audienceTotal(data.instagram.audience) > 100) errors.audience = "Male and female percentages cannot exceed 100% combined.";
     return errors;
   }
@@ -260,7 +319,6 @@ function validateStep(step: StepKey, data: OnboardingData): FieldErrors {
     if (!data.youtube.channelName.trim()) errors.channelName = "Channel name is required.";
     if (data.youtube.subscribers === "" || Number(data.youtube.subscribers) < 0) errors.subscribers = "Enter a valid subscriber count.";
     if (!data.youtube.niches.length) errors.niches = "Select at least one primary niche.";
-    if (data.youtubeDescriptionMode === "manual" && !data.youtube.contentDescription.trim()) errors.contentDescription = "Describe your YouTube content.";
     if (audienceTotal(data.youtube.audience) > 100) errors.audience = "Male and female percentages cannot exceed 100% combined.";
     return errors;
   }

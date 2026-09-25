@@ -34,6 +34,7 @@ export type OnboardingData = {
     age: string;
     gender: string;
     platforms: PlatformKey[];
+    contentDescription: string;
   };
   instagram: InstagramProfile;
   youtube: YouTubeProfile;
@@ -66,6 +67,7 @@ export const EMPTY_ONBOARDING: OnboardingData = {
     age: "",
     gender: "",
     platforms: [],
+    contentDescription: "",
   },
   instagram: {
     username: "",

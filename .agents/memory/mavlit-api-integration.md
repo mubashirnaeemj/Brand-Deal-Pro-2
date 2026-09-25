@@ -1,6 +1,6 @@
 ---
 name: MAVLIT API integration
-description: External API authentication, pitch lifecycle, CORS, and the frontend-only onboarding boundary
+description: External API authentication, pitch lifecycle, cookie transport, and creator onboarding boundary
 ---
 
 # MAVLIT API Integration
@@ -13,7 +13,7 @@ description: External API authentication, pitch lifecycle, CORS, and the fronten
 - AuthContext (`artifacts/mavlit/src/contexts/AuthContext.tsx`) is the single source of truth for user state; caches to `mavlit_profile_cache` in localStorage as a loading fallback
 
 ## ProtectedRoute
-- Authenticated app pages require login. Profile setup is a separate public frontend-only preview and does not gate dashboard access.
+- All app pages require login; an incomplete creator can only access creator onboarding until their account profile is saved with the required fields.
 
 ## Pitch lifecycle
 
@@ -31,10 +31,10 @@ Keep browser calls to the external MAVLIT API on the app's own origin via the se
 
 **How to apply:** Route any new account API call through the same-origin proxy; do not reintroduce direct browser calls to the external host. Verify that login is followed by a successful cookie-backed profile read. Anonymous screenshot 401s are expected and cannot verify a signed-in flow.
 
-## Frontend-only onboarding
+## Onboarding boundary
 
-Keep `/profile-setup` independent of authentication and the backend API. Draft and completed answers are stored only on the visitor's device; completing this preview does not update their account or unlock the dashboard.
+Creator onboarding now gates access to the frontend. Local drafts persist per account on the device, but only a successfully saved account profile can unlock the app. The current external API has no authoritative `onboarding_completed` field, so the client derives status from persisted required fields until the backend supplies one.
 
-**Why:** The user explicitly requested a frontend-only page. A forced server-completeness gate would strand users in a form that cannot update server state. The external API's September 2026 contract now supports creator age, gender, per-platform description modes, and generation; the frontend-only boundary is a product choice, not a missing API capability.
+**Why:** The user replaced the earlier frontend-only preview requirement with a mandatory login → profile → full-app flow. The remote FastAPI source is not present in this workspace; a frontend gate alone does not secure the external API against direct requests.
 
-**How to apply:** Do not reintroduce API submission or auth gating on this page without a new request. Be clear in UI copy that local answers do not create a server profile.
+**How to apply:** Keep route checks based on validated server profile data, not local draft flags. Once the backend can change, make completion authoritative in its profile responses and enforce it on creator-facing endpoints. Do not equate editing a draft with submitting a profile.

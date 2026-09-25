@@ -71,9 +71,8 @@ export default function DescriptionModeSelector({
             <Sparkles size={18} className="mt-0.5 shrink-0 text-primary" />
             <div className="space-y-3 text-sm leading-6 text-slate-300">
               <p>MAVLIT will analyze your {source} and generate a creator description optimized for brand matching.</p>
-              <p className="flex items-center gap-2 font-semibold text-white"><Clock3 size={15} className="text-primary" /> Estimated time: 8–10 minutes.</p>
-              <p>You can continue onboarding without waiting.</p>
-              <p className="text-xs text-muted-foreground">Frontend preview only — no content is analyzed yet.</p>
+              <p className="flex items-center gap-2 font-semibold text-white"><Clock3 size={15} className="text-primary" /> MAVLIT will try to generate this when you complete your profile.</p>
+              <p>If generation fails, add a description yourself to finish onboarding.</p>
             </div>
           </div>
         </div>

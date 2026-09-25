@@ -6,7 +6,7 @@ export default function ReviewStep({ data }: { data: OnboardingData }) {
     <div>
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">One last check</p>
       <h1 className="mt-2 text-2xl font-extrabold text-white sm:text-3xl">Review your profile</h1>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">Check your answers before saving them on this device.</p>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">Check your answers before submitting your creator profile.</p>
 
       <div className="mt-7 space-y-4">
         <ReviewCard icon={<User size={17} />} title="Creator information">
@@ -15,10 +15,10 @@ export default function ReviewStep({ data }: { data: OnboardingData }) {
             ["Age", data.creator.age],
             ["Gender", data.creator.gender],
             ["Platforms", data.creator.platforms.map(capitalize).join(", ")],
+            ["Overall description", data.creator.contentDescription],
           ]} />
         </ReviewCard>
 
-        {data.creator.platforms.includes("instagram") && (
           <ReviewCard icon={<Instagram size={17} />} title="Instagram information">
             <Rows rows={[
               ["Username", `@${data.instagram.username}`],
@@ -30,7 +30,6 @@ export default function ReviewStep({ data }: { data: OnboardingData }) {
               ["Avoid", data.instagram.excludedCategories || "None specified"],
             ]} />
           </ReviewCard>
-        )}
 
         {data.creator.platforms.includes("youtube") && (
           <ReviewCard icon={<Youtube size={17} />} title="YouTube information">
@@ -48,7 +47,7 @@ export default function ReviewStep({ data }: { data: OnboardingData }) {
       </div>
       <div className="mt-5 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/10 p-4">
         <MapPin size={16} className="mt-0.5 shrink-0 text-primary" />
-        <p className="text-xs leading-5 text-slate-300">This is a frontend-only preview. Saving keeps your answers on this device; it does not create an account or update your MAVLIT profile.</p>
+        <p className="text-xs leading-5 text-slate-300">Your draft stays on this device. Completing your profile saves these required details to your MAVLIT account and unlocks the app.</p>
       </div>
     </div>
   );

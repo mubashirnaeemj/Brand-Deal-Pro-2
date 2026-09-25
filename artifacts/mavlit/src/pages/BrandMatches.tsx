@@ -4,11 +4,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2, SlidersHorizontal, Music, Building2, Bookmark,
-  ChevronDown, ChevronUp, Clock, X, Copy, Check,
+  ChevronDown, ChevronUp, Clock, X, Copy, Check, RefreshCw,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { api, ApiRequestError, getAllMatches, type ApiBrand, type ApiMatch, type SavedBrand } from "@/lib/api";
+import { api, ApiRequestError, getAllMatches, type ApiBrand, type ApiMatch, type MatchesResponse, type SavedBrand } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 const ACCENT = "#7c3aed";
@@ -18,11 +18,15 @@ function nicheOf(match: ApiMatch) {
   return match.niche?.trim() || "Uncategorized";
 }
 
+function percent(score: number) {
+  return Math.round(Math.min(1, Math.max(0, score)) * 100);
+}
+
 function ScoreRing({ match, size = 56 }: { match: ApiMatch; size?: number }) {
   const [hovered, setHovered] = useState(false);
   const radius = size / 2 - 6;
   const circumference = 2 * Math.PI * radius;
-  const score = Number.isFinite(match.total_score) ? match.total_score : 0;
+  const score = percent(Number.isFinite(match.total_score) ? match.total_score : 0);
   const dimensions = Object.entries(match.dimensions ?? {});
 
   return (
@@ -32,9 +36,9 @@ function ScoreRing({ match, size = 56 }: { match: ApiMatch; size?: number }) {
       <svg className="absolute inset-0 -rotate-90" width={size} height={size}>
         <circle cx={size / 2} cy={size / 2} r={radius} stroke="hsl(240 5% 15%)" strokeWidth="4" fill="none" />
         <circle cx={size / 2} cy={size / 2} r={radius} stroke="hsl(262 83% 58%)" strokeWidth="4" fill="none"
-          strokeDasharray={`${Math.min(100, Math.max(0, score)) / 100 * circumference} ${circumference}`} strokeLinecap="round" />
+          strokeDasharray={`${score / 100 * circumference} ${circumference}`} strokeLinecap="round" />
       </svg>
-      <span className="text-xs font-bold text-white z-10">{Math.round(score)}%</span>
+      <span className="text-xs font-bold text-white z-10">{score}%</span>
       {hovered && dimensions.length > 0 && (
         <div className="absolute bottom-[calc(100%+8px)] right-0 z-[100] w-52 rounded-xl border border-border bg-[hsl(240_10%_6%)] shadow-2xl p-3 pointer-events-none">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2.5">Score Breakdown</p>
@@ -43,11 +47,11 @@ function ScoreRing({ match, size = 56 }: { match: ApiMatch; size?: number }) {
               <div key={key}>
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-[11px] text-muted-foreground">{key.replace(/[_-]/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2")}</span>
-                  <span className="text-[11px] font-bold text-white">{detail.score == null ? "N/A" : Math.round(detail.score)}</span>
+                  <span className="text-[11px] font-bold text-white">{detail.score == null ? "N/A" : `${percent(detail.score)}%`}</span>
                 </div>
                 <div className="h-1 rounded-full bg-white/10 overflow-hidden">
                   <div className="h-full rounded-full bg-primary transition-all duration-300"
-                    style={{ width: `${Math.min(100, Math.max(0, detail.score ?? 0))}%` }} />
+                    style={{ width: `${percent(detail.score ?? 0)}%` }} />
                 </div>
               </div>
             ))}
@@ -253,6 +257,9 @@ export default function BrandMatches() {
   const { toast } = useToast();
   const [activeCategory, setActiveCategory] = useState("All");
   const [selectedMatch, setSelectedMatch] = useState<ApiMatch | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [refreshSuccess, setRefreshSuccess] = useState(false);
   const { data: matches, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["pitch-matches"],
     queryFn: getAllMatches,
@@ -271,6 +278,28 @@ export default function BrandMatches() {
       window.dispatchEvent(new Event("mavlit:profile-incomplete"));
     }
   }, [error]);
+
+  const refreshMatches = async () => {
+    if (refreshing) return;
+    setRefreshError(null);
+    setRefreshSuccess(false);
+    setRefreshing(true);
+    try {
+      const response = await api.post<MatchesResponse>("/matches/me/refresh?limit=100", {});
+      if (!Array.isArray(response.matches)) throw new Error("Invalid refreshed matches response");
+      const result = await refetch();
+      if (result.isError) throw result.error ?? new Error("Could not reload matches.");
+      setSelectedMatch(null);
+      setRefreshSuccess(true);
+    } catch (cause) {
+      if (cause instanceof ApiRequestError && cause.status === 403) {
+        window.dispatchEvent(new Event("mavlit:profile-incomplete"));
+      }
+      setRefreshError(cause instanceof Error ? cause.message : "Could not refresh matches.");
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const savedBrandIds = new Set(savedBrandsList.map((brand) => brand.brand_id));
   const toggleSave = useCallback(async (brandId: number, brandName: string) => {
@@ -311,12 +340,21 @@ export default function BrandMatches() {
               </span>
               <span className="text-muted-foreground text-xs">Based on your creator profile</span>
             </div>
-            <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">Your Brand Matches</h1>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-4">
+              <h1 className="text-4xl font-extrabold text-white tracking-tight">Your Brand Matches</h1>
+              <button type="button" onClick={refreshMatches} disabled={refreshing || isLoading}
+                className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-white transition hover:border-primary/50 hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50">
+                <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
+                {refreshing ? "Refreshing…" : "Refresh matches"}
+              </button>
+            </div>
             <p className="text-muted-foreground text-base max-w-xl">
               {isLoading ? "Finding your brand matches…" : isError ? "Unable to load your matches." : (
                 <>MAVLIT found <span className="text-white font-semibold">{matches?.length ?? 0} high-fit brands</span> based on your audience data, content style, and engagement metrics.</>
               )}
             </p>
+            {refreshError && <p role="alert" className="mt-3 text-sm text-red-400">{refreshError}</p>}
+            {refreshSuccess && <p role="status" className="mt-3 text-sm text-emerald-400">Matches refreshed.</p>}
           </motion.div>
 
           {!isLoading && !isError && matches && (

@@ -73,6 +73,6 @@ Direct server-to-server requests to `api.mavlit.com` work, but as of September 2
 
 Keep `/profile-setup` independent of authentication and the backend API. Draft and completed answers are stored only on the visitor's device; completing this preview does not update their account or unlock the dashboard.
 
-**Why:** The user explicitly requested a frontend-only page, and the external API does not support every field in the onboarding form. A forced server-completeness gate would strand users in a form that cannot update server state.
+**Why:** The user explicitly requested a frontend-only page. A forced server-completeness gate would strand users in a form that cannot update server state. The external API's September 2026 contract now supports creator age, gender, per-platform description modes, and generation; the frontend-only boundary is a product choice, not a missing API capability.
 
 **How to apply:** Do not reintroduce API submission or auth gating on this page without a new request. Be clear in UI copy that local answers do not create a server profile.

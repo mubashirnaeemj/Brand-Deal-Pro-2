@@ -98,7 +98,6 @@ function SharedDetails({
         onChange={(mode) => {
           setGenerateError(null);
           setDescriptionMode(mode);
-          if (mode === "generate") void generate();
         }}
         onGenerate={generate} generating={generating} generateError={generateError}>
         <Field label={`${platform} description`}>

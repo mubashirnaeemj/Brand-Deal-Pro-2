@@ -14,6 +14,7 @@ export default function ProfileSettings() {
   const [form, setForm] = useState<ProfileForm | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [generatingCount, setGeneratingCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -41,9 +42,15 @@ export default function ProfileSettings() {
     setError(null);
   };
 
+  const generated = (platform: "instagram" | "youtube", description: string) => {
+    setForm((current) => current ? { ...current, [platform]: { ...current[platform], description } } : current);
+    setSaved(false);
+    setError(null);
+  };
+
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form || !profile || saving) return;
+    if (!form || !profile || saving || generatingCount > 0) return;
     setError(null);
     const validationError = validateProfile(form, profile);
     if (validationError) {
@@ -126,15 +133,19 @@ export default function ProfileSettings() {
               </div>
             </section>
 
-            <InstagramSection value={form.instagram} onChange={(instagram) => change({ ...form, instagram })} />
-            <YoutubeSection value={form.youtube} onChange={(youtube) => change({ ...form, youtube })} />
+            <InstagramSection value={form.instagram} onChange={(instagram) => change({ ...form, instagram })}
+              onGenerated={(description) => generated("instagram", description)}
+              onGeneratingChange={(active) => setGeneratingCount((count) => count + (active ? 1 : -1))} />
+            <YoutubeSection value={form.youtube} onChange={(youtube) => change({ ...form, youtube })}
+              onGenerated={(description) => generated("youtube", description)}
+              onGeneratingChange={(active) => setGeneratingCount((count) => count + (active ? 1 : -1))} />
 
             {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>}
             {saved && <p role="status" className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">Profile saved.</p>}
             <div className="flex justify-end">
-              <button type="submit" disabled={saving}
+              <button type="submit" disabled={saving || generatingCount > 0}
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50">
-                <Save size={16} /> {saving ? "Saving…" : "Save Profile"}
+                <Save size={16} /> {saving ? "Saving…" : generatingCount > 0 ? "Generating…" : "Save Profile"}
               </button>
             </div>
           </form>

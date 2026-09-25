@@ -11,8 +11,8 @@ import YouTubeStep from "@/components/onboarding/YouTubeStep";
 import ReviewStep from "@/components/onboarding/ReviewStep";
 import {
   EMPTY_ONBOARDING,
-  audienceTotal,
   formatPlatforms,
+  NICHE_OPTIONS,
   parsePlatforms,
   type FieldErrors,
   type OnboardingData,
@@ -139,9 +139,12 @@ export default function OnboardingPage() {
         instagram_description: instagramDescription || null,
         youtube_description: youtubeDescription || null,
         instagram_sub_niches: data.instagram.subNiches,
+        instagram_excluded_categories: data.instagram.excludedCategories,
         youtube_channel_name: data.youtube.channelName.trim() || null,
         youtube_subscribers: data.youtube.subscribers ? Number(data.youtube.subscribers) : null,
         youtube_primary_niche: data.youtube.niches[0] || null,
+        youtube_sub_niches: data.youtube.subNiches,
+        youtube_excluded_categories: data.youtube.excludedCategories,
       });
       if (!isProfileComplete(updated)) {
         setSubmitError("Your profile was saved, but onboarding is still incomplete. Check your details and try again.");
@@ -245,16 +248,21 @@ function loadDraft(profile: CreatorProfile | null): SavedDraft {
       instagram: {
         ...EMPTY_ONBOARDING.instagram,
         username: profile.instagram_handle ?? profile.creator_handle ?? "",
-        followers: profile.follower_count != null ? String(profile.follower_count) : "",
+        followers: profile.instagram_followers != null ? String(profile.instagram_followers) :
+          parsePlatforms(profile.primary_platform)[0] === "instagram" && profile.follower_count != null ? String(profile.follower_count) : "",
         niches: profile.instagram_primary_niche ? [profile.instagram_primary_niche] : profile.content_niche ? [profile.content_niche] : [],
+        subNiches: profile.instagram_sub_niches ?? profile.sub_niches ?? [],
         contentDescription: profile.instagram_description ?? "",
+        excludedCategories: profile.instagram_excluded_categories ?? profile.excluded_categories ?? [],
       },
       youtube: {
         ...EMPTY_ONBOARDING.youtube,
         channelName: profile.youtube_channel_name ?? "",
         subscribers: profile.youtube_subscribers != null ? String(profile.youtube_subscribers) : "",
         niches: profile.youtube_primary_niche ? [profile.youtube_primary_niche] : [],
+        subNiches: profile.youtube_sub_niches ?? [],
         contentDescription: profile.youtube_description ?? "",
+        excludedCategories: profile.youtube_excluded_categories ?? [],
       },
     }),
   };
@@ -277,11 +285,7 @@ function currentFields(data: OnboardingData): OnboardingData {
       niches: data.instagram.niches ?? [],
       subNiches: data.instagram.subNiches ?? [],
       contentDescription: data.instagram.contentDescription ?? "",
-      excludedCategories: data.instagram.excludedCategories ?? "",
-      audience: {
-        malePct: data.instagram.audience?.malePct ?? "",
-        femalePct: data.instagram.audience?.femalePct ?? "",
-      },
+      excludedCategories: categoriesArray(data.instagram.excludedCategories),
     },
     youtube: {
       channelName: data.youtube.channelName ?? "",
@@ -289,13 +293,13 @@ function currentFields(data: OnboardingData): OnboardingData {
       niches: data.youtube.niches ?? [],
       subNiches: data.youtube.subNiches ?? [],
       contentDescription: data.youtube.contentDescription ?? "",
-      excludedCategories: data.youtube.excludedCategories ?? "",
-      audience: {
-        malePct: data.youtube.audience?.malePct ?? "",
-        femalePct: data.youtube.audience?.femalePct ?? "",
-      },
+      excludedCategories: categoriesArray(data.youtube.excludedCategories),
     },
   };
+}
+
+function categoriesArray(value: string[] | string | null | undefined): string[] {
+  return Array.isArray(value) ? value : typeof value === "string" ? value.split(",").map((part) => part.trim()).filter(Boolean) : [];
 }
 
 function validateStep(step: StepKey, data: OnboardingData): FieldErrors {
@@ -312,16 +316,14 @@ function validateStep(step: StepKey, data: OnboardingData): FieldErrors {
     const errors: FieldErrors = {};
     if (!data.instagram.username.trim()) errors.username = "Instagram username is required.";
     if (data.instagram.followers === "" || !Number.isInteger(Number(data.instagram.followers)) || Number(data.instagram.followers) < 0) errors.followers = "Enter a valid follower count.";
-    if (!data.instagram.niches.length) errors.niches = "Select at least one primary niche.";
-    if (audienceTotal(data.instagram.audience) > 100) errors.audience = "Male and female percentages cannot exceed 100% combined.";
+    if (!data.instagram.niches.length || data.instagram.niches.some((niche) => !NICHE_OPTIONS.includes(niche as typeof NICHE_OPTIONS[number]))) errors.niches = "Select a listed primary niche.";
     return errors;
   }
   if (step === "youtube") {
     const errors: FieldErrors = {};
     if (!data.youtube.channelName.trim()) errors.channelName = "Channel name is required.";
     if (data.youtube.subscribers === "" || Number(data.youtube.subscribers) < 0) errors.subscribers = "Enter a valid subscriber count.";
-    if (!data.youtube.niches.length) errors.niches = "Select at least one primary niche.";
-    if (audienceTotal(data.youtube.audience) > 100) errors.audience = "Male and female percentages cannot exceed 100% combined.";
+    if (!data.youtube.niches.length || data.youtube.niches.some((niche) => !NICHE_OPTIONS.includes(niche as typeof NICHE_OPTIONS[number]))) errors.niches = "Select a listed primary niche.";
     return errors;
   }
   return {};

@@ -7,11 +7,17 @@ export default function DescriptionModeSelector({
   mode,
   onChange,
   children,
+  onGenerate,
+  generating = false,
+  generateError,
 }: {
   platform: PlatformKey;
   mode: DescriptionMode;
   onChange: (mode: DescriptionMode) => void;
   children: ReactNode;
+  onGenerate?: () => void;
+  generating?: boolean;
+  generateError?: string | null;
 }) {
   const source = platform === "instagram" ? "Instagram posts/captions" : "YouTube videos/titles/descriptions";
 
@@ -71,8 +77,20 @@ export default function DescriptionModeSelector({
             <Sparkles size={18} className="mt-0.5 shrink-0 text-primary" />
             <div className="space-y-3 text-sm leading-6 text-slate-300">
               <p>MAVLIT will analyze your {source} and generate a creator description optimized for brand matching.</p>
-              <p className="flex items-center gap-2 font-semibold text-white"><Clock3 size={15} className="text-primary" /> MAVLIT will try to generate this when you complete your profile.</p>
-              <p>If generation fails, add a description yourself to finish onboarding.</p>
+              {onGenerate ? (
+                <>
+                  <button type="button" onClick={onGenerate} disabled={generating}
+                    className="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                    {generating ? "Generating…" : "Generate description"}
+                  </button>
+                  {generateError && <p role="alert" className="text-red-400">{generateError}</p>}
+                </>
+              ) : (
+                <>
+                  <p className="flex items-center gap-2 font-semibold text-white"><Clock3 size={15} className="text-primary" /> MAVLIT will try to generate this when you complete your profile.</p>
+                  <p>If generation fails, add a description yourself to finish onboarding.</p>
+                </>
+              )}
             </div>
           </div>
         </div>

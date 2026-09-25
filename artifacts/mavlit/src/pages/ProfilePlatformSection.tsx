@@ -1,6 +1,10 @@
+import { useState } from "react";
 import { Instagram, Youtube } from "lucide-react";
+import { api } from "@/lib/api";
+import BrandCategoriesToAvoid from "@/components/onboarding/BrandCategoriesToAvoid";
+import DescriptionModeSelector from "@/components/onboarding/DescriptionModeSelector";
 import MultiSelectDropdown from "@/components/onboarding/MultiSelectDropdown";
-import { INPUT_CLASS, NICHE_OPTIONS, SUB_NICHE_OPTIONS } from "@/components/onboarding/types";
+import { INPUT_CLASS, NICHE_OPTIONS, subNicheOptions, type DescriptionMode } from "@/components/onboarding/types";
 import type { PlatformDetails, ProfileForm } from "./profileForm";
 
 type InstagramDetails = ProfileForm["instagram"];
@@ -19,70 +23,99 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function SharedDetails({
   platform,
+  username,
   value,
   onChange,
+  onGenerated,
+  onGeneratingChange,
 }: {
   platform: "instagram" | "youtube";
+  username: string;
   value: PlatformDetails;
   onChange: (value: PlatformDetails) => void;
+  onGenerated: (description: string) => void;
+  onGeneratingChange: (active: boolean) => void;
 }) {
-  const options = [...new Set([...NICHE_OPTIONS, ...(value.primaryNiche ? [value.primaryNiche] : [])])];
-  const subNicheOptions = [...new Set([...SUB_NICHE_OPTIONS, ...value.subNiches])];
+  const [descriptionMode, setDescriptionMode] = useState<DescriptionMode>("manual");
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const set = <K extends keyof PlatformDetails>(key: K, next: PlatformDetails[K]) =>
     onChange({ ...value, [key]: next });
+  const generate = async () => {
+    if (!username.trim() || !NICHE_OPTIONS.includes(value.primaryNiche as typeof NICHE_OPTIONS[number])) {
+      setGenerateError(`Add your ${platform === "instagram" ? "Instagram username" : "YouTube channel name"} and primary niche first.`);
+      return;
+    }
+    setGenerateError(null);
+    setGenerating(true);
+    onGeneratingChange(true);
+    try {
+      const result = await api.post<{ description: string }>("/creator-profile/me/generate-description", {
+        platform,
+        username: username.trim(),
+        niche: value.primaryNiche,
+      });
+      if (!result.description?.trim()) throw new Error("MAVLIT did not return a description. Please try again.");
+      onGenerated(result.description.trim());
+      setDescriptionMode("manual");
+    } catch (error) {
+      setGenerateError(error instanceof Error ? error.message : "Could not generate a description.");
+    } finally {
+      setGenerating(false);
+      onGeneratingChange(false);
+    }
+  };
 
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Primary niche">
-          <select value={value.primaryNiche} onChange={(event) => set("primaryNiche", event.target.value)} className={INPUT_CLASS}>
+          <select value={NICHE_OPTIONS.includes(value.primaryNiche as typeof NICHE_OPTIONS[number]) ? value.primaryNiche : ""}
+            onChange={(event) => onChange({ ...value, primaryNiche: event.target.value,
+              subNiches: value.subNiches.filter((item) => subNicheOptions([event.target.value]).includes(item)) })}
+            className={INPUT_CLASS}>
             <option value="">Select a niche</option>
-            {options.map((option) => <option key={option} value={option}>{option}</option>)}
+            {NICHE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
+          {value.primaryNiche && !NICHE_OPTIONS.includes(value.primaryNiche as typeof NICHE_OPTIONS[number]) && (
+            <span className="mt-1 block text-xs normal-case tracking-normal text-amber-400">
+              Your saved niche ({value.primaryNiche}) is no longer an option. Choose one above to update it.
+            </span>
+          )}
         </Field>
         <MultiSelectDropdown
           label="Sub-niches"
           selected={value.subNiches}
           onChange={(subNiches) => set("subNiches", subNiches)}
-          options={subNicheOptions}
+          options={subNicheOptions([value.primaryNiche])}
           placeholder="Select sub-niches"
           searchable
         />
       </div>
-      <Field label="Brand categories to avoid">
-        <input
-          value={value.excludedCategories}
-          onChange={(event) => set("excludedCategories", event.target.value)}
-          placeholder="Alcohol, Gambling, Crypto"
-          className={INPUT_CLASS}
-        />
-      </Field>
-      <Field label={`${platform} description`}>
-        <textarea
-          rows={4}
-          value={value.description}
-          onChange={(event) => set("description", event.target.value)}
-          placeholder={`Describe your ${platform === "instagram" ? "Instagram" : "YouTube"} content.`}
-          className={`${INPUT_CLASS} resize-none`}
-        />
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Audience male (%)">
-          <input type="number" min="0" max="100" step="0.1" value={value.audience.malePct}
-            onChange={(event) => set("audience", { ...value.audience, malePct: event.target.value })} className={INPUT_CLASS} />
+      <BrandCategoriesToAvoid selected={value.excludedCategories}
+        onChange={(excludedCategories) => set("excludedCategories", excludedCategories)} />
+      <DescriptionModeSelector platform={platform} mode={descriptionMode}
+        onChange={(mode) => {
+          setGenerateError(null);
+          setDescriptionMode(mode);
+          if (mode === "generate") void generate();
+        }}
+        onGenerate={generate} generating={generating} generateError={generateError}>
+        <Field label={`${platform} description`}>
+          <textarea rows={4} value={value.description} onChange={(event) => set("description", event.target.value)}
+            placeholder={`Describe your ${platform === "instagram" ? "Instagram" : "YouTube"} content.`}
+            className={`${INPUT_CLASS} resize-none`} />
         </Field>
-        <Field label="Audience female (%)">
-          <input type="number" min="0" max="100" step="0.1" value={value.audience.femalePct}
-            onChange={(event) => set("audience", { ...value.audience, femalePct: event.target.value })} className={INPUT_CLASS} />
-        </Field>
-      </div>
+      </DescriptionModeSelector>
     </>
   );
 }
 
-export function InstagramSection({ value, onChange }: {
+export function InstagramSection({ value, onChange, onGenerated, onGeneratingChange }: {
   value: InstagramDetails;
   onChange: (value: InstagramDetails) => void;
+  onGenerated: (description: string) => void;
+  onGeneratingChange: (active: boolean) => void;
 }) {
   return (
     <section className={cardClass}>
@@ -99,15 +132,19 @@ export function InstagramSection({ value, onChange }: {
         </Field>
       </div>
       <div className="mt-4 grid gap-4">
-        <SharedDetails platform="instagram" value={value} onChange={(details) => onChange({ ...value, ...details })} />
+        <SharedDetails platform="instagram" username={value.username}
+          value={value} onChange={(details) => onChange({ ...value, ...details })}
+          onGenerated={onGenerated} onGeneratingChange={onGeneratingChange} />
       </div>
     </section>
   );
 }
 
-export function YoutubeSection({ value, onChange }: {
+export function YoutubeSection({ value, onChange, onGenerated, onGeneratingChange }: {
   value: YoutubeDetails;
   onChange: (value: YoutubeDetails) => void;
+  onGenerated: (description: string) => void;
+  onGeneratingChange: (active: boolean) => void;
 }) {
   return (
     <section className={cardClass}>
@@ -124,7 +161,9 @@ export function YoutubeSection({ value, onChange }: {
         </Field>
       </div>
       <div className="mt-4 grid gap-4">
-        <SharedDetails platform="youtube" value={value} onChange={(details) => onChange({ ...value, ...details })} />
+        <SharedDetails platform="youtube" username={value.channelName}
+          value={value} onChange={(details) => onChange({ ...value, ...details })}
+          onGenerated={onGenerated} onGeneratingChange={onGeneratingChange} />
       </div>
     </section>
   );

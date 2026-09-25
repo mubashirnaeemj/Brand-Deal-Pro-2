@@ -1,9 +1,9 @@
 import { Instagram } from "lucide-react";
-import AudienceDemographicsForm from "./AudienceDemographicsForm";
+import BrandCategoriesToAvoid from "./BrandCategoriesToAvoid";
 import DescriptionModeSelector from "./DescriptionModeSelector";
 import MultiSelectDropdown from "./MultiSelectDropdown";
 import type { DescriptionMode, FieldErrors, InstagramProfile } from "./types";
-import { INPUT_CLASS, NICHE_OPTIONS, SUB_NICHE_OPTIONS } from "./types";
+import { INPUT_CLASS, NICHE_OPTIONS, subNicheOptions } from "./types";
 
 export default function InstagramStep({
   value,
@@ -39,8 +39,11 @@ export default function InstagramStep({
         </Field>
       </div>
       <div className="mt-5 grid gap-5 sm:grid-cols-2">
-        <MultiSelectDropdown label="Primary niche" options={NICHE_OPTIONS} selected={value.niches} onChange={(items) => set("niches", items)} placeholder="Select one or more" error={errors.niches} />
-        <MultiSelectDropdown label="Sub-niches" options={SUB_NICHE_OPTIONS} selected={value.subNiches} onChange={(items) => set("subNiches", items)} placeholder="Select sub-niches" searchable />
+        <MultiSelectDropdown label="Primary niche" options={NICHE_OPTIONS} selected={value.niches}
+          onChange={(items) => onChange({ ...value, niches: items, subNiches: value.subNiches.filter((item) => subNicheOptions(items).includes(item)) })}
+          placeholder="Select one or more" error={errors.niches} />
+        <MultiSelectDropdown label="Sub-niches" options={subNicheOptions(value.niches)} selected={value.subNiches}
+          onChange={(items) => set("subNiches", items)} placeholder="Select sub-niches" searchable />
       </div>
 
       <div className="mt-5">
@@ -51,12 +54,8 @@ export default function InstagramStep({
         </DescriptionModeSelector>
       </div>
       <div className="mt-5">
-        <Field label="Brand categories to avoid">
-          <input value={value.excludedCategories} onChange={(event) => set("excludedCategories", event.target.value)} placeholder="Alcohol, Gambling, Crypto, Politics" className={INPUT_CLASS} />
-        </Field>
-      </div>
-      <div className="mt-5">
-        <AudienceDemographicsForm value={value.audience} onChange={(audience) => set("audience", audience)} errors={errors} />
+        <BrandCategoriesToAvoid selected={value.excludedCategories}
+          onChange={(excludedCategories) => set("excludedCategories", excludedCategories)} />
       </div>
     </div>
   );

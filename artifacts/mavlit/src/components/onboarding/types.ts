@@ -5,19 +5,13 @@ export const parsePlatforms = (value: string | null | undefined): PlatformKey[] 
 export const formatPlatforms = (platforms: PlatformKey[]): string => platforms.join(",");
 export type DescriptionMode = "manual" | "generate";
 
-export type AudienceDemographics = {
-  malePct: string;
-  femalePct: string;
-};
-
 export type InstagramProfile = {
   username: string;
   followers: string;
   niches: string[];
   subNiches: string[];
   contentDescription: string;
-  excludedCategories: string;
-  audience: AudienceDemographics;
+  excludedCategories: string[];
 };
 
 export type YouTubeProfile = {
@@ -26,8 +20,7 @@ export type YouTubeProfile = {
   niches: string[];
   subNiches: string[];
   contentDescription: string;
-  excludedCategories: string;
-  audience: AudienceDemographics;
+  excludedCategories: string[];
 };
 
 export type OnboardingData = {
@@ -47,21 +40,17 @@ export type OnboardingData = {
 export type StepKey = "welcome" | "creator" | "instagram" | "youtube" | "review";
 export type FieldErrors = Record<string, string>;
 
-export const NICHE_OPTIONS = [
-  "Music", "Beauty", "Health", "Fitness", "Fashion", "Finance", "Business",
-  "Education", "Gaming", "Technology", "Food", "Travel", "Lifestyle",
-  "Entertainment", "Sports", "Parenting", "Art", "Photography",
-];
+export const SUB_NICHES_BY_NICHE = {
+  Music: ["Music Production", "Songwriting", "DJing", "Audio Gear", "Singing", "Live Performance", "Music Education", "Music Reviews", "Instrument Tutorials", "Recording & Mixing"],
+  Health: ["Nutrition", "Mental Health", "Sleep", "Preventive Care", "Healthy Aging", "Women's Health", "Men's Health", "Holistic Health", "Public Health", "Wellness Routines"],
+  Beauty: ["Skincare", "Makeup", "Haircare", "Fragrance", "Nail Art", "Beauty Tutorials", "Product Reviews", "Clean Beauty", "Bridal Beauty", "Men's Grooming"],
+  Fitness: ["Strength Training", "Running", "Yoga", "Pilates", "HIIT", "Mobility", "Home Workouts", "Cycling", "Dance Fitness", "Recovery"],
+} as const;
 
-export const SUB_NICHE_OPTIONS = [
-  "Music Production", "Songwriting", "DJing", "Audio Gear", "Skincare",
-  "Makeup", "Wellness", "Strength Training", "Running", "Streetwear",
-  "Personal Finance", "Investing", "Entrepreneurship", "Career Growth",
-  "Online Learning", "Game Reviews", "Esports", "Consumer Tech",
-  "Software", "Recipes", "Restaurant Reviews", "Adventure Travel",
-  "Luxury Travel", "Home & Living", "Comedy", "Film & TV", "Football",
-  "Basketball", "Family Life", "Digital Art", "Portrait Photography",
-];
+export const NICHE_OPTIONS = Object.keys(SUB_NICHES_BY_NICHE) as (keyof typeof SUB_NICHES_BY_NICHE)[];
+export const subNicheOptions = (niches: string[]): string[] =>
+  [...new Set(niches.flatMap((niche) =>
+    niche in SUB_NICHES_BY_NICHE ? [...SUB_NICHES_BY_NICHE[niche as keyof typeof SUB_NICHES_BY_NICHE]] : []))];
 
 export const EMPTY_ONBOARDING: OnboardingData = {
   instagramDescriptionMode: "manual",
@@ -79,8 +68,7 @@ export const EMPTY_ONBOARDING: OnboardingData = {
     niches: [],
     subNiches: [],
     contentDescription: "",
-    excludedCategories: "",
-    audience: { malePct: "", femalePct: "" },
+    excludedCategories: [],
   },
   youtube: {
     channelName: "",
@@ -88,14 +76,9 @@ export const EMPTY_ONBOARDING: OnboardingData = {
     niches: [],
     subNiches: [],
     contentDescription: "",
-    excludedCategories: "",
-    audience: { malePct: "", femalePct: "" },
+    excludedCategories: [],
   },
 };
 
 export const INPUT_CLASS =
   "w-full rounded-xl border border-border bg-secondary/80 px-4 py-3 text-sm text-white outline-none transition placeholder:text-muted-foreground/50 focus:border-primary/70 focus:ring-2 focus:ring-primary/15";
-
-export function audienceTotal(audience: AudienceDemographics) {
-  return (Number(audience.malePct) || 0) + (Number(audience.femalePct) || 0);
-}

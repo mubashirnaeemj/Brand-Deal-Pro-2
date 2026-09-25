@@ -9,6 +9,7 @@ export default function MultiSelectDropdown({
   placeholder,
   searchable = false,
   error,
+  closeOnSelect = false,
 }: {
   label: string;
   options: string[];
@@ -17,6 +18,7 @@ export default function MultiSelectDropdown({
   placeholder: string;
   searchable?: boolean;
   error?: string;
+  closeOnSelect?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -27,10 +29,13 @@ export default function MultiSelectDropdown({
 
   const toggle = (option: string) => {
     onChange(selected.includes(option) ? selected.filter((item) => item !== option) : [...selected, option]);
+    if (closeOnSelect) setOpen(false);
   };
 
   return (
-    <div className="relative">
+    <div className="relative" onKeyDown={(event) => {
+      if (event.key === "Escape") setOpen(false);
+    }}>
       <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</label>
       <button
         type="button"
@@ -94,6 +99,10 @@ export default function MultiSelectDropdown({
               })}
               {!filtered.length && <p className="px-3 py-6 text-center text-sm text-muted-foreground">No matching options</p>}
             </div>
+            <button type="button" onClick={() => setOpen(false)}
+              className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-xs font-semibold text-white hover:bg-secondary">
+              Done
+            </button>
           </div>
         </>
       )}

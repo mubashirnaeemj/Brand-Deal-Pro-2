@@ -10,6 +10,7 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { api, ApiRequestError, getAllPitches, type DashboardStats } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ── Mini brand lookup for icons/colors ────────────────────────────────────────
 
@@ -66,6 +67,7 @@ function BrandDot({ name }: { name: string }) {
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
+  const { logout } = useAuth();
 
   const { data: dashStats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useQuery<DashboardStats>({
     queryKey: ["dashboard"],
@@ -208,8 +210,12 @@ export default function Dashboard() {
 
             {!pitchesLoading && pitchesError && (
               <p className="text-xs text-red-400 py-6 text-center">
-                Couldn't load your pitches: {pitchesQueryError instanceof Error ? pitchesQueryError.message : "Unknown error"}.{" "}
-                <button onClick={() => refetchPitches()} className="underline">Retry</button>
+                {pitchesQueryError instanceof ApiRequestError && pitchesQueryError.status === 401
+                  ? "Your session isn't being accepted by the pitch API. "
+                  : `Couldn't load your pitches: ${pitchesQueryError instanceof Error ? pitchesQueryError.message : "Unknown error"}. `}
+                {pitchesQueryError instanceof ApiRequestError && pitchesQueryError.status === 401
+                  ? <button onClick={() => void logout()} className="underline">Sign in again</button>
+                  : <button onClick={() => refetchPitches()} className="underline">Retry</button>}
               </p>
             )}
 

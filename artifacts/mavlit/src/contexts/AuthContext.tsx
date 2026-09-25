@@ -19,7 +19,16 @@ export interface CreatorProfile {
   content_description: string | null;
   instagram_description: string | null;
   instagram_sub_niches: string[] | null;
+  instagram_excluded_categories: string[] | null;
+  instagram_description_mode: string | null;
+  instagram_audience_gender_male_pct: number | null;
+  instagram_audience_gender_female_pct: number | null;
   youtube_description: string | null;
+  youtube_sub_niches: string[] | null;
+  youtube_excluded_categories: string[] | null;
+  youtube_description_mode: string | null;
+  youtube_audience_gender_male_pct: number | null;
+  youtube_audience_gender_female_pct: number | null;
   instagram_primary_niche: string | null;
   youtube_primary_niche: string | null;
   excluded_categories: string[] | null;

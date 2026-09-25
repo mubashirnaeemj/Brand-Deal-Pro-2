@@ -99,7 +99,7 @@ export interface ApiMatch {
   brand_name: string;
   niche: string | null;
   total_score: number;
-  dimensions: Record<string, { score: number; weight: number }>;
+  dimensions: Record<string, { score: number | null; weight: number }>;
   reasons: string[];
 }
 
@@ -113,8 +113,10 @@ export interface MatchesResponse {
 export async function getAllMatches(): Promise<ApiMatch[]> {
   const matches: ApiMatch[] = [];
   while (true) {
-    const page = await api.get<MatchesResponse>(`/matches/me?limit=100&offset=${matches.length}`);
-    if (!Array.isArray(page.matches)) throw new Error("Invalid matches response");
+    const page = await api.get<MatchesResponse>(matches.length ? `/matches/me?offset=${matches.length}` : "/matches/me");
+    if (!Array.isArray(page.matches) || !Number.isInteger(page.total) || page.total < 0) {
+      throw new Error("Invalid matches response");
+    }
     matches.push(...page.matches);
     if (matches.length >= page.total) return matches;
     if (page.matches.length === 0) throw new Error("Matches ended before the reported total");

@@ -1,235 +1,56 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  CheckCircle2, SlidersHorizontal, Music, Headphones, Zap, Camera,
-  ShoppingBag, Cpu, Copy, Check, Linkedin, ChevronDown, ChevronUp,
-  Clock, X, Building2, Users, Bookmark,
+  CheckCircle2, SlidersHorizontal, Music, Building2, Bookmark,
+  ChevronDown, ChevronUp, Clock, X, Copy, Check,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { api, type SavedBrand } from "@/lib/api";
+import { api, ApiRequestError, getAllMatches, type ApiBrand, type ApiMatch, type SavedBrand } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
-const CATEGORIES = ["All", "Audio", "Streaming", "Lifestyle", "Software", "Retail", "Beverage"];
+const ACCENT = "#7c3aed";
+const TIMING_COPY = "Brand campaign calendars are often planned months in advance. Research upcoming campaigns and reach out early.";
 
-const TIMING_COPY =
-  "Brand campaign calendars are planned 60–90 days out. Pitching in June means you're pitching for Q4/Holiday. Brands casting now won't be visible until those campaigns go live — which is why early outreach is a competitive advantage.";
-
-type ContactType = "agency" | "in-house";
-
-const BRANDS = [
-  {
-    id: 1,
-    name: "Sennheiser",
-    slug: "sennheiser",
-    category: "Audio",
-    color: "#7c3aed",
-    matchScore: 97,
-    scoreBreakdown: { nicheFit: 98, audienceOverlap: 95, creatorTierFit: 96, platformMatch: 98 },
-    icon: Headphones,
-    contactType: "agency" as ContactType,
-    contact: {
-      name: "Sarah Chen",
-      title: "Director of Influencer Marketing",
-      company: "Edelman",
-      linkedin: "https://linkedin.com/in/sarah-chen-example",
-      email: "sarah.chen@edelman.com",
-      verifiedAt: "Jun 12, 2026",
-      note: "Handles creator partnerships for Sennheiser's North America campaigns.",
-    },
-    hashtag: "SennheiserPartner",
-    reasons: [
-      "Your gear-focused content aligns perfectly with their pro audio audience — avg. 84% overlap with Sennheiser buyers.",
-      "3 of your last 5 videos featured studio equipment, making native integration seamless and authentic.",
-    ],
-  },
-  {
-    id: 2,
-    name: "Spotify for Artists",
-    slug: "spotify",
-    category: "Streaming",
-    color: "#1db954",
-    matchScore: 94,
-    scoreBreakdown: { nicheFit: 91, audienceOverlap: 97, creatorTierFit: 93, platformMatch: 94 },
-    icon: Music,
-    contactType: "in-house" as ContactType,
-    contact: {
-      name: "Marcus Williams",
-      title: "Creator Partnerships Manager",
-      company: "Spotify",
-      linkedin: "https://linkedin.com/in/marcus-williams-example",
-      email: "m.williams@spotify.com",
-      verifiedAt: "Jun 20, 2026",
-      note: "Manages creator campaigns directly from Spotify's internal partnerships team.",
-    },
-    hashtag: "SpotifyPartner",
-    reasons: [
-      "Your audience skews 18–34 and streams 4+ hours of music daily — Spotify's exact target demographic.",
-      "Creator-to-platform partnership campaigns are active in Q3; your niche positions you as a top-tier candidate.",
-    ],
-  },
-  {
-    id: 3,
-    name: "Native Instruments",
-    slug: "native-instruments",
-    category: "Software",
-    color: "#f59e0b",
-    matchScore: 91,
-    scoreBreakdown: { nicheFit: 95, audienceOverlap: 88, creatorTierFit: 90, platformMatch: 91 },
-    icon: Cpu,
-    contactType: "agency" as ContactType,
-    contact: {
-      name: "Priya Sharma",
-      title: "Account Supervisor",
-      company: "Fleischman Hillard",
-      linkedin: "https://linkedin.com/in/priya-sharma-example",
-      email: "p.sharma@fleishman.com",
-      verifiedAt: "Jun 8, 2026",
-      note: "Oversees influencer and creator strategy for Native Instruments' global campaigns.",
-    },
-    hashtag: "NativeInstrumentsPartner",
-    reasons: [
-      "68% of your followers self-identify as producers or beatmakers — exactly who NI targets with Maschine and Komplete.",
-      "Your tutorial-style content averages 9-min watch time, giving sponsored segments meaningful exposure.",
-    ],
-  },
-  {
-    id: 4,
-    name: "GoPro",
-    slug: "gopro",
-    category: "Lifestyle",
-    color: "#0ea5e9",
-    matchScore: 88,
-    scoreBreakdown: { nicheFit: 83, audienceOverlap: 88, creatorTierFit: 91, platformMatch: 88 },
-    icon: Camera,
-    contactType: "in-house" as ContactType,
-    contact: {
-      name: "Jake Torres",
-      title: "Influencer Marketing Manager",
-      company: "GoPro",
-      linkedin: "https://linkedin.com/in/jake-torres-example",
-      email: "j.torres@gopro.com",
-      verifiedAt: "Jun 15, 2026",
-      note: "Runs GoPro's creator program and reviews inbound partnership pitches directly.",
-    },
-    hashtag: "GoPro",
-    reasons: [
-      "Live performance and behind-the-scenes content make up 40% of your catalog — prime territory for GoPro's POV narrative.",
-      "Your engagement rate of 6.2% is 3× the platform average, ensuring sponsored content converts, not just reaches.",
-    ],
-  },
-  {
-    id: 5,
-    name: "Sweetwater",
-    slug: "sweetwater",
-    category: "Retail",
-    color: "#ec4899",
-    matchScore: 85,
-    scoreBreakdown: { nicheFit: 90, audienceOverlap: 82, creatorTierFit: 82, platformMatch: 86 },
-    icon: ShoppingBag,
-    contactType: "in-house" as ContactType,
-    contact: {
-      name: "Dana Kim",
-      title: "Brand Partnerships Lead",
-      company: "Sweetwater",
-      linkedin: "https://linkedin.com/in/dana-kim-example",
-      email: "d.kim@sweetwater.com",
-      verifiedAt: "Jun 18, 2026",
-      note: "Leads Sweetwater's affiliate and creator partnership initiatives from their Fort Wayne HQ.",
-    },
-    hashtag: "SweetwaterPartner",
-    reasons: [
-      "Sweetwater's affiliate conversion rate is highest among gear-review creators — your format mirrors their top earners.",
-      "Your comment section regularly features gear questions, signaling purchase-intent audiences Sweetwater actively seeks.",
-    ],
-  },
-  {
-    id: 6,
-    name: "Red Bull",
-    slug: "red-bull",
-    category: "Beverage",
-    color: "#ef4444",
-    matchScore: 81,
-    scoreBreakdown: { nicheFit: 78, audienceOverlap: 83, creatorTierFit: 85, platformMatch: 78 },
-    icon: Zap,
-    contactType: "agency" as ContactType,
-    contact: {
-      name: "Alex Rivera",
-      title: "Account Manager",
-      company: "Edelman",
-      linkedin: "https://linkedin.com/in/alex-rivera-example",
-      email: "a.rivera@edelman.com",
-      verifiedAt: "May 29, 2026",
-      note: "Manages Red Bull Music creator campaigns across North America and Latin America.",
-    },
-    hashtag: "RedBullMusicPartner",
-    reasons: [
-      "Red Bull Music sponsors 200+ creator campaigns yearly; your music-lifestyle blend fits their cultural content strategy.",
-      "Audience affinity analysis shows 71% of your followers also follow Red Bull Music's official channels.",
-    ],
-  },
-];
-
-type Brand = (typeof BRANDS)[0];
-
-/* ─── Score Ring ─────────────────────────────────────────── */
-type ScoreBreakdown = { nicheFit: number; audienceOverlap: number; creatorTierFit: number; platformMatch: number };
-
-const BREAKDOWN_LABELS: { key: keyof ScoreBreakdown; label: string }[] = [
-  { key: "nicheFit",       label: "Niche Fit" },
-  { key: "audienceOverlap", label: "Audience Overlap" },
-  { key: "creatorTierFit", label: "Creator Tier Fit" },
-  { key: "platformMatch",  label: "Platform Match" },
-];
-
-function barColor(v: number) {
-  if (v >= 90) return "hsl(262 83% 58%)";
-  if (v >= 80) return "hsl(160 84% 39%)";
-  return "hsl(38 92% 50%)";
+function nicheOf(match: ApiMatch) {
+  return match.niche?.trim() || "Uncategorized";
 }
 
-function ScoreRing({ score, size = 56, breakdown }: { score: number; size?: number; breakdown?: ScoreBreakdown }) {
+function ScoreRing({ match, size = 56 }: { match: ApiMatch; size?: number }) {
   const [hovered, setHovered] = useState(false);
-  const r = size / 2 - 6;
-  const circ = 2 * Math.PI * r;
-  const dash = (score / 100) * circ;
-  return (
-    <div
-      className="relative flex items-center justify-center cursor-default"
-      style={{ width: size, height: size }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <svg className="absolute inset-0 -rotate-90" width={size} height={size}>
-        <circle cx={size / 2} cy={size / 2} r={r} stroke="hsl(240 5% 15%)" strokeWidth="4" fill="none" />
-        <circle cx={size / 2} cy={size / 2} r={r} stroke="hsl(262 83% 58%)" strokeWidth="4" fill="none"
-          strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" />
-      </svg>
-      <span className="text-xs font-bold text-white z-10">{score}%</span>
+  const radius = size / 2 - 6;
+  const circumference = 2 * Math.PI * radius;
+  const score = Number.isFinite(match.total_score) ? match.total_score : 0;
+  const dimensions = Object.entries(match.dimensions ?? {});
 
-      {hovered && breakdown && (
+  return (
+    <div className="relative flex items-center justify-center cursor-default"
+      style={{ width: size, height: size }}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      <svg className="absolute inset-0 -rotate-90" width={size} height={size}>
+        <circle cx={size / 2} cy={size / 2} r={radius} stroke="hsl(240 5% 15%)" strokeWidth="4" fill="none" />
+        <circle cx={size / 2} cy={size / 2} r={radius} stroke="hsl(262 83% 58%)" strokeWidth="4" fill="none"
+          strokeDasharray={`${Math.min(100, Math.max(0, score)) / 100 * circumference} ${circumference}`} strokeLinecap="round" />
+      </svg>
+      <span className="text-xs font-bold text-white z-10">{Math.round(score)}%</span>
+      {hovered && dimensions.length > 0 && (
         <div className="absolute bottom-[calc(100%+8px)] right-0 z-[100] w-52 rounded-xl border border-border bg-[hsl(240_10%_6%)] shadow-2xl p-3 pointer-events-none">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2.5">Score Breakdown</p>
           <div className="flex flex-col gap-2">
-            {BREAKDOWN_LABELS.map(({ key, label }) => {
-              const val = breakdown[key];
-              return (
-                <div key={key}>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[11px] text-muted-foreground">{label}</span>
-                    <span className="text-[11px] font-bold text-white">{val}</span>
-                  </div>
-                  <div className="h-1 rounded-full bg-white/10 overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-300"
-                      style={{ width: `${val}%`, background: barColor(val) }}
-                    />
-                  </div>
+            {dimensions.map(([key, detail]) => (
+              <div key={key}>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[11px] text-muted-foreground">{key.replace(/[_-]/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2")}</span>
+                  <span className="text-[11px] font-bold text-white">{detail.score == null ? "N/A" : Math.round(detail.score)}</span>
                 </div>
-              );
-            })}
+                <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full rounded-full bg-primary transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.max(0, detail.score ?? 0))}%` }} />
+                </div>
+              </div>
+            ))}
           </div>
           <div className="absolute bottom-[-5px] right-3 w-2.5 h-2.5 rotate-45 bg-[hsl(240_10%_6%)] border-r border-b border-border" />
         </div>
@@ -238,183 +59,107 @@ function ScoreRing({ score, size = 56, breakdown }: { score: number; size?: numb
   );
 }
 
-/* ─── Copy Email Button ──────────────────────────────────── */
-function CopyEmailButton({ email, variant = "default" }: { email: string; variant?: "default" | "panel" }) {
+function CopyEmailButton({ email }: { email: string }) {
   const [copied, setCopied] = useState(false);
-  const handle = () => {
-    navigator.clipboard.writeText(email).then(() => {
+  return (
+    <button type="button" onClick={() => navigator.clipboard.writeText(email).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
-  };
-  const base = "flex items-center gap-1.5 rounded-lg text-xs font-semibold transition-all duration-200";
-  const styles = variant === "panel"
-    ? `${base} px-4 py-2 border border-border text-muted-foreground hover:text-white hover:border-white/30`
-    : `${base} px-3 py-1.5 border border-border text-muted-foreground hover:text-white hover:border-white/30`;
-  return (
-    <button onClick={handle} className={styles}>
+    })} className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-white hover:border-white/30">
       {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
       {copied ? "Copied!" : "Copy email"}
     </button>
   );
 }
 
-/* ─── Contact Type Badge ─────────────────────────────────── */
-function ContactBadge({ type }: { type: ContactType }) {
-  if (type === "agency") {
-    return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/30">
-        <Building2 size={11} />
-        Agency-side
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-      <Users size={11} />
-      In-house
-    </span>
-  );
-}
-
-/* ─── Contact Intel Panel (slide-out) ───────────────────── */
-function ContactPanel({ brand, onClose }: { brand: Brand; onClose: () => void }) {
-  const Icon = brand.icon;
-  const [, setLocation] = useLocation();
+function ContactPanel({ match, onClose }: { match: ApiMatch; onClose: () => void }) {
+  const [, navigate] = useLocation();
+  const { data: detail, isLoading } = useQuery<ApiBrand>({
+    queryKey: ["brand", match.brand_raw_id],
+    queryFn: () => api.get(`/brands/${match.brand_raw_id}`),
+    retry: 1,
+    staleTime: 60_000,
+  });
+  const contact = detail?.top_contact;
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
   }, [onClose]);
-
-  const handlePitch = () => {
-    onClose();
-    setLocation(`/pitch?brand=${encodeURIComponent(brand.name)}`);
-  };
 
   return (
     <>
-      {/* Backdrop */}
-      <motion.div
-        key="backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Panel */}
-      <motion.div
-        key="panel"
-        initial={{ x: "100%" }}
-        animate={{ x: 0 }}
-        exit={{ x: "100%" }}
+      <motion.div key="backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }} className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={onClose} />
+      <motion.div key="panel" initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
         transition={{ type: "spring", damping: 28, stiffness: 260 }}
-        className="fixed top-0 right-0 h-full w-full max-w-md bg-[hsl(240_10%_5%)] border-l border-border z-50 flex flex-col overflow-hidden shadow-2xl"
-      >
-        {/* Header */}
+        className="fixed top-0 right-0 h-full w-full max-w-md bg-[hsl(240_10%_5%)] border-l border-border z-50 flex flex-col overflow-hidden shadow-2xl">
         <div className="flex items-center justify-between px-6 py-5 border-b border-border shrink-0">
           <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0"
-              style={{ background: `linear-gradient(135deg, ${brand.color}cc, ${brand.color}66)` }}
-            >
-              <Icon size={18} />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0"
+              style={{ background: `linear-gradient(135deg, ${ACCENT}cc, ${ACCENT}66)` }}>
+              <Building2 size={18} />
             </div>
             <div>
-              <h2 className="text-white font-bold text-base leading-tight">{brand.name}</h2>
-              <span className="text-xs" style={{ color: brand.color }}>{brand.category}</span>
+              <h2 className="text-white font-bold text-base leading-tight">{match.brand_name}</h2>
+              <span className="text-xs" style={{ color: ACCENT }}>{nicheOf(match)}</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <ScoreRing score={brand.matchScore} size={44} breakdown={brand.scoreBreakdown} />
-            <button
-              onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-white hover:bg-white/5 transition-colors"
-            >
+            <ScoreRing match={match} size={44} />
+            <button type="button" onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-white hover:bg-white/5">
               <X size={16} />
             </button>
           </div>
         </div>
-
-        {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-
-          {/* Contact Intel */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Contact Intel</p>
             <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
-              {/* Name + badge */}
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-white font-bold text-base leading-snug">{brand.contact.name}</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">{brand.contact.title}</p>
-                  <p className="text-sm text-muted-foreground">{brand.contact.company}</p>
-                </div>
-                <ContactBadge type={brand.contactType} />
-              </div>
-
-              <div className="h-px bg-border" />
-
-              {/* Actions */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <a
-                  href={brand.contact.linkedin}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-primary text-white hover:bg-primary/85 transition-colors duration-200"
-                >
-                  <Linkedin size={13} />
-                  View on LinkedIn
-                </a>
-                <CopyEmailButton email={brand.contact.email} variant="panel" />
-              </div>
-
-              {/* Email display + verified */}
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border border-border">
-                <span className="text-xs text-muted-foreground font-mono flex-1 truncate">{brand.contact.email}</span>
-              </div>
-              <p className="text-xs text-muted-foreground/60 -mt-1">
-                {brand.contact.verifiedAt ? `Last verified: ${brand.contact.verifiedAt}` : "Verification pending"}
-              </p>
-
-              {/* Note */}
-              <p className="text-xs text-muted-foreground leading-relaxed">{brand.contact.note}</p>
+              {isLoading ? <p className="text-sm text-muted-foreground">Loading contact details…</p> : contact ? (
+                <>
+                  <div>
+                    <p className="text-white font-bold text-base leading-snug">{contact.name}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">{contact.title}</p>
+                    <p className="text-sm text-muted-foreground">{match.brand_name}</p>
+                  </div>
+                  {contact.email ? (
+                    <>
+                      <div className="h-px bg-border" />
+                      <CopyEmailButton email={contact.email} />
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border border-border">
+                        <span className="text-xs text-muted-foreground font-mono flex-1 truncate">{contact.email}</span>
+                      </div>
+                    </>
+                  ) : null}
+                </>
+              ) : <p className="text-sm text-muted-foreground">Contact details are not available for this brand.</p>}
             </div>
           </div>
-
-          {/* Why it's a match */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Why it's a match</p>
-            <ul className="space-y-3">
-              {brand.reasons.map((reason, i) => (
-                <li key={i} className="flex items-start gap-2.5">
-                  <CheckCircle2 size={14} className="mt-0.5 shrink-0" style={{ color: brand.color }} />
-                  <span className="text-sm text-muted-foreground leading-relaxed">{reason}</span>
-                </li>
-              ))}
-            </ul>
+            {match.reasons.length ? (
+              <ul className="space-y-3">
+                {match.reasons.map((reason, index) => (
+                  <li key={index} className="flex items-start gap-2.5">
+                    <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-primary" />
+                    <span className="text-sm text-muted-foreground leading-relaxed">{reason}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="text-sm text-muted-foreground">No match reasons were provided.</p>}
           </div>
-
-          {/* Hashtag research tip */}
           <div className="px-4 py-3 rounded-xl bg-white/[0.03] border border-border">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              <span className="font-semibold text-white/50">Research tip:</span> Search{" "}
-              <span className="font-mono text-white/60">#{brand.hashtag}Partner</span> or{" "}
-              <span className="font-mono text-white/60">#{brand.hashtag}Ad</span> on Instagram to see the volume and style of their past creator campaigns before you pitch.
+              <span className="font-semibold text-white/50">Research tip:</span> Review {match.brand_name}'s previous creator partnerships before you pitch.
             </p>
           </div>
         </div>
-
-        {/* Footer CTA */}
         <div className="px-6 py-5 border-t border-border shrink-0">
-          <button
-            onClick={handlePitch}
-            className="w-full py-3 rounded-xl text-sm font-bold bg-primary text-white hover:bg-primary/85 transition-colors duration-200 shadow-lg shadow-primary/20"
-          >
+          <button type="button" onClick={() => { onClose(); navigate(`/pitch?brand=${encodeURIComponent(match.brand_name)}`); }}
+            className="w-full py-3 rounded-xl text-sm font-bold bg-primary text-white hover:bg-primary/85 transition-colors duration-200 shadow-lg shadow-primary/20">
             Create pitch email →
           </button>
         </div>
@@ -423,121 +168,79 @@ function ContactPanel({ brand, onClose }: { brand: Brand; onClose: () => void })
   );
 }
 
-/* ─── Brand Card ─────────────────────────────────────────── */
-function BrandCard({ brand, index, onOpen, saved, onToggleSave }: {
-  brand: Brand; index: number; onOpen: () => void;
-  saved: boolean; onToggleSave: (e: React.MouseEvent) => void;
+function BrandCard({ match, index, onOpen, saved, onToggleSave }: {
+  match: ApiMatch; index: number; onOpen: () => void;
+  saved: boolean; onToggleSave: (event: React.MouseEvent) => void;
 }) {
-  const Icon = brand.icon;
   const [timingOpen, setTimingOpen] = useState(false);
-  const [, setLocation] = useLocation();
+  const [, navigate] = useLocation();
+  const id = match.brand_raw_id;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
+    <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12, scale: 0.97 }}
-      transition={{ duration: 0.35, delay: index * 0.06, ease: "easeOut" }}
+      transition={{ duration: 0.35, delay: Math.min(index, 8) * 0.06, ease: "easeOut" }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
-      data-testid={`card-brand-${brand.id}`}
-      onClick={() => setLocation(`/brands/${brand.slug}`)}
-      className="group relative flex flex-col bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/50 transition-colors duration-300 cursor-pointer"
-    >
-      <div
-        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
-        style={{ boxShadow: `inset 0 0 40px 0 ${brand.color}18` }}
-      />
-
-      {/* Header */}
+      data-testid={`card-brand-${id}`} onClick={onOpen} role="button" tabIndex={0}
+      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(); } }}
+      className="group relative flex flex-col bg-card border border-border rounded-2xl overflow-visible hover:z-20 hover:border-primary/50 transition-colors duration-300 cursor-pointer">
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+        style={{ boxShadow: `inset 0 0 40px 0 ${ACCENT}18` }} />
       <div className="p-6 flex items-start gap-4">
-        <div
-          className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0 shadow-lg"
-          style={{ background: `linear-gradient(135deg, ${brand.color}cc, ${brand.color}66)` }}
-          data-testid={`img-logo-${brand.id}`}
-        >
-          <Icon size={24} />
-        </div>
-
+        <div className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0 shadow-lg"
+          style={{ background: `linear-gradient(135deg, ${ACCENT}cc, ${ACCENT}66)` }}
+          data-testid={`img-logo-${id}`}><Building2 size={24} /></div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-white font-bold text-sm leading-snug" data-testid={`text-brandname-${brand.id}`}>
-              {brand.name}
-            </h3>
+            <h3 className="text-white font-bold text-sm leading-snug" data-testid={`text-brandname-${id}`}>{match.brand_name}</h3>
             <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={onToggleSave}
-                title={saved ? "Remove from shortlist" : "Save to shortlist"}
-                className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${saved ? "text-primary bg-primary/15" : "text-muted-foreground hover:text-white hover:bg-white/5"}`}
-              >
+              <button type="button" onClick={onToggleSave} title={saved ? "Remove from shortlist" : "Save to shortlist"}
+                className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${saved ? "text-primary bg-primary/15" : "text-muted-foreground hover:text-white hover:bg-white/5"}`}>
                 <Bookmark size={14} className={saved ? "fill-primary" : ""} />
               </button>
-              <ScoreRing score={brand.matchScore} breakdown={brand.scoreBreakdown} />
+              <ScoreRing match={match} />
             </div>
           </div>
-          <span
-            className="inline-flex items-center mt-1 px-2 py-0.5 rounded-md text-xs font-semibold"
-            style={{ background: `${brand.color}22`, color: brand.color }}
-            data-testid={`text-category-${brand.id}`}
-          >
-            {brand.category}
-          </span>
-
-          {/* Timing badge — expandable */}
-          <button
-            onClick={(e) => { e.stopPropagation(); setTimingOpen((o) => !o); }}
-            className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/15 transition-colors duration-200"
-          >
-            <Clock size={11} />
-            Pitch now → Q4/Holiday campaigns
+          <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-md text-xs font-semibold"
+            style={{ background: `${ACCENT}22`, color: ACCENT }} data-testid={`text-category-${id}`}>{nicheOf(match)}</span>
+          <button type="button" onClick={(event) => { event.stopPropagation(); setTimingOpen((open) => !open); }}
+            className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/15 transition-colors duration-200">
+            <Clock size={11} />Plan outreach early
             {timingOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
           </button>
-
           <AnimatePresence>
-            {timingOpen && (
-              <motion.p
-                initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                animate={{ opacity: 1, height: "auto", marginTop: 8 }}
-                exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                transition={{ duration: 0.25 }}
-                className="text-xs text-muted-foreground leading-relaxed overflow-hidden"
-              >
-                {TIMING_COPY}
-              </motion.p>
-            )}
+            {timingOpen && <motion.p initial={{ opacity: 0, height: 0, marginTop: 0 }}
+              animate={{ opacity: 1, height: "auto", marginTop: 8 }}
+              exit={{ opacity: 0, height: 0, marginTop: 0 }} transition={{ duration: 0.25 }}
+              className="text-xs text-muted-foreground leading-relaxed overflow-hidden">{TIMING_COPY}</motion.p>}
           </AnimatePresence>
         </div>
       </div>
-
-      {/* Why it's a match */}
       <div className="px-6 pb-4 flex flex-col gap-3 flex-1">
         <div className="h-px bg-border" />
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Why it's a match</p>
-        <ul className="flex flex-col gap-3">
-          {brand.reasons.map((reason, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <CheckCircle2 size={15} className="mt-0.5 shrink-0" style={{ color: brand.color }} />
-              <span className="text-sm text-muted-foreground leading-relaxed">{reason}</span>
-            </li>
-          ))}
-        </ul>
-
-        {/* Compact contact preview */}
+        {match.reasons.length ? (
+          <ul className="flex flex-col gap-3">
+            {match.reasons.map((reason, index) => (
+              <li key={index} className="flex items-start gap-2.5">
+                <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-primary" />
+                <span className="text-sm text-muted-foreground leading-relaxed">{reason}</span>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="text-sm text-muted-foreground">No match reasons were provided.</p>}
         <div className="mt-1 px-4 py-3 rounded-xl bg-[hsl(240_10%_8%)] border border-border flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-bold text-white leading-snug">{brand.contact.name}</p>
-            <p className="text-xs text-muted-foreground leading-snug">{brand.contact.title} · {brand.contact.company}</p>
+            <p className="text-sm font-bold text-white leading-snug">Contact Intel</p>
+            <p className="text-xs text-muted-foreground leading-snug">Open match for available details</p>
           </div>
-          <ContactBadge type={brand.contactType} />
+          <Building2 size={15} className="text-muted-foreground" />
         </div>
       </div>
-
-      {/* CTA */}
       <div className="px-6 pb-5 pt-1">
-        <button
-          data-testid={`button-pitch-${brand.id}`}
-          onClick={(e) => { e.stopPropagation(); setLocation(`/pitch?brand=${encodeURIComponent(brand.name)}`); }}
-          className="w-full py-2.5 rounded-xl text-sm font-semibold border border-border text-white/70 hover:bg-primary hover:border-primary hover:text-white transition-all duration-200"
-        >
+        <button type="button" data-testid={`button-pitch-${id}`}
+          onClick={(event) => { event.stopPropagation(); navigate(`/pitch?brand=${encodeURIComponent(match.brand_name)}`); }}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold border border-border text-white/70 hover:bg-primary hover:border-primary hover:text-white transition-all duration-200">
           Create pitch email →
         </button>
       </div>
@@ -545,14 +248,17 @@ function BrandCard({ brand, index, onOpen, saved, onToggleSave }: {
   );
 }
 
-/* ─── Page ───────────────────────────────────────────────── */
 export default function BrandMatches() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeCategory, setActiveCategory] = useState("All");
-  const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
-
-  // Load saved brand IDs from API
+  const [selectedMatch, setSelectedMatch] = useState<ApiMatch | null>(null);
+  const { data: matches, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ["pitch-matches"],
+    queryFn: getAllMatches,
+    staleTime: 60_000,
+    retry: (count, cause) => !(cause instanceof ApiRequestError && (cause.status === 401 || cause.status === 403)) && count < 1,
+  });
   const { data: savedBrandsList = [] } = useQuery<SavedBrand[]>({
     queryKey: ["saved-brands"],
     queryFn: () => api.get("/saved-brands/me"),
@@ -560,23 +266,25 @@ export default function BrandMatches() {
     retry: 1,
   });
 
-  const savedBrandIds = new Set(savedBrandsList.map(sb => sb.brand_id));
+  useEffect(() => {
+    if (error instanceof ApiRequestError && error.status === 403) {
+      window.dispatchEvent(new Event("mavlit:profile-incomplete"));
+    }
+  }, [error]);
 
+  const savedBrandIds = new Set(savedBrandsList.map((brand) => brand.brand_id));
   const toggleSave = useCallback(async (brandId: number, brandName: string) => {
     if (savedBrandIds.has(brandId)) {
-      // Optimistic remove
-      queryClient.setQueryData<SavedBrand[]>(["saved-brands"], prev =>
-        (prev ?? []).filter(sb => sb.brand_id !== brandId)
-      );
+      queryClient.setQueryData<SavedBrand[]>(["saved-brands"], (previous) =>
+        (previous ?? []).filter((brand) => brand.brand_id !== brandId));
       try { await api.delete(`/saved-brands/${brandId}`); }
       catch {
         queryClient.invalidateQueries({ queryKey: ["saved-brands"] });
         toast({ title: "Couldn't remove bookmark", description: `Failed to unsave ${brandName}. Please try again.`, variant: "destructive" });
       }
     } else {
-      // Optimistic add
-      queryClient.setQueryData<SavedBrand[]>(["saved-brands"], prev => [
-        ...(prev ?? []),
+      queryClient.setQueryData<SavedBrand[]>(["saved-brands"], (previous) => [
+        ...(previous ?? []),
         { brand_id: brandId, name: brandName, niche: "", short_bio: null, saved_at: new Date().toISOString() },
       ]);
       try { await api.post("/saved-brands", { brand_id: brandId }); }
@@ -587,98 +295,87 @@ export default function BrandMatches() {
     }
   }, [savedBrandIds, queryClient, toast]);
 
-  const filtered =
-    activeCategory === "All" ? BRANDS : BRANDS.filter((b) => b.category === activeCategory);
+  const categories = ["All", ...new Set((matches ?? []).map(nicheOf))];
+  const filtered = activeCategory === "All" ? matches ?? [] : (matches ?? []).filter((match) => nicheOf(match) === activeCategory);
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <Navbar />
-
       <main className="pt-28 pb-24 px-4">
         <div className="max-w-6xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="mb-6"
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }} className="mb-6">
             <div className="flex items-center gap-2 mb-3">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/30">
-                <Music size={11} />
-                Music Niche
+                <Music size={11} />Brand Matches
               </span>
-              <span className="text-muted-foreground text-xs">Updated today</span>
+              <span className="text-muted-foreground text-xs">Based on your creator profile</span>
             </div>
-            <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">
-              Your Brand Matches
-            </h1>
+            <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">Your Brand Matches</h1>
             <p className="text-muted-foreground text-base max-w-xl">
-              MAVLIT found <span className="text-white font-semibold">{BRANDS.length} high-fit brands</span> based
-              on your audience data, content style, and engagement metrics.
+              {isLoading ? "Finding your brand matches…" : isError ? "Unable to load your matches." : (
+                <>MAVLIT found <span className="text-white font-semibold">{matches?.length ?? 0} high-fit brands</span> based on your audience data, content style, and engagement metrics.</>
+              )}
             </p>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.15 }}
-            className="flex items-center gap-3 mb-8 flex-wrap"
-          >
-            <div className="flex items-center gap-1.5 text-muted-foreground mr-1">
-              <SlidersHorizontal size={15} />
-              <span className="text-sm font-medium">Filter:</span>
-            </div>
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                data-testid={`button-filter-${cat.toLowerCase()}`}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-all duration-200 ${
-                  activeCategory === cat
-                    ? "bg-primary border-primary text-white shadow-lg shadow-primary/30"
-                    : "border-border text-muted-foreground hover:border-primary/50 hover:text-white"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-            <span className="ml-auto text-xs text-muted-foreground hidden sm:block">
-              {filtered.length} result{filtered.length !== 1 ? "s" : ""}
-            </span>
-          </motion.div>
+          {!isLoading && !isError && matches && (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.15 }} className="flex items-center gap-3 mb-8 flex-wrap">
+              <div className="flex items-center gap-1.5 text-muted-foreground mr-1">
+                <SlidersHorizontal size={15} /><span className="text-sm font-medium">Filter:</span>
+              </div>
+              {categories.map((category) => (
+                <button key={category} type="button" data-testid={`button-filter-${category.toLowerCase()}`}
+                  onClick={() => setActiveCategory(category)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-all duration-200 ${
+                    activeCategory === category ? "bg-primary border-primary text-white shadow-lg shadow-primary/30" :
+                      "border-border text-muted-foreground hover:border-primary/50 hover:text-white"
+                  }`}>{category}</button>
+              ))}
+              <span className="ml-auto text-xs text-muted-foreground hidden sm:block">
+                {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+              </span>
+            </motion.div>
+          )}
 
-          <AnimatePresence mode="popLayout">
-            {filtered.length > 0 ? (
-              <motion.div key="grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filtered.map((brand, i) => (
-                  <BrandCard key={brand.id} brand={brand} index={i} onOpen={() => setSelectedBrand(brand)}
-                    saved={savedBrandIds.has(brand.id)}
-                    onToggleSave={(e) => { e.stopPropagation(); toggleSave(brand.id, brand.name); }} />
-                ))}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex flex-col items-center justify-center py-24 text-center"
-              >
-                <p className="text-muted-foreground text-lg font-medium">No matches in this category yet.</p>
-                <p className="text-muted-foreground text-sm mt-1">Try a different filter or check back after your next content upload.</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {isLoading ? (
+            <p role="status" className="py-24 text-center text-muted-foreground">Loading matches…</p>
+          ) : isError ? (
+            <div role="alert" className="py-24 text-center">
+              <p className="text-muted-foreground text-lg font-medium">Could not load your brand matches.</p>
+              <button type="button" onClick={() => refetch()}
+                className="mt-4 rounded-xl border border-border px-4 py-2 text-sm font-semibold text-white hover:border-primary/50">
+                Try again
+              </button>
+            </div>
+          ) : (
+            <AnimatePresence mode="popLayout">
+              {filtered.length > 0 ? (
+                <motion.div key="grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {filtered.map((match, index) => (
+                    <BrandCard key={match.brand_raw_id} match={match} index={index}
+                      onOpen={() => setSelectedMatch(match)}
+                      saved={savedBrandIds.has(match.brand_raw_id)}
+                      onToggleSave={(event) => { event.stopPropagation(); toggleSave(match.brand_raw_id, match.brand_name); }} />
+                  ))}
+                </motion.div>
+              ) : (
+                <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="flex flex-col items-center justify-center py-24 text-center">
+                  <p className="text-muted-foreground text-lg font-medium">
+                    {matches?.length ? "No matches in this category yet." : "No brand matches yet."}
+                  </p>
+                  <p className="text-muted-foreground text-sm mt-1">Try a different filter or check back after your next content upload.</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
         </div>
       </main>
-
       <Footer />
-
-      {/* Contact Intel Panel */}
       <AnimatePresence>
-        {selectedBrand && (
-          <ContactPanel brand={selectedBrand} onClose={() => setSelectedBrand(null)} />
-        )}
+        {selectedMatch && <ContactPanel match={selectedMatch} onClose={() => setSelectedMatch(null)} />}
       </AnimatePresence>
     </div>
   );

@@ -3,7 +3,7 @@ import { Save, User } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import PlatformSelector from "@/components/onboarding/PlatformSelector";
 import { INPUT_CLASS, parsePlatforms } from "@/components/onboarding/types";
-import { isProfileComplete, type CreatorProfile, useAuth } from "@/contexts/AuthContext";
+import { isDescriptionPending, isProfileComplete, type CreatorProfile, type DescriptionJob, type DescriptionPlatform, useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { InstagramSection, YoutubeSection } from "./ProfilePlatformSection";
 import { profilePatch, profileToForm, validateProfile, type ProfileForm } from "./profileForm";
@@ -18,6 +18,7 @@ export default function ProfileSettings() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [pollError, setPollError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -36,6 +37,47 @@ export default function ProfileSettings() {
     return () => { active = false; };
   }, [retry]);
 
+  const instagramStatus = profile?.instagram_description_status;
+  const youtubeStatus = profile?.youtube_description_status;
+  const instagramJobId = profile?.instagram_description_job_id;
+  const youtubeJobId = profile?.youtube_description_job_id;
+  const jobPending = isDescriptionPending(instagramStatus) || isDescriptionPending(youtubeStatus);
+
+  useEffect(() => {
+    if (!jobPending) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const latest = await api.get<CreatorProfile>("/creator-profile/me");
+        if (stopped) return;
+        setPollError(null);
+        setForm((current) => {
+          if (!current) return current;
+          let next = current;
+          for (const platform of ["instagram", "youtube"] as const) {
+            const wasPending = platform === "instagram" ? isDescriptionPending(instagramStatus) : isDescriptionPending(youtubeStatus);
+            if (wasPending && latest[`${platform}_description_status`] === "completed") {
+              const description = latest[`${platform}_description`]?.trim();
+              if (description) next = { ...next, [platform]: { ...next[platform], description } };
+            }
+          }
+          return next;
+        });
+        setProfile(latest);
+        if (isDescriptionPending(latest.instagram_description_status) || isDescriptionPending(latest.youtube_description_status)) {
+          timer = setTimeout(poll, 1000);
+        }
+      } catch {
+        if (stopped) return;
+        setPollError("Could not check description progress. Retrying…");
+        timer = setTimeout(poll, 3000);
+      }
+    };
+    timer = setTimeout(poll, 1000);
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [jobPending, instagramStatus, youtubeStatus, instagramJobId, youtubeJobId]);
+
   const change = (next: ProfileForm) => {
     setForm(next);
     setSaved(false);
@@ -48,42 +90,85 @@ export default function ProfileSettings() {
     setError(null);
   };
 
+  const startGeneration = async (platform: DescriptionPlatform, username: string, niche: string) => {
+    let result: DescriptionJob;
+    try {
+      result = await api.post<DescriptionJob>("/creator-profile/me/generate-description", { platform, username, niche });
+    } catch (cause) {
+      // A timed-out POST may have queued the job. Check the persisted state before offering a retry.
+      const current = await api.get<CreatorProfile>("/creator-profile/me").catch(() => null);
+      if (current && isDescriptionPending(current[`${platform}_description_status`])) {
+        setProfile(current);
+        return;
+      }
+      if (current && current[`${platform}_description_status`] === "completed" &&
+          current[`${platform}_description_job_id`] &&
+          current[`${platform}_description_job_id`] !== profile?.[`${platform}_description_job_id`] &&
+          current[`${platform}_description`]?.trim()) {
+        setProfile(current);
+        generated(platform, current[`${platform}_description`]!.trim());
+        return;
+      }
+      throw cause;
+    }
+    if (result.platform !== platform || !["queued", "running", "completed", "failed"].includes(result.status)) {
+      throw new Error("MAVLIT returned an unexpected generation response. Please reload your profile.");
+    }
+    setProfile((current) => current ? {
+      ...current,
+      [`${platform}_description_status`]: result.status,
+      [`${platform}_description_job_id`]: result.job_id,
+      [`${platform}_description_error`]: result.error,
+      ...(result.status === "completed" ? { [`${platform}_description`]: result.description } : {}),
+    } : current);
+    if (result.status === "failed") throw new Error(result.error || "Description generation failed.");
+    if (result.status === "completed") {
+      if (!result.description?.trim()) throw new Error("MAVLIT completed generation without a description. Please reload your profile.");
+      generated(platform, result.description.trim());
+    }
+  };
+
   const saveUsernameForGeneration = async (platform: "instagram" | "youtube", enteredUsername: string): Promise<string> => {
-    if (!profile?.full_name?.trim()) throw new Error("Save your full name before generating a description.");
+    const current = await api.get<CreatorProfile>("/creator-profile/me");
+    if (isDescriptionPending(current[`${platform}_description_status`])) {
+      setProfile(current);
+      throw new Error(`${platform === "instagram" ? "Instagram" : "YouTube"} description generation is already in progress.`);
+    }
+    if (!current.full_name?.trim()) throw new Error("Save your full name before generating a description.");
     const creatorHandle = platform === "instagram"
       ? enteredUsername
-      : profile.creator_handle?.trim() || profile.instagram_handle?.trim().replace(/^@/, "");
+      : current.creator_handle?.trim() || current.instagram_handle?.trim().replace(/^@/, "");
     if (!creatorHandle) throw new Error("Save your Instagram username before generating a YouTube description.");
 
     // Use persisted values, not the other unsaved fields in the editor, when saving a name before generation.
     const updated = await updateProfile({
-      full_name: profile.full_name,
+      full_name: current.full_name,
       creator_handle: creatorHandle,
-      age: profile.age,
-      gender: profile.gender,
-      primary_platform: profile.primary_platform,
-      follower_count: profile.follower_count,
-      content_niche: profile.content_niche,
-      content_description: profile.content_description,
-      excluded_categories: profile.excluded_categories,
-      instagram_handle: platform === "instagram" ? enteredUsername : profile.instagram_handle,
-      instagram_followers: profile.instagram_followers,
-      instagram_primary_niche: profile.instagram_primary_niche,
-      instagram_sub_niches: profile.instagram_sub_niches,
-      instagram_excluded_categories: profile.instagram_excluded_categories,
-      instagram_description: profile.instagram_description,
-      instagram_description_mode: profile.instagram_description_mode,
-      instagram_audience_gender_male_pct: profile.instagram_audience_gender_male_pct,
-      instagram_audience_gender_female_pct: profile.instagram_audience_gender_female_pct,
-      youtube_channel_name: platform === "youtube" ? enteredUsername : profile.youtube_channel_name,
-      youtube_subscribers: profile.youtube_subscribers,
-      youtube_primary_niche: profile.youtube_primary_niche,
-      youtube_sub_niches: profile.youtube_sub_niches,
-      youtube_excluded_categories: profile.youtube_excluded_categories,
-      youtube_description: profile.youtube_description,
-      youtube_description_mode: profile.youtube_description_mode,
-      youtube_audience_gender_male_pct: profile.youtube_audience_gender_male_pct,
-      youtube_audience_gender_female_pct: profile.youtube_audience_gender_female_pct,
+      age: current.age,
+      gender: current.gender,
+      primary_platform: current.primary_platform,
+      follower_count: current.follower_count,
+      content_niche: current.content_niche,
+      content_description: current.content_description,
+      excluded_categories: current.excluded_categories,
+      instagram_handle: platform === "instagram" ? enteredUsername : current.instagram_handle,
+      instagram_followers: current.instagram_followers,
+      instagram_primary_niche: current.instagram_primary_niche,
+      instagram_sub_niches: current.instagram_sub_niches,
+      instagram_excluded_categories: current.instagram_excluded_categories,
+      instagram_description: current.instagram_description,
+      instagram_description_mode: current.instagram_description_mode,
+      instagram_audience_gender_male_pct: current.instagram_audience_gender_male_pct,
+      instagram_audience_gender_female_pct: current.instagram_audience_gender_female_pct,
+      youtube_channel_name: platform === "youtube" ? enteredUsername : current.youtube_channel_name,
+      youtube_subscribers: current.youtube_subscribers,
+      youtube_primary_niche: current.youtube_primary_niche,
+      youtube_sub_niches: current.youtube_sub_niches,
+      youtube_excluded_categories: current.youtube_excluded_categories,
+      youtube_description: current.youtube_description,
+      youtube_description_mode: current.youtube_description_mode,
+      youtube_audience_gender_male_pct: current.youtube_audience_gender_male_pct,
+      youtube_audience_gender_female_pct: current.youtube_audience_gender_female_pct,
     });
     setProfile(updated);
     const savedUsername = platform === "instagram"
@@ -108,7 +193,7 @@ export default function ProfileSettings() {
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form || !profile || saving || generatingCount > 0) return;
+    if (!form || !profile || saving || generatingCount > 0 || jobPending) return;
     setError(null);
     const validationError = validateProfile(form, profile);
     if (validationError) {
@@ -192,22 +277,25 @@ export default function ProfileSettings() {
             </section>
 
             <InstagramSection value={form.instagram} onChange={(instagram) => change({ ...form, instagram })}
-              onGenerated={(description) => generated("instagram", description)}
               onSaveUsername={(username) => saveUsernameForGeneration("instagram", username)}
-              generationBusy={generatingCount > 0}
+              onStartGeneration={(username, niche) => startGeneration("instagram", username, niche)}
+              generationBusy={generatingCount > 0 || saving} status={instagramStatus}
+              statusError={profile.instagram_description_error}
               onGeneratingChange={(active) => setGeneratingCount((count) => count + (active ? 1 : -1))} />
             <YoutubeSection value={form.youtube} onChange={(youtube) => change({ ...form, youtube })}
-              onGenerated={(description) => generated("youtube", description)}
               onSaveUsername={(username) => saveUsernameForGeneration("youtube", username)}
-              generationBusy={generatingCount > 0}
+              onStartGeneration={(username, niche) => startGeneration("youtube", username, niche)}
+              generationBusy={generatingCount > 0 || saving} status={youtubeStatus}
+              statusError={profile.youtube_description_error}
               onGeneratingChange={(active) => setGeneratingCount((count) => count + (active ? 1 : -1))} />
 
+            {pollError && <p role="alert" className="text-sm text-amber-400">{pollError}</p>}
             {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>}
             {saved && <p role="status" className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">Profile saved.</p>}
             <div className="flex justify-end">
-              <button type="submit" disabled={saving || generatingCount > 0}
+              <button type="submit" disabled={saving || generatingCount > 0 || jobPending}
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50">
-                <Save size={16} /> {saving ? "Saving…" : generatingCount > 0 ? "Generating…" : "Save Profile"}
+                <Save size={16} /> {saving ? "Saving…" : generatingCount > 0 || jobPending ? "Generating…" : "Save Profile"}
               </button>
             </div>
           </form>

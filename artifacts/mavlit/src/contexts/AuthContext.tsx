@@ -3,6 +3,19 @@ import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, ApiRequestError } from "@/lib/api";
 
+export type DescriptionStatus = "idle" | "queued" | "running" | "completed" | "failed";
+export type DescriptionPlatform = "instagram" | "youtube";
+export const isDescriptionPending = (status: DescriptionStatus | null | undefined) =>
+  status === "queued" || status === "running";
+
+export interface DescriptionJob {
+  platform: DescriptionPlatform;
+  status: DescriptionStatus;
+  job_id: string | null;
+  description: string | null;
+  error: string | null;
+}
+
 export interface CreatorProfile {
   id: number;
   email: string;
@@ -21,12 +34,18 @@ export interface CreatorProfile {
   instagram_sub_niches: string[] | null;
   instagram_excluded_categories: string[] | null;
   instagram_description_mode: string | null;
+  instagram_description_status?: DescriptionStatus | null;
+  instagram_description_job_id?: string | null;
+  instagram_description_error?: string | null;
   instagram_audience_gender_male_pct: number | null;
   instagram_audience_gender_female_pct: number | null;
   youtube_description: string | null;
   youtube_sub_niches: string[] | null;
   youtube_excluded_categories: string[] | null;
   youtube_description_mode: string | null;
+  youtube_description_status?: DescriptionStatus | null;
+  youtube_description_job_id?: string | null;
+  youtube_description_error?: string | null;
   youtube_audience_gender_male_pct: number | null;
   youtube_audience_gender_female_pct: number | null;
   instagram_primary_niche: string | null;

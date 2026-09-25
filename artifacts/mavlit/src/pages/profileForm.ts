@@ -91,6 +91,7 @@ export function profilePatch(form: ProfileForm, profile: CreatorProfile): Partia
     instagram_sub_niches: form.instagram.subNiches,
     instagram_excluded_categories: form.instagram.excludedCategories,
     instagram_description: form.instagram.description.trim() || null,
+    content_description: profile.content_description?.trim() || form.instagram.description.trim() || form.youtube.description.trim() || null,
     youtube_channel_name: form.youtube.channelName.trim() || null,
     youtube_subscribers: optionalNumber(form.youtube.subscribers),
     youtube_primary_niche: form.youtube.primaryNiche.trim() || null,

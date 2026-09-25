@@ -1,0 +1,283 @@
+```markdown
+# Creator Description Generation API
+
+## Authentication
+
+All creator profile APIs require the JWT authentication cookie:
+
+```text
+access_token
+```
+
+Frontend requests must include credentials:
+
+```javascript
+fetch(url, {
+  credentials: "include"
+});
+```
+
+---
+
+## Start Description Generation
+
+### Endpoint
+
+```http
+POST /creator-profile/me/generate-description
+```
+
+### Purpose
+
+Queues background generation of an Instagram or YouTube creator description.
+
+The API returns immediately. It does not wait for scraping or LLM generation to finish.
+
+### Request
+
+```json
+{
+  "platform": "instagram",
+  "username": "@creator_username",
+  "niche": "Beauty"
+}
+```
+
+### Supported Platforms
+
+```text
+instagram
+youtube
+```
+
+### Initial Response
+
+```json
+{
+  "platform": "instagram",
+  "status": "queued",
+  "job_id": "8cdbf3d3-8cf5-4f72-8de5-0e3edb92a4dc",
+  "description": null,
+  "posts_analyzed": null,
+  "videos_analyzed": null,
+  "bio_found": false,
+  "error": null
+}
+```
+
+### Generation States
+
+```text
+idle
+queued
+running
+completed
+failed
+```
+
+### Duplicate Requests
+
+If generation is already `queued` or `running` for the same platform, the API returns the existing job instead of creating another job.
+
+---
+
+## Get Creator Profile and Generation Status
+
+### Endpoint
+
+```http
+GET /creator-profile/me
+```
+
+### Purpose
+
+Returns the creator profile and the current Instagram/YouTube description-generation state.
+
+The frontend should poll this endpoint while a description job is `queued` or `running`.
+
+### Response Example
+
+```json
+{
+  "id": 1,
+  "email": "creator@example.com",
+  "is_active": true,
+
+  "full_name": "Jane Doe",
+  "age": 28,
+  "gender": "female",
+
+  "instagram_handle": "@janedoe",
+  "instagram_primary_niche": "Beauty",
+
+  "instagram_description": null,
+  "instagram_description_mode": "generate",
+  "instagram_description_status": "running",
+  "instagram_description_job_id": "8cdbf3d3-8cf5-4f72-8de5-0e3edb92a4dc",
+  "instagram_description_error": null,
+
+  "youtube_description": null,
+  "youtube_description_mode": null,
+  "youtube_description_status": "idle",
+  "youtube_description_job_id": null,
+  "youtube_description_error": null
+}
+```
+
+---
+
+## Completed State
+
+When generation completes:
+
+```json
+{
+  "instagram_description_status": "completed",
+  "instagram_description_job_id": "8cdbf3d3-8cf5-4f72-8de5-0e3edb92a4dc",
+  "instagram_description": "Generated creator description..."
+}
+```
+
+The frontend should:
+
+1. Stop polling.
+2. Enable the Save Profile button.
+3. Place `instagram_description` into the description textarea.
+4. Continue saving the creator profile.
+
+---
+
+## Failed State
+
+When generation fails:
+
+```json
+{
+  "instagram_description_status": "failed",
+  "instagram_description_job_id": "8cdbf3d3-8cf5-4f72-8de5-0e3edb92a4dc",
+  "instagram_description_error": "Instagram profile has no bio or captions to analyze"
+}
+```
+
+The frontend should:
+
+1. Stop polling.
+2. Enable the Save Profile button.
+3. Display `instagram_description_error`.
+4. Allow the user to retry generation.
+
+---
+
+## Recommended Frontend Polling
+
+```javascript
+async function waitForDescription(platform) {
+  while (true) {
+    const response = await fetch("/creator-profile/me", {
+      credentials: "include"
+    });
+
+    if (!response.ok) {
+      throw new Error("Could not load creator profile");
+    }
+
+    const profile = await response.json();
+
+    const status = profile[platform + "_description_status"];
+    const description = profile[platform + "_description"];
+    const error = profile[platform + "_description_error"];
+
+    if (status === "completed") {
+      return description;
+    }
+
+    if (status === "failed") {
+      throw new Error(error || "Description generation failed");
+    }
+
+    // Disable the generation/save controls while queued or running.
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+}
+```
+
+---
+
+## Frontend Button Rules
+
+| Status | Button behavior |
+|---|---|
+| `idle` | Enable generation/save controls |
+| `queued` | Disable controls |
+| `running` | Disable controls |
+| `completed` | Enable controls |
+| `failed` | Enable controls and show error |
+
+---
+
+## Save Creator Profile
+
+### Endpoint
+
+```http
+PUT /creator-profile/me
+```
+
+### Purpose
+
+Saves the creator profile after required fields and generated descriptions are ready.
+
+The generated description should be included in the normal profile payload:
+
+```json
+{
+  "instagram_description": "Generated creator description...",
+  "content_description": "Generated creator description..."
+}
+```
+
+---
+
+## Error Responses
+
+### Not authenticated
+
+```http
+401 Unauthorized
+```
+
+### Invalid platform
+
+```http
+400 Bad Request
+```
+
+```json
+{
+  "detail": "Platform must be instagram or youtube"
+}
+```
+
+### Missing username or niche
+
+```http
+400 Bad Request
+```
+
+### Incomplete creator profile
+
+```http
+422 Unprocessable Entity
+```
+
+---
+
+## Important Implementation Notes
+
+- There is no separate status endpoint.
+- Use `GET /creator-profile/me` for status polling.
+- The job state is stored in the `creator_profiles` database row.
+- Instagram and YouTube have independent generation states.
+- A page refresh or browser close does not lose the job state.
+- The backend prevents duplicate generation requests while a job is already queued or running.
+```

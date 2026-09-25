@@ -9,6 +9,7 @@ export default function DescriptionModeSelector({
   children,
   onGenerate,
   generating = false,
+  generateDisabled = false,
   generateError,
 }: {
   platform: PlatformKey;
@@ -17,6 +18,7 @@ export default function DescriptionModeSelector({
   children: ReactNode;
   onGenerate?: () => void;
   generating?: boolean;
+  generateDisabled?: boolean;
   generateError?: string | null;
 }) {
   const source = platform === "instagram" ? "Instagram posts/captions" : "YouTube videos/titles/descriptions";
@@ -79,7 +81,7 @@ export default function DescriptionModeSelector({
               <p>MAVLIT will analyze your {source} and generate a creator description optimized for brand matching.</p>
               {onGenerate ? (
                 <>
-                  <button type="button" onClick={onGenerate} disabled={generating}
+                  <button type="button" onClick={onGenerate} disabled={generating || generateDisabled}
                     className="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
                     {generating ? "Generating…" : "Generate description"}
                   </button>

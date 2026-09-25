@@ -27,14 +27,18 @@ function SharedDetails({
   value,
   onChange,
   onGenerated,
+  onSaveUsername,
   onGeneratingChange,
+  generationBusy,
 }: {
   platform: "instagram" | "youtube";
   username: string;
   value: PlatformDetails;
   onChange: (value: PlatformDetails) => void;
   onGenerated: (description: string) => void;
+  onSaveUsername: (username: string) => Promise<string>;
   onGeneratingChange: (active: boolean) => void;
+  generationBusy: boolean;
 }) {
   const [descriptionMode, setDescriptionMode] = useState<DescriptionMode>("manual");
   const [generating, setGenerating] = useState(false);
@@ -42,7 +46,8 @@ function SharedDetails({
   const set = <K extends keyof PlatformDetails>(key: K, next: PlatformDetails[K]) =>
     onChange({ ...value, [key]: next });
   const generate = async () => {
-    if (!username.trim() || !NICHE_OPTIONS.includes(value.primaryNiche as typeof NICHE_OPTIONS[number])) {
+    const enteredUsername = platform === "instagram" ? username.trim().replace(/^@/, "") : username.trim();
+    if (!enteredUsername || !NICHE_OPTIONS.includes(value.primaryNiche as typeof NICHE_OPTIONS[number])) {
       setGenerateError(`Add your ${platform === "instagram" ? "Instagram username" : "YouTube channel name"} and primary niche first.`);
       return;
     }
@@ -50,9 +55,10 @@ function SharedDetails({
     setGenerating(true);
     onGeneratingChange(true);
     try {
+      const savedUsername = await onSaveUsername(enteredUsername);
       const result = await api.post<{ description: string }>("/creator-profile/me/generate-description", {
         platform,
-        username: username.trim(),
+        username: savedUsername,
         niche: value.primaryNiche,
       });
       if (!result.description?.trim()) throw new Error("MAVLIT did not return a description. Please try again.");
@@ -99,7 +105,8 @@ function SharedDetails({
           setGenerateError(null);
           setDescriptionMode(mode);
         }}
-        onGenerate={generate} generating={generating} generateError={generateError}>
+        onGenerate={generate} generating={generating} generateDisabled={generationBusy}
+        generateError={generateError}>
         <Field label={`${platform} description`}>
           <textarea rows={4} value={value.description} onChange={(event) => set("description", event.target.value)}
             placeholder={`Describe your ${platform === "instagram" ? "Instagram" : "YouTube"} content.`}
@@ -110,11 +117,13 @@ function SharedDetails({
   );
 }
 
-export function InstagramSection({ value, onChange, onGenerated, onGeneratingChange }: {
+export function InstagramSection({ value, onChange, onGenerated, onSaveUsername, onGeneratingChange, generationBusy }: {
   value: InstagramDetails;
   onChange: (value: InstagramDetails) => void;
   onGenerated: (description: string) => void;
+  onSaveUsername: (username: string) => Promise<string>;
   onGeneratingChange: (active: boolean) => void;
+  generationBusy: boolean;
 }) {
   return (
     <section className={cardClass}>
@@ -133,17 +142,20 @@ export function InstagramSection({ value, onChange, onGenerated, onGeneratingCha
       <div className="mt-4 grid gap-4">
         <SharedDetails platform="instagram" username={value.username}
           value={value} onChange={(details) => onChange({ ...value, ...details })}
-          onGenerated={onGenerated} onGeneratingChange={onGeneratingChange} />
+          onGenerated={onGenerated} onSaveUsername={onSaveUsername} onGeneratingChange={onGeneratingChange}
+          generationBusy={generationBusy} />
       </div>
     </section>
   );
 }
 
-export function YoutubeSection({ value, onChange, onGenerated, onGeneratingChange }: {
+export function YoutubeSection({ value, onChange, onGenerated, onSaveUsername, onGeneratingChange, generationBusy }: {
   value: YoutubeDetails;
   onChange: (value: YoutubeDetails) => void;
   onGenerated: (description: string) => void;
+  onSaveUsername: (username: string) => Promise<string>;
   onGeneratingChange: (active: boolean) => void;
+  generationBusy: boolean;
 }) {
   return (
     <section className={cardClass}>
@@ -162,7 +174,8 @@ export function YoutubeSection({ value, onChange, onGenerated, onGeneratingChang
       <div className="mt-4 grid gap-4">
         <SharedDetails platform="youtube" username={value.channelName}
           value={value} onChange={(details) => onChange({ ...value, ...details })}
-          onGenerated={onGenerated} onGeneratingChange={onGeneratingChange} />
+          onGenerated={onGenerated} onSaveUsername={onSaveUsername} onGeneratingChange={onGeneratingChange}
+          generationBusy={generationBusy} />
       </div>
     </section>
   );

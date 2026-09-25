@@ -48,6 +48,64 @@ export default function ProfileSettings() {
     setError(null);
   };
 
+  const saveUsernameForGeneration = async (platform: "instagram" | "youtube", enteredUsername: string): Promise<string> => {
+    if (!profile?.full_name?.trim()) throw new Error("Save your full name before generating a description.");
+    const creatorHandle = platform === "instagram"
+      ? enteredUsername
+      : profile.creator_handle?.trim() || profile.instagram_handle?.trim().replace(/^@/, "");
+    if (!creatorHandle) throw new Error("Save your Instagram username before generating a YouTube description.");
+
+    // Use persisted values, not the other unsaved fields in the editor, when saving a name before generation.
+    const updated = await updateProfile({
+      full_name: profile.full_name,
+      creator_handle: creatorHandle,
+      age: profile.age,
+      gender: profile.gender,
+      primary_platform: profile.primary_platform,
+      follower_count: profile.follower_count,
+      content_niche: profile.content_niche,
+      content_description: profile.content_description,
+      excluded_categories: profile.excluded_categories,
+      instagram_handle: platform === "instagram" ? enteredUsername : profile.instagram_handle,
+      instagram_followers: profile.instagram_followers,
+      instagram_primary_niche: profile.instagram_primary_niche,
+      instagram_sub_niches: profile.instagram_sub_niches,
+      instagram_excluded_categories: profile.instagram_excluded_categories,
+      instagram_description: profile.instagram_description,
+      instagram_description_mode: profile.instagram_description_mode,
+      instagram_audience_gender_male_pct: profile.instagram_audience_gender_male_pct,
+      instagram_audience_gender_female_pct: profile.instagram_audience_gender_female_pct,
+      youtube_channel_name: platform === "youtube" ? enteredUsername : profile.youtube_channel_name,
+      youtube_subscribers: profile.youtube_subscribers,
+      youtube_primary_niche: profile.youtube_primary_niche,
+      youtube_sub_niches: profile.youtube_sub_niches,
+      youtube_excluded_categories: profile.youtube_excluded_categories,
+      youtube_description: profile.youtube_description,
+      youtube_description_mode: profile.youtube_description_mode,
+      youtube_audience_gender_male_pct: profile.youtube_audience_gender_male_pct,
+      youtube_audience_gender_female_pct: profile.youtube_audience_gender_female_pct,
+    });
+    setProfile(updated);
+    const savedUsername = platform === "instagram"
+      ? updated.instagram_handle?.trim().replace(/^@/, "")
+      : updated.youtube_channel_name?.trim();
+    if (!savedUsername || savedUsername.toLowerCase() !== enteredUsername.toLowerCase()) {
+      throw new Error("The profile did not save your new username. Please try again.");
+    }
+    setForm((current) => {
+      if (!current) return current;
+      if (platform === "instagram" && current.instagram.username.trim().replace(/^@/, "") === enteredUsername) {
+        return { ...current, instagram: { ...current.instagram, username: savedUsername } };
+      }
+      if (platform === "youtube" && current.youtube.channelName.trim() === enteredUsername) {
+        return { ...current, youtube: { ...current.youtube, channelName: savedUsername } };
+      }
+      return current;
+    });
+    setSaved(false);
+    return savedUsername;
+  };
+
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form || !profile || saving || generatingCount > 0) return;
@@ -135,9 +193,13 @@ export default function ProfileSettings() {
 
             <InstagramSection value={form.instagram} onChange={(instagram) => change({ ...form, instagram })}
               onGenerated={(description) => generated("instagram", description)}
+              onSaveUsername={(username) => saveUsernameForGeneration("instagram", username)}
+              generationBusy={generatingCount > 0}
               onGeneratingChange={(active) => setGeneratingCount((count) => count + (active ? 1 : -1))} />
             <YoutubeSection value={form.youtube} onChange={(youtube) => change({ ...form, youtube })}
               onGenerated={(description) => generated("youtube", description)}
+              onSaveUsername={(username) => saveUsernameForGeneration("youtube", username)}
+              generationBusy={generatingCount > 0}
               onGeneratingChange={(active) => setGeneratingCount((count) => count + (active ? 1 : -1))} />
 
             {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>}

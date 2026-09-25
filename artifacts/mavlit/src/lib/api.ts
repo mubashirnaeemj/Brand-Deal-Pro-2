@@ -1,4 +1,4 @@
-const API_BASE = "https://api.mavlit.com";
+const API_BASE = "/api/mavlit";
 
 type ApiErrorBody = { detail?: unknown; message?: unknown };
 

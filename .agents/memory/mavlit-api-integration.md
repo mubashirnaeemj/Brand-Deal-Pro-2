@@ -23,13 +23,13 @@ Generating an email is not evidence that the creator sent it. New generated pitc
 
 **How to apply:** Use backend state for pipeline and dashboard counts; preserve uncertain historical data instead of inventing sent dates or outcomes.
 
-## External API CORS requirement
+## Browser/API session transport
 
-As of September 25, 2026, `api.mavlit.com` returns credentialed CORS headers for the published app and the current Replit development origin. The static screenshot tool uses `http://127.0.0.1`, which is not an allowed browser origin; that screenshot cannot verify authenticated pages.
+Keep browser calls to the external MAVLIT API on the app's own origin via the server-side proxy, including login, profile validation, pitches, and other account routes. A successful cross-origin CORS preflight is not evidence that the browser retained or sent an external session cookie.
 
-**Why:** Earlier CORS observations predated the API configuration change; a localhost screenshot still reports a misleading CORS error even while real configured origins are allowed.
+**Why:** The Replit preview runs in an iframe, and browser cookie restrictions can leave a login response successful while subsequent external API requests return 401. The app-origin proxy gives the session a host-only, path-scoped, partitioned cookie. Switching transport requires signing in again; existing external-domain cookies are not reused.
 
-**How to apply:** Check CORS against the actual app origin and a credentialed browser session, not the screenshot tool's loopback origin.
+**How to apply:** Route any new account API call through the same-origin proxy; do not reintroduce direct browser calls to the external host. Verify that login is followed by a successful cookie-backed profile read. Anonymous screenshot 401s are expected and cannot verify a signed-in flow.
 
 ## Frontend-only onboarding
 

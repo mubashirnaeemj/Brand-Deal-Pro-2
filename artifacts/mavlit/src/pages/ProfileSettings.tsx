@@ -278,7 +278,7 @@ export default function ProfileSettings() {
   const { data: subNicheOptions = [], isLoading: subNichesLoading } = useQuery<SubNiche[]>({
     queryKey: ["sub-niches"],
     queryFn: () =>
-      fetch("https://api.mavlit.com/sub-niches", { credentials: "include" }).then((r) => {
+      fetch("/api/mavlit/sub-niches", { credentials: "include" }).then((r) => {
         if (!r.ok) throw new Error("Failed to load sub-niches");
         return r.json();
       }),

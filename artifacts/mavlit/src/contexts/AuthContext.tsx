@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, ApiRequestError } from "@/lib/api";
 
 export interface CreatorProfile {
   id: number;
@@ -97,8 +97,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    // Login sets the httpOnly cookie on the server; we receive the profile in the response
-    const profile = await api.post<CreatorProfile>("/auth/login", { email, password });
+    // A successful login response alone does not prove the browser kept its
+    // httpOnly session cookie (especially when the app is inside a preview).
+    await api.post<CreatorProfile>("/auth/login", { email, password });
+    let profile: CreatorProfile;
+    try {
+      profile = await api.get<CreatorProfile>("/creator-profile/me");
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.status === 401) {
+        throw new Error("Sign-in succeeded, but your browser did not keep the session. Open MAVLIT in its own tab and try again.");
+      }
+      throw err;
+    }
     queryClient.clear();
     setUser(profile);
     try { localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile)); } catch { /* ignore */ }

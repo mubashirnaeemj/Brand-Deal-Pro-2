@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { api, type ApiPitch } from "@/lib/api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, getAllPitches, type ApiPitch, type PitchUpdateRequest } from "@/lib/api";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -13,11 +13,12 @@ import Footer from "@/components/Footer";
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface PitchRecord {
-  id: string;
+  id: number;
   brand: string;
   date: string;
-  status: "waiting" | "conversation" | "closed";
+  status: string;
   agreedRate?: string;
+  sentAt: string | null;
 }
 
 interface DealContext {
@@ -40,15 +41,6 @@ const BRAND_DB: Record<string, {
   "GoPro":               { Icon: Camera,       color: "#0ea5e9", category: "Lifestyle", type: "in-house", signal: "Creator ambassador program — studio and live performance content"      },
   "Sweetwater":          { Icon: ShoppingBag,  color: "#ec4899", category: "Retail",    type: "in-house", signal: "Holiday season gear bundle promotion — gear review content preferred"  },
   "Red Bull":            { Icon: Zap,          color: "#ef4444", category: "Beverage",  type: "agency",   signal: "Music culture content series — studio sessions and live events"        },
-};
-
-// ── Activity context (hardcoded for demo) ──────────────────────────────────────
-
-const ACTIVITY_CONTEXT: Record<string, string> = {
-  "Spotify for Artists": "Last activity 4 days ago",
-  "Native Instruments":  "Last activity 11 days ago",
-  "Red Bull":            "Last activity today",
-  "GoPro":              "Pitched today",
 };
 
 // ── Deal context data ──────────────────────────────────────────────────────────
@@ -155,37 +147,31 @@ const CREATOR_PROFILE = {
   niche: "Music Production & Gear Reviews", pastPartnerships: "AudioTechnica, Ableton, Sweetwater",
 };
 
-// ── LocalStorage helpers ───────────────────────────────────────────────────────
-
-const DEMO_PITCHES: PitchRecord[] = [
-  { id: "demo-1", brand: "Sennheiser",          date: "Jun 10, 2026", status: "closed", agreedRate: "$2,400" },
-  { id: "demo-2", brand: "Spotify for Artists", date: "Jun 12, 2026", status: "conversation" },
-  { id: "demo-3", brand: "Native Instruments",  date: "Jun 5, 2026",  status: "conversation" },
-  { id: "demo-4", brand: "Red Bull",            date: "Jun 16, 2026", status: "conversation" },
-  { id: "demo-5", brand: "GoPro",               date: "Jun 15, 2026", status: "waiting"      },
-];
-
-const PITCHES_VERSION = "v2";
-
-function loadPitches(): PitchRecord[] {
-  try {
-    const version = localStorage.getItem("mavlit_pitches_version");
-    if (version === PITCHES_VERSION) {
-      const raw = localStorage.getItem("mavlit_pitches");
-      if (raw) return JSON.parse(raw) as PitchRecord[];
-    }
-  } catch { /* ignore */ }
-  localStorage.setItem("mavlit_pitches", JSON.stringify(DEMO_PITCHES));
-  localStorage.setItem("mavlit_pitches_version", PITCHES_VERSION);
-  return DEMO_PITCHES;
-}
-
-function savePitches(pitches: PitchRecord[]) {
-  try { localStorage.setItem("mavlit_pitches", JSON.stringify(pitches)); } catch { /* ignore */ }
-}
-
 function formatRate(rate: string): string {
-  return rate.trim().startsWith("$") ? rate.trim() : `$${rate.trim()}`;
+  return `$${Number(rate).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+}
+
+function todayLocal(): string {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+}
+
+type LegacyPitch = { id: string; brand: string; date: string; status: string; agreedRate?: string; serverId?: number };
+
+function readLegacyPitches(): LegacyPitch[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem("mavlit_pitches") ?? "[]");
+    return Array.isArray(stored)
+      ? stored.filter((item): item is LegacyPitch => typeof item?.id === "string" && item.id.startsWith("pitch-") && typeof item.brand === "string")
+      : [];
+  } catch { return []; }
+}
+
+function readLegacyOverrides(): Record<string, { status?: string; agreedRate?: string }> {
+  try {
+    const stored = JSON.parse(localStorage.getItem("mavlit_pitch_overrides") ?? "{}");
+    return stored && typeof stored === "object" && !Array.isArray(stored) ? stored : {};
+  } catch { return {}; }
 }
 
 // ── Shared UI ──────────────────────────────────────────────────────────────────
@@ -255,9 +241,15 @@ function BrandAvatar({ brand }: { brand: string }) {
 // ── My Pitches Tab ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: PitchRecord["status"] }) {
-  if (status === "waiting")      return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-zinc-500/15 text-zinc-400 border border-zinc-500/20 whitespace-nowrap">Waiting for reply</span>;
-  if (status === "conversation") return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/25 whitespace-nowrap">In conversation</span>;
-  return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 whitespace-nowrap">Closed</span>;
+  const labels: Record<string, string> = {
+    generated: "Draft — not sent", sent: "Waiting for reply", conversation: "In conversation",
+    negotiating: "Negotiating", closed_won: "Closed — won", closed_lost: "Closed — lost",
+    proposal_sent: "Sent date unconfirmed", waiting: "Sent date unconfirmed",
+  };
+  const color = status === "closed_won" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
+    : status === "conversation" || status === "negotiating" ? "bg-primary/15 text-primary border-primary/25"
+    : "bg-zinc-500/15 text-zinc-400 border-zinc-500/20";
+  return <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${color}`}>{labels[status] ?? status}</span>;
 }
 
 // ── Close Deal Modal ────────────────────────────────────────────────────────────
@@ -268,10 +260,14 @@ function CloseDealModal({
   brand,
   onConfirm,
   onCancel,
+  busy,
+  error,
 }: {
   brand: string;
   onConfirm: (outcome: CloseOutcome, rate: string) => void;
   onCancel: () => void;
+  busy: boolean;
+  error: string | null;
 }) {
   const [outcome, setOutcome] = useState<CloseOutcome | null>(null);
   const [rate, setRate] = useState("");
@@ -353,6 +349,7 @@ function CloseDealModal({
         </AnimatePresence>
 
         {/* Actions */}
+        {error && <p className="text-xs text-red-400">{error}</p>}
         <div className="flex gap-2 pt-1">
           <button
             onClick={onCancel}
@@ -362,10 +359,10 @@ function CloseDealModal({
           </button>
           <button
             onClick={() => outcome && onConfirm(outcome, rate)}
-            disabled={outcome === null}
+            disabled={outcome === null || busy}
             className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-40 transition-all"
           >
-            Save outcome
+            {busy ? "Saving…" : "Save outcome"}
           </button>
         </div>
       </motion.div>
@@ -375,11 +372,50 @@ function CloseDealModal({
 
 // ── Add Pitch Modal ────────────────────────────────────────────────────────────
 
-function AddPitchModal({ onAdd, onCancel }: { onAdd: (brand: string) => void; onCancel: () => void }) {
+function MarkSentModal({ brand, onConfirm, onCancel, busy, error }: {
+  brand: string;
+  onConfirm: (date: string) => void;
+  onCancel: () => void;
+  busy: boolean;
+  error: string | null;
+}) {
+  const [date, setDate] = useState(todayLocal);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative w-full max-w-sm bg-card border border-border rounded-2xl p-6 shadow-2xl space-y-5">
+        <div>
+          <h3 className="text-white font-bold text-base">Mark as sent</h3>
+          <p className="text-xs text-muted-foreground mt-1">When did you send your pitch to {brand}?</p>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-white/70 mb-1.5">Date sent</label>
+          <input type="date" value={date} max={todayLocal()} onChange={e => setDate(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm focus:outline-none focus:border-primary/60" />
+        </div>
+        {error && <p role="alert" className="text-xs text-red-400">{error}</p>}
+        <div className="flex gap-2">
+          <button onClick={onCancel} disabled={busy} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-white">Cancel</button>
+          <button onClick={() => onConfirm(date)} disabled={!date || busy} className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-40">
+            {busy ? "Saving…" : "Mark as sent"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddPitchModal({ onAdd, onCancel, busy, error }: {
+  onAdd: (brand: string, sentAt: string) => void;
+  onCancel: () => void;
+  busy: boolean;
+  error: string | null;
+}) {
   const [brand, setBrand] = useState("");
+  const [sentAt, setSentAt] = useState(todayLocal);
   const [, setLocation] = useLocation();
 
-  const handleSubmit = () => { if (brand.trim()) onAdd(brand.trim()); };
+  const handleSubmit = () => { if (brand.trim() && sentAt) onAdd(brand.trim(), sentAt); };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -408,6 +444,11 @@ function AddPitchModal({ onAdd, onCancel }: { onAdd: (brand: string) => void; on
             className="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 transition-all"
           />
         </div>
+        <div>
+          <label className="block text-xs font-semibold text-white/70 mb-1.5">Date you sent the pitch</label>
+          <input type="date" value={sentAt} max={todayLocal()} onChange={e => setSentAt(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm focus:outline-none focus:border-primary/60" />
+        </div>
         <p className="text-xs text-muted-foreground leading-relaxed">
           Want to generate the email too?{" "}
           <button
@@ -418,15 +459,16 @@ function AddPitchModal({ onAdd, onCancel }: { onAdd: (brand: string) => void; on
           </button>
         </p>
         <div className="flex gap-2 pt-1">
+          {error && <p className="text-xs text-red-400">{error}</p>}
           <button onClick={onCancel} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-white transition-all">
             Cancel
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!brand.trim()}
+            disabled={!brand.trim() || !sentAt || busy}
             className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-40 transition-all"
           >
-            Add pitch
+            {busy ? "Saving…" : "Add pitch"}
           </button>
         </div>
       </motion.div>
@@ -437,65 +479,107 @@ function AddPitchModal({ onAdd, onCancel }: { onAdd: (brand: string) => void; on
 // ── My Pitches Tab ─────────────────────────────────────────────────────────────
 
 function MyPitchesTab({
-  pitches, onUpdate, onUseDealMaker,
+  pitches, onUpdate, onAdd, onUseDealMaker,
 }: {
   pitches: PitchRecord[];
-  onUpdate: (p: PitchRecord[]) => void;
+  onUpdate: (id: number, body: PitchUpdateRequest) => Promise<void>;
+  onAdd: (brand: string, sentAt: string) => Promise<void>;
   onUseDealMaker: (brand: string) => void;
 }) {
-  const [closingId, setClosingId]     = useState<string | null>(null);
-  const [statusEditId, setStatusEditId] = useState<string | null>(null);
+  const [closingId, setClosingId]     = useState<number | null>(null);
+  const [sendingId, setSendingId]     = useState<number | null>(null);
+  const [statusEditId, setStatusEditId] = useState<number | null>(null);
   const [addingPitch, setAddingPitch] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const cancelClose = () => setClosingId(null);
+  const cancelClose = () => { setClosingId(null); setActionError(null); };
 
-  const confirmClose = (outcome: CloseOutcome, rate: string) => {
+  const markSent = async (date: string) => {
+    if (sendingId === null) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await onUpdate(sendingId, { status: "sent", sent_at: date, agreed_rate: null });
+      setSendingId(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Couldn't mark the pitch as sent.");
+    } finally { setBusy(false); }
+  };
+
+  const confirmClose = async (outcome: CloseOutcome, rate: string) => {
     if (!closingId) return;
-    const finalRate = outcome === "yes" && rate.trim()
-      ? (rate.trim().startsWith("$") ? rate.trim() : `$${rate.trim()}`)
-      : undefined;
-    const updated = pitches.map(p =>
-      p.id === closingId ? { ...p, status: "closed" as const, agreedRate: finalRate } : p
-    );
-    onUpdate(updated);
-    cancelClose();
+    const cleanRate = rate.replace(/[$,\s]/g, "");
+    if (outcome === "yes" && rate.trim() && (!/^\d+(\.\d{1,2})?$/.test(cleanRate) || !Number.isFinite(Number(cleanRate)))) {
+      setActionError("Enter a valid non-negative amount (up to two decimal places).");
+      return;
+    }
+    setBusy(true);
+    setActionError(null);
+    try {
+      await onUpdate(closingId, {
+        status: outcome === "yes" ? "closed_won" : "closed_lost",
+        agreed_rate: outcome === "yes" && rate.trim() ? Number(cleanRate) : null,
+      });
+      cancelClose();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Couldn't save the outcome.");
+    } finally { setBusy(false); }
   };
 
-  const changeStatus = (id: string, newStatus: PitchRecord["status"]) => {
-    if (newStatus === "closed") { setClosingId(id); return; }
-    onUpdate(pitches.map(p => p.id === id ? { ...p, status: newStatus, agreedRate: undefined } : p));
+  const changeStatus = async (deal: PitchRecord, newStatus: string) => {
+    setStatusEditId(null);
+    if (newStatus === "close") { setActionError(null); setClosingId(deal.id); return; }
+    if (newStatus === "sent" && !deal.sentAt) { setActionError(null); setSendingId(deal.id); return; }
+    setBusy(true);
+    setActionError(null);
+    try {
+      await onUpdate(deal.id, {
+        status: newStatus,
+        agreed_rate: null,
+      });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Couldn't update the pitch.");
+    } finally { setBusy(false); }
   };
 
-  const addPitch = (brand: string) => {
-    const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    const newPitch: PitchRecord = { id: `pitch-${Date.now()}`, brand, date: today, status: "waiting" };
-    onUpdate([newPitch, ...pitches]);
-    setAddingPitch(false);
+  const addPitch = async (brand: string, sentAt: string) => {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await onAdd(brand, sentAt);
+      setAddingPitch(false);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Couldn't add the pitch.");
+    } finally { setBusy(false); }
   };
 
   const closingBrand = pitches.find(p => p.id === closingId)?.brand ?? "";
+  const sendingBrand = pitches.find(p => p.id === sendingId)?.brand ?? "";
 
   return (
     <>
       <AnimatePresence>
-        {closingId && <CloseDealModal brand={closingBrand} onConfirm={confirmClose} onCancel={cancelClose} />}
-        {addingPitch && <AddPitchModal onAdd={addPitch} onCancel={() => setAddingPitch(false)} />}
+        {closingId !== null && <CloseDealModal brand={closingBrand} onConfirm={confirmClose} onCancel={cancelClose} busy={busy} error={actionError} />}
+        {sendingId !== null && <MarkSentModal brand={sendingBrand} onConfirm={markSent} onCancel={() => { setSendingId(null); setActionError(null); }} busy={busy} error={actionError} />}
+        {addingPitch && <AddPitchModal onAdd={addPitch} onCancel={() => { setAddingPitch(false); setActionError(null); }} busy={busy} error={actionError} />}
       </AnimatePresence>
 
       {/* Header row */}
       <div className="flex justify-end mb-4">
         <button
-          onClick={() => setAddingPitch(true)}
+          onClick={() => { setActionError(null); setAddingPitch(true); }}
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all shadow-sm shadow-primary/20"
         >
           <Plus size={13} />
           Add pitch
         </button>
       </div>
+      {actionError && !addingPitch && closingId === null && sendingId === null && <p role="alert" className="text-sm text-red-400 mb-4">{actionError}</p>}
 
       {pitches.length === 0 ? (
         <div className="text-center py-20">
-          <p className="text-muted-foreground text-sm">No pitches yet. Head to the Pitch page to send your first one.</p>
+          <p className="text-muted-foreground text-sm">No pitches yet. Generate a draft on the Pitch page, or add outreach you've already sent.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -505,16 +589,14 @@ function MyPitchesTab({
 
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-white truncate">{deal.brand}</p>
-                <p className="text-xs text-muted-foreground">{deal.date}</p>
-                {deal.status !== "closed" && ACTIVITY_CONTEXT[deal.brand] && (
-                  <p className="text-xs text-muted-foreground/60">{ACTIVITY_CONTEXT[deal.brand]}</p>
-                )}
+                 <p className="text-xs text-muted-foreground">{deal.sentAt ? "Sent" : "Created"} {deal.date}</p>
               </div>
 
               {/* Clickable status badge with dropdown */}
               <div className="relative">
                 <button
-                  onClick={() => setStatusEditId(statusEditId === deal.id ? null : deal.id)}
+                   onClick={() => setStatusEditId(statusEditId === deal.id ? null : deal.id)}
+                   disabled={busy}
                   className="flex items-center gap-1"
                 >
                   <StatusBadge status={deal.status} />
@@ -531,13 +613,20 @@ function MyPitchesTab({
                         transition={{ duration: 0.12 }}
                         className="absolute right-0 top-full mt-1.5 z-20 bg-card border border-border rounded-xl overflow-hidden shadow-2xl min-w-[170px]"
                       >
-                        {(["waiting", "conversation", "closed"] as const).map(s => (
+                         {([
+                           { value: "sent", label: "Waiting for reply" },
+                           ...(deal.sentAt ? [
+                           { value: "conversation", label: "In conversation" },
+                           { value: "negotiating", label: "Negotiating" },
+                           { value: "close", label: "Close deal…" },
+                           ] : []),
+                         ]).map(s => (
                           <button
-                            key={s}
-                            onClick={() => { changeStatus(deal.id, s); setStatusEditId(null); }}
-                            className={`w-full text-left px-3.5 py-2.5 text-xs font-medium transition-colors hover:bg-secondary/60 ${deal.status === s ? "text-white bg-secondary/40" : "text-muted-foreground"}`}
+                             key={s.value}
+                             onClick={() => changeStatus(deal, s.value)}
+                             className={`w-full text-left px-3.5 py-2.5 text-xs font-medium transition-colors hover:bg-secondary/60 ${deal.status === s.value ? "text-white bg-secondary/40" : "text-muted-foreground"}`}
                           >
-                            {s === "waiting" ? "Waiting for reply" : s === "conversation" ? "In conversation" : "Closed"}
+                             {s.value === "sent" && !deal.sentAt ? "Mark as sent" : s.label}
                           </button>
                         ))}
                       </motion.div>
@@ -546,7 +635,7 @@ function MyPitchesTab({
                 </AnimatePresence>
               </div>
 
-              {deal.status !== "closed" && (
+               {!deal.status.startsWith("closed_") && (
                 <button
                   onClick={() => onUseDealMaker(deal.brand)}
                   className="shrink-0 text-xs text-primary font-semibold hover:text-primary/80 transition-colors whitespace-nowrap"
@@ -555,7 +644,7 @@ function MyPitchesTab({
                 </button>
               )}
 
-              {deal.status === "closed" && deal.agreedRate && (
+               {deal.status === "closed_won" && deal.agreedRate && (
                 <span className="shrink-0 text-xs text-emerald-400 font-semibold">
                   {formatRate(deal.agreedRate)}
                 </span>
@@ -1013,7 +1102,7 @@ function DealMakerTab({
   const toggle = (id: string) => setOpenCard(prev => prev === id ? null : id);
 
   const brandOptions = [
-    ...pitches.filter(p => p.status !== "closed").map(p => p.brand),
+    ...pitches.filter(p => !p.status.startsWith("closed_") && p.status !== "closed").map(p => p.brand),
     "A brand I found myself",
   ];
   const uniqueOptions = [...new Set(brandOptions)];
@@ -1105,60 +1194,96 @@ function DealMakerTab({
 export default function Pipeline() {
   const [tab, setTab]               = useState<"pitches" | "dealmaker">("pitches");
   const [dealmakerBrand, setDealmakerBrand] = useState("");
-
-  // Fetch pitches from API (primary source)
-  const { data: apiPitches } = useQuery<ApiPitch[]>({
+  const [legacyPitches, setLegacyPitches] = useState(readLegacyPitches);
+  const [legacyOverrides, setLegacyOverrides] = useState(readLegacyOverrides);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { data: apiPitches, isLoading, isError, refetch } = useQuery({
     queryKey: ["pitches"],
-    queryFn: () => api.get("/pitches/me"),
+    queryFn: getAllPitches,
     staleTime: 60_000,
+    retry: 1,
   });
 
-  // Status overrides for API pitches stored in localStorage
-  const [overrides, setOverrides] = useState<Record<string, { status: PitchRecord["status"]; agreedRate?: string }>>(() => {
-    try { return JSON.parse(localStorage.getItem("mavlit_pitch_overrides") ?? "{}"); } catch { return {}; }
-  });
-
-  // Manually-added local pitches (via AddPitchModal, prefix "pitch-")
-  const [localPitches, setLocalPitches] = useState<PitchRecord[]>(() => {
-    try {
-      const all = JSON.parse(localStorage.getItem("mavlit_pitches") ?? "[]") as PitchRecord[];
-      return all.filter(p => p.id.startsWith("pitch-"));
-    } catch { return []; }
-  });
-
-  // Convert API pitches → PitchRecord format, applying any local overrides
-  const apiPitchRecords: PitchRecord[] = (apiPitches ?? []).map(p => {
-    const id = `api-${p.id}`;
-    const ov = overrides[id];
-    return {
-      id,
+  const pitches: PitchRecord[] = (apiPitches ?? []).map(p => ({
+      id: p.id,
       brand: p.brand_name,
-      date: new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-      status: ov?.status ?? "waiting",
-      agreedRate: ov?.agreedRate,
-    };
-  });
+      date: p.sent_at
+        ? new Date(`${p.sent_at}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+        : new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      status: p.status,
+      agreedRate: p.agreed_rate ?? undefined,
+      sentAt: p.sent_at,
+  }));
 
-  // Merged list: API pitches first, then manually-added local ones
-  const pitches = apiPitches !== undefined
-    ? [...apiPitchRecords, ...localPitches]
-    : loadPitches(); // show demo data while API is loading
-
-  const updatePitches = (updated: PitchRecord[]) => {
-    const updatedApi   = updated.filter(p => p.id.startsWith("api-"));
-    const updatedLocal = updated.filter(p => !p.id.startsWith("api-"));
-
-    // Save overrides for API pitches
-    const newOverrides: typeof overrides = {};
-    for (const p of updatedApi) {
-      newOverrides[p.id] = { status: p.status, agreedRate: p.agreedRate };
+  const updatePitch = async (id: number, body: PitchUpdateRequest) => {
+    const updated = await api.patch<ApiPitch>(`/pitches/${id}`, body);
+    queryClient.setQueryData<ApiPitch[]>(["pitches"], previous => previous?.map(p => p.id === id ? updated : p));
+    if (legacyOverrides[`api-${id}`]) {
+      const next = { ...legacyOverrides };
+      delete next[`api-${id}`];
+      localStorage.setItem("mavlit_pitch_overrides", JSON.stringify(next));
+      setLegacyOverrides(next);
     }
-    setOverrides(newOverrides);
-    try { localStorage.setItem("mavlit_pitch_overrides", JSON.stringify(newOverrides)); } catch { /* ignore */ }
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["pitches"] }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+    ]);
+  };
 
-    // Save local pitches
-    setLocalPitches(updatedLocal);
-    try { localStorage.setItem("mavlit_pitches", JSON.stringify(updatedLocal)); } catch { /* ignore */ }
+  const addPitch = async (brand: string, sentAt: string) => {
+    const created = await api.post<ApiPitch>("/pitches/manual", {
+      custom_brand_name: brand,
+      status: "sent",
+      sent_at: sentAt,
+    });
+    queryClient.setQueryData<ApiPitch[]>(["pitches"], previous => previous ? [created, ...previous] : [created]);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["pitches"] }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+    ]);
+  };
+
+  const importLegacy = async () => {
+    if (!window.confirm(`Import ${legacyPitches.length} pitch${legacyPitches.length === 1 ? "" : "es"} saved only in this browser into the currently signed-in account? Closed entries without a recorded rate will be imported as sent for your review.`)) return;
+    setImporting(true);
+    setImportError(null);
+    try {
+      for (const old of legacyPitches) {
+        const parsed = new Date(old.date);
+        if (!old.brand.trim() || !Number.isFinite(parsed.getTime()) || parsed > new Date()) {
+          throw new Error(`Couldn't import ${old.brand || "an entry"}: its brand or date needs correction.`);
+        }
+        const sentAt = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+        let serverId = old.serverId;
+        if (!serverId) {
+          const created = await api.post<ApiPitch>("/pitches/manual", { custom_brand_name: old.brand.trim(), status: "sent", sent_at: sentAt });
+          serverId = created.id;
+          const all = JSON.parse(localStorage.getItem("mavlit_pitches") ?? "[]") as LegacyPitch[];
+          localStorage.setItem("mavlit_pitches", JSON.stringify(all.map(item => item.id === old.id ? { ...item, serverId } : item)));
+        }
+        if (old.status === "conversation") {
+          await api.patch<ApiPitch>(`/pitches/${serverId}`, { status: "conversation" });
+        } else if (old.status === "closed" && old.agreedRate) {
+          const amount = Number(old.agreedRate.replace(/[$,\s]/g, ""));
+          if (!Number.isFinite(amount) || amount < 0) throw new Error(`Couldn't import the rate for ${old.brand}. The server entry is saved; correct the browser entry and retry.`);
+          await api.patch<ApiPitch>(`/pitches/${serverId}`, { status: "closed_won", agreed_rate: amount });
+        }
+        // Keep the browser entry until all of its server updates have succeeded.
+        const all = JSON.parse(localStorage.getItem("mavlit_pitches") ?? "[]") as LegacyPitch[];
+        localStorage.setItem("mavlit_pitches", JSON.stringify(all.filter(item => item.id !== old.id)));
+        setLegacyPitches(readLegacyPitches());
+      }
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "Couldn't finish importing. Already imported entries remain in your account.");
+    } finally {
+      setImporting(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["pitches"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      ]);
+    }
   };
 
   const goToDealMaker = (brand: string) => {
@@ -1178,6 +1303,27 @@ export default function Pipeline() {
             <p className="text-muted-foreground text-base">Track your pitches and use Deal Tools to prepare for every conversation.</p>
           </motion.div>
 
+          {legacyPitches.length > 0 && (
+            <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+              <p>{legacyPitches.length} older manual pitch{legacyPitches.length === 1 ? " is" : "es are"} saved only in this browser. They won't appear in your account until you import them.</p>
+              <p className="mt-1 text-xs text-amber-200/80">Review the signed-in account before importing. Closed entries without a recorded rate will be imported as sent so you can update the outcome.</p>
+              <button onClick={importLegacy} disabled={importing} className="mt-2 underline disabled:opacity-50">{importing ? "Importing…" : "Import these pitches"}</button>
+              {importError && <p role="alert" className="mt-2 text-red-400">{importError}</p>}
+            </div>
+          )}
+
+          {Object.keys(legacyOverrides).length > 0 && (
+            <details className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+              <summary className="cursor-pointer font-semibold">Earlier browser-only status changes need review</summary>
+              <p className="mt-2 text-xs">These were never saved to the server and are not applied to the Pipeline. Check that each entry belongs to this account, then update its status and sent date. The old details remain on this device until you update an entry.</p>
+              <ul className="mt-2 text-xs space-y-1">
+                {Object.entries(legacyOverrides).map(([key, value]) => (
+                  <li key={key}>{key}: {value.status ?? "unknown status"}{value.agreedRate ? ` · ${value.agreedRate}` : ""}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+
           {/* Tabs */}
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.06 }}
             className="flex gap-2 mb-7 p-1 bg-card border border-border rounded-2xl w-fit">
@@ -1185,7 +1331,7 @@ export default function Pipeline() {
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${tab === t.id ? "bg-primary text-white shadow-md shadow-primary/30" : "text-muted-foreground hover:text-white"}`}>
                 {t.label}
-                {t.id === "pitches" && (
+                {t.id === "pitches" && !isError && !isLoading && (
                   <span className="ml-1.5 text-xs opacity-60">{pitches.length}</span>
                 )}
               </button>
@@ -1195,7 +1341,15 @@ export default function Pipeline() {
           <AnimatePresence mode="wait">
             {tab === "pitches" && (
               <motion.div key="pitches" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-                <MyPitchesTab pitches={pitches} onUpdate={updatePitches} onUseDealMaker={goToDealMaker} />
+                {isLoading ? (
+                  <p className="text-center text-muted-foreground py-16 text-sm">Loading your pitches…</p>
+                ) : isError ? (
+                  <p role="alert" className="text-center text-red-400 py-16 text-sm">
+                    Couldn't load your pitches. <button onClick={() => refetch()} className="underline">Retry</button>
+                  </p>
+                ) : (
+                  <MyPitchesTab pitches={pitches} onUpdate={updatePitch} onAdd={addPitch} onUseDealMaker={goToDealMaker} />
+                )}
               </motion.div>
             )}
             {tab === "dealmaker" && (

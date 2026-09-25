@@ -23,6 +23,7 @@ export const api = {
   get:    <T>(path: string)                => apiFetch<T>(path),
   post:   <T>(path: string, body: unknown) => apiFetch<T>(path, { method: "POST",   body: JSON.stringify(body) }),
   put:    <T>(path: string, body: unknown) => apiFetch<T>(path, { method: "PUT",    body: JSON.stringify(body) }),
+  patch:  <T>(path: string, body: unknown) => apiFetch<T>(path, { method: "PATCH",  body: JSON.stringify(body) }),
   delete: <T>(path: string)               => apiFetch<T>(path, { method: "DELETE" }),
 };
 
@@ -46,9 +47,64 @@ export interface ApiPitch {
   content_link: string | null;
   contact_name: string | null;
   contact_email: string | null;
-  pitch_text: string;
+  pitch_text: string | null;
   status: string;
+  source: string;
+  is_manual: boolean;
+  sent_at: string | null;
+  agreed_rate: string | null;
   created_at: string;
+}
+
+export interface PitchListResponse {
+  pitches: ApiPitch[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface PitchUpdateRequest {
+  status?: string;
+  sent_at?: string | null;
+  agreed_rate?: number | null;
+}
+
+export async function getAllPitches(): Promise<ApiPitch[]> {
+  const pitches: ApiPitch[] = [];
+  while (true) {
+    const page = await api.get<PitchListResponse>(`/pitches/me?limit=100&offset=${pitches.length}`);
+    if (!Array.isArray(page.pitches)) throw new Error("Invalid pitch list response");
+    pitches.push(...page.pitches);
+    if (pitches.length >= page.total) return pitches;
+    if (page.pitches.length === 0) throw new Error("Pitch list ended before the reported total");
+  }
+}
+
+export interface ApiMatch {
+  brand_raw_id: number;
+  brand_name: string;
+  niche: string | null;
+  total_score: number;
+  dimensions: Record<string, { score: number; weight: number }>;
+  reasons: string[];
+}
+
+export interface MatchesResponse {
+  matches: ApiMatch[];
+  total: number;
+  cached: boolean;
+  computed_at: string;
+}
+
+export async function getAllMatches(): Promise<ApiMatch[]> {
+  const matches: ApiMatch[] = [];
+  while (true) {
+    const page = await api.get<MatchesResponse>(`/matches/me?limit=100&offset=${matches.length}`);
+    if (!Array.isArray(page.matches)) throw new Error("Invalid matches response");
+    matches.push(...page.matches);
+    if (matches.length >= page.total) return matches;
+    if (page.matches.length === 0) throw new Error("Matches ended before the reported total");
+  }
 }
 
 export interface SavedBrand {

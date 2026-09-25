@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { api, type DashboardStats, type ApiPitch } from "@/lib/api";
+import { api, getAllPitches, type DashboardStats } from "@/lib/api";
 
 // ── Mini brand lookup for icons/colors ────────────────────────────────────────
 
@@ -23,16 +23,21 @@ const BRAND_ICONS: Record<string, { Icon: React.ElementType; color: string }> = 
 };
 
 function statusLabel(status: string) {
-  if (status === "proposal_sent" || status === "waiting") return { label: "Sent",        bg: "bg-violet-500/15", text: "text-violet-400" };
-  if (status === "conversation")                           return { label: "Replied",     bg: "bg-sky-500/15",    text: "text-sky-400"    };
-  if (status === "closed_won")                             return { label: "Closed ✓",    bg: "bg-emerald-500/15",text: "text-emerald-400" };
-  if (status === "closed_lost" || status === "declined")   return { label: "Closed",      bg: "bg-zinc-500/15",   text: "text-zinc-400"   };
+  if (status === "generated")                              return { label: "Draft",      bg: "bg-zinc-500/15", text: "text-zinc-400" };
+  if (status === "sent")                                   return { label: "Sent",       bg: "bg-violet-500/15", text: "text-violet-400" };
+  if (status === "conversation")                           return { label: "Replied",    bg: "bg-sky-500/15", text: "text-sky-400" };
+  if (status === "negotiating")                            return { label: "Negotiating",bg: "bg-sky-500/15", text: "text-sky-400" };
+  if (status === "closed_won")                            return { label: "Won",        bg: "bg-emerald-500/15",text: "text-emerald-400" };
+  if (status === "closed_lost" || status === "declined")   return { label: "Lost",       bg: "bg-zinc-500/15", text: "text-zinc-400" };
+  if (status === "proposal_sent" || status === "waiting") return { label: "Sent (unconfirmed)", bg: "bg-zinc-500/15", text: "text-zinc-400" };
   return { label: status, bg: "bg-zinc-500/15", text: "text-zinc-400" };
 }
 
 function relativeDate(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
+  const diff = Date.now() - new Date(iso.length === 10 ? `${iso}T00:00:00` : iso).getTime();
   const days = Math.floor(diff / 86_400_000);
+  if (!Number.isFinite(days)) return "Date unavailable";
+  if (days < 0) return "Upcoming";
   if (days === 0) return "Today";
   if (days === 1) return "Yesterday";
   if (days < 7)  return `${days} days ago`;
@@ -62,25 +67,27 @@ function BrandDot({ name }: { name: string }) {
 export default function Dashboard() {
   const [, setLocation] = useLocation();
 
-  const { data: dashStats, isLoading: statsLoading, isError: statsError } = useQuery<DashboardStats>({
+  const { data: dashStats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useQuery<DashboardStats>({
     queryKey: ["dashboard"],
     queryFn: () => api.get("/dashboard/me"),
     staleTime: 30_000,
     retry: 1,
+    refetchOnMount: "always",
   });
 
-  const { data: apiPitches, isLoading: pitchesLoading } = useQuery<ApiPitch[]>({
+  const { data: apiPitches, isLoading: pitchesLoading, isError: pitchesError, refetch: refetchPitches } = useQuery({
     queryKey: ["pitches"],
-    queryFn: () => api.get("/pitches/me"),
+    queryFn: getAllPitches,
     staleTime: 60_000,
     retry: 1,
+    refetchOnMount: "always",
   });
 
   const statCards = useMemo(() => [
-    { label: "Brand Matches",     value: statsLoading ? null : statsError ? "—" : (dashStats?.brand_matches     ?? 0), sub: "In your niche",            icon: Users,       color: "#7c3aed" },
-    { label: "Active Deals",      value: statsLoading ? null : statsError ? "—" : (dashStats?.active_deals      ?? 0), sub: "In your pipeline",         icon: Zap,         color: "#0ea5e9" },
-    { label: "Saved Brands",      value: statsLoading ? null : statsError ? "—" : (dashStats?.saved_brands      ?? 0), sub: "On your shortlist",        icon: Bookmark,    color: "#10b981" },
-    { label: "Verified Contacts", value: statsLoading ? null : statsError ? "—" : (dashStats?.verified_contacts ?? 0), sub: "Across saved/pitched brands", icon: ShieldCheck, color: "#f59e0b" },
+    { label: "Brand Matches",     value: statsLoading ? null : statsError ? "—" : dashStats?.brand_matches,     sub: "In your niche",            icon: Users,       color: "#7c3aed" },
+    { label: "Active Deals",      value: statsLoading ? null : statsError ? "—" : dashStats?.active_deals,      sub: "In your pipeline",         icon: Zap,         color: "#0ea5e9" },
+    { label: "Saved Brands",      value: statsLoading ? null : statsError ? "—" : dashStats?.saved_brands,      sub: "On your shortlist",        icon: Bookmark,    color: "#10b981" },
+    { label: "Verified Contacts", value: statsLoading ? null : statsError ? "—" : dashStats?.verified_contacts, sub: "Across saved/pitched brands", icon: ShieldCheck, color: "#f59e0b" },
   ], [dashStats, statsLoading, statsError]);
 
   const recentDeals = (apiPitches ?? []).slice(0, 3);
@@ -113,7 +120,7 @@ export default function Dashboard() {
                   <div>
                     {s.value === null
                       ? <div className="h-8 w-12 bg-secondary/60 rounded-lg animate-pulse" />
-                      : <p className="text-3xl font-extrabold text-white tracking-tight">{s.value}</p>
+                       : <p className="text-3xl font-extrabold text-white tracking-tight">{s.value ?? "—"}</p>
                     }
                     <p className="text-xs text-muted-foreground mt-1">{s.sub}</p>
                   </div>
@@ -121,6 +128,7 @@ export default function Dashboard() {
               );
             })}
           </div>
+          {statsError && <p className="text-sm text-red-400">Couldn't load your dashboard counts. <button className="underline" onClick={() => refetchStats()}>Retry</button></p>}
 
           {/* Quick Actions */}
           <motion.div
@@ -185,7 +193,7 @@ export default function Dashboard() {
             className="bg-card border border-border rounded-2xl p-6"
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold text-white">My Deals</h2>
+              <h2 className="text-sm font-bold text-white">Recent pitches</h2>
               <button onClick={() => setLocation("/deals")}
                 className="text-xs text-primary hover:text-primary/80 font-semibold flex items-center gap-1 transition-colors">
                 View all <ChevronRight size={12} />
@@ -198,16 +206,22 @@ export default function Dashboard() {
               </div>
             )}
 
-            {!pitchesLoading && recentDeals.length === 0 && (
+            {!pitchesLoading && pitchesError && (
+              <p className="text-xs text-red-400 py-6 text-center">
+                Couldn't load your pitches. <button onClick={() => refetchPitches()} className="underline">Retry</button>
+              </p>
+            )}
+
+            {!pitchesLoading && !pitchesError && recentDeals.length === 0 && (
               <p className="text-xs text-muted-foreground py-6 text-center">
                 No pitches yet.{" "}
                 <button onClick={() => setLocation("/pitch")} className="text-primary hover:underline">
-                  Send your first pitch →
+                  Create your first pitch →
                 </button>
               </p>
             )}
 
-            {!pitchesLoading && recentDeals.length > 0 && (
+            {!pitchesLoading && !pitchesError && recentDeals.length > 0 && (
               <div className="flex flex-col gap-2">
                 {recentDeals.map((pitch, i) => {
                   const { label, bg, text } = statusLabel(pitch.status);
@@ -230,13 +244,13 @@ export default function Dashboard() {
                         {label}
                       </span>
                       <span className="shrink-0 text-xs text-muted-foreground hidden sm:block">
-                        {relativeDate(pitch.created_at)}
+                        {pitch.sent_at ? `Sent ${relativeDate(pitch.sent_at)}` : `Created ${relativeDate(pitch.created_at)}`}
                       </span>
                       <button
                         onClick={() => setLocation("/deals")}
                         className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border text-white/70 hover:text-white hover:border-primary/50 hover:bg-primary/10 transition-all whitespace-nowrap"
                       >
-                        Open deal →
+                        Open in Pipeline →
                       </button>
                     </motion.div>
                   );

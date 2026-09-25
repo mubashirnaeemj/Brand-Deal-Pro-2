@@ -1,54 +1,17 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useLocation, useSearch } from "wouter";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, Copy, Check, ChevronDown, AlertTriangle, Lightbulb,
-  Headphones, Music, Cpu, Camera, ShoppingBag, Zap, User, ArrowRight,
-  Building2, Users, Mail, CheckCircle2,
+  User, ArrowRight, Building2, Mail, CheckCircle2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { api, type ApiPitch } from "@/lib/api";
+import { api, getAllMatches, type ApiBrand, type ApiPitch } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-
-const MATCHED_BRANDS = [
-  { id: 1, name: "Sennheiser",          icon: Headphones,  color: "#7c3aed", category: "Audio"     },
-  { id: 2, name: "Spotify for Artists", icon: Music,       color: "#1db954", category: "Streaming"  },
-  { id: 3, name: "Native Instruments",  icon: Cpu,         color: "#f59e0b", category: "Software"   },
-  { id: 4, name: "GoPro",               icon: Camera,      color: "#0ea5e9", category: "Lifestyle"  },
-  { id: 5, name: "Sweetwater",          icon: ShoppingBag, color: "#ec4899", category: "Retail"     },
-  { id: 6, name: "Red Bull",            icon: Zap,         color: "#ef4444", category: "Beverage"   },
-];
-
-const BRAND_CONTACTS: Record<string, { name: string; title: string; company: string; type: "agency"|"in-house"; email: string }> = {
-  "Sennheiser":          { name: "Sarah Chen",     title: "Director of Influencer Marketing", company: "Edelman",             type: "agency",   email: "sarah.chen@edelman.com"   },
-  "Spotify for Artists": { name: "Marcus Williams", title: "Creator Partnerships Manager",    company: "Spotify",             type: "in-house", email: "m.williams@spotify.com"   },
-  "Native Instruments":  { name: "Priya Sharma",    title: "Account Supervisor",               company: "Fleischman Hillard",  type: "agency",   email: "p.sharma@fleishman.com"   },
-  "GoPro":               { name: "Jake Torres",     title: "Influencer Marketing Manager",     company: "GoPro",               type: "in-house", email: "j.torres@gopro.com"       },
-  "Sweetwater":          { name: "Dana Kim",        title: "Brand Partnerships Lead",          company: "Sweetwater",          type: "in-house", email: "d.kim@sweetwater.com"     },
-  "Red Bull":            { name: "Alex Rivera",     title: "Account Manager",                  company: "Edelman",             type: "agency",   email: "a.rivera@edelman.com"     },
-};
-
-const BRAND_LAUNCHES: Record<string, string[]> = {
-  "Sennheiser":          ["HD 490 Pro Headphones", "Profile USB Mic", "Momentum True Wireless 4"],
-  "Spotify for Artists": ["Countdown Pages", "Discovery Mode expansion", "Clips for Artists"],
-  "Native Instruments":  ["Komplete 15 Ultimate", "Maschine+ standalone", "Traktor Pro 4"],
-  "GoPro":               ["HERO13 Black", "MAX 2 camera", "Quik app redesign"],
-  "Sweetwater":          ["SweetCare Pro support tier", "Sweetwater Studios expansion", "Musician financing upgrades"],
-  "Red Bull":            ["Red Bull Organics range", "Red Bull Basement 2025", "Team Red Bull creator roster"],
-};
-
-// Maps matched brand names to their API IDs
-const BRAND_NAME_TO_ID: Record<string, number> = {
-  "Sennheiser":          1,
-  "Spotify for Artists": 2,
-  "Native Instruments":  3,
-  "GoPro":               4,
-  "Sweetwater":          5,
-  "Red Bull":            6,
-};
 
 const NICHES    = ["Music Production","Music Performance","Audio Engineering","Gear Reviews","Lifestyle & Music","Electronic Music","Hip-Hop / Beats","Singer-Songwriter","Studio Vlogging","DJ / Live Sets","Music Education","Other"];
 const PLATFORMS = ["Instagram","TikTok","YouTube","Substack"];
@@ -128,33 +91,23 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function ContactTypeBadge({ type }: { type: "agency"|"in-house" }) {
-  if (type === "agency") return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/30">
-      <Building2 size={10} />Agency-side
-    </span>
-  );
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-      <Users size={10} />In-house
-    </span>
-  );
-}
-
-
 // ── Outbound Mode ──────────────────────────────────────────────────────────────
 
 function OutboundMode() {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
   const search = useSearch();
   const queryClient = useQueryClient();
-  const [prefillBrand] = useState(() => new URLSearchParams(search).get("brand") ?? "");
-  const [form, setFormState] = useState<OutboundForm>(() => {
-    if (prefillBrand && MATCHED_BRANDS.some(b => b.name === prefillBrand)) {
-      return { ...EMPTY_OUTBOUND, brandSource: "matched", selectedBrand: prefillBrand };
-    }
-    return EMPTY_OUTBOUND;
+  const { data: matches, isLoading: matchesLoading, isError: matchesError, refetch: refetchMatches } = useQuery({
+    queryKey: ["pitch-matches"],
+    queryFn: getAllMatches,
+    staleTime: 60_000,
+    retry: 1,
   });
+  const [prefillBrand] = useState(() => new URLSearchParams(search).get("brand") ?? "");
+  const [form, setFormState] = useState<OutboundForm>(() => prefillBrand
+    ? { ...EMPTY_OUTBOUND, brandSource: "found", customBrand: prefillBrand }
+    : EMPTY_OUTBOUND);
   const [generating, setGenerating] = useState(false);
   const [email, setEmail]           = useState<string | null>(null);
   const [copied, setCopied]         = useState(false);
@@ -163,20 +116,36 @@ function OutboundMode() {
   const [error, setError]           = useState<string | null>(null);
   const emailRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const prefilledMatch = matches?.find(b => b.brand_name === prefillBrand);
+    if (prefilledMatch) {
+      setFormState(previous => previous.brandSource === "found" && previous.customBrand === prefillBrand
+        ? { ...previous, brandSource: "matched", selectedBrand: String(prefilledMatch.brand_raw_id), customBrand: "" }
+        : previous);
+    }
+  }, [matches, prefillBrand]);
+
   const set = <K extends keyof OutboundForm>(k: K, v: OutboundForm[K]) => setFormState(p => ({ ...p, [k]: v }));
 
-  const brandName    = form.brandSource === "matched" ? form.selectedBrand : form.customBrand;
-  const activeContact = form.brandSource === "matched" && form.selectedBrand ? (BRAND_CONTACTS[form.selectedBrand] ?? null) : null;
+  const selectedMatch = matches?.find(b => String(b.brand_raw_id) === form.selectedBrand);
+  const brandName = form.brandSource === "matched" ? selectedMatch?.brand_name ?? "" : form.customBrand;
+  const { data: brandDetail } = useQuery<ApiBrand>({
+    queryKey: ["brand", selectedMatch?.brand_raw_id],
+    queryFn: () => api.get(`/brands/${selectedMatch!.brand_raw_id}`),
+    enabled: form.brandSource === "matched" && !!selectedMatch,
+    staleTime: 60_000,
+  });
+  const activeContact = form.brandSource === "matched" ? brandDetail?.top_contact : null;
   const canGenerate  = brandName.trim() && form.creatorName.trim() && form.handle.trim() && form.followers.trim() && form.engagementRate.trim() && form.story.trim();
 
   const generate = async () => {
     if (!canGenerate) return;
     setGenerating(true); setEmail(null); setError(null); setHasCopied(false); setPitchLogged(false);
     try {
-      const body = form.brandSource === "matched" && BRAND_NAME_TO_ID[form.selectedBrand]
+      const body = form.brandSource === "matched" && selectedMatch
         ? {
             is_custom: false,
-            brand_id: BRAND_NAME_TO_ID[form.selectedBrand],
+            brand_id: selectedMatch.brand_raw_id,
             story: form.story,
             product_reference: form.recentProductLaunch || undefined,
             past_brand_partnership: form.pastDeals || undefined,
@@ -191,8 +160,9 @@ function OutboundMode() {
             content_link: form.contentLink || undefined,
           };
       const data = await api.post<ApiPitch>("/pitches", body);
-      setEmail(data.pitch_text);
       setPitchLogged(true); // API auto-saves the pitch
+      if (data.pitch_text) setEmail(data.pitch_text);
+      else setError("Your draft was saved, but the API returned no email text. Find it in your Pipeline rather than generating a duplicate.");
       // Invalidate cached pitches and dashboard stats so Pipeline + Dashboard reflect the new pitch immediately
       queryClient.invalidateQueries({ queryKey: ["pitches"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -230,30 +200,30 @@ function OutboundMode() {
           <AnimatePresence mode="wait">
             {form.brandSource === "matched" ? (
               <motion.div key="matched" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-                {prefillBrand && form.selectedBrand === prefillBrand && (
+                {prefillBrand && selectedMatch?.brand_name === prefillBrand && (
                   <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-primary/10 border border-primary/25 text-xs font-semibold text-primary">
                     <CheckCircle2 size={12} />
                     Pre-filled from your matches — just add your story below
                   </div>
                 )}
                 <Label>Select a matched brand</Label>
+                {matchesLoading && <p className="text-sm text-muted-foreground py-3">Loading your matches…</p>}
+                {matchesError && <p className="text-sm text-red-400 py-3">Couldn't load matches. <button className="underline" onClick={() => refetchMatches()}>Retry</button> or use “A brand I found myself”.</p>}
+                {!matchesLoading && !matchesError && matches?.length === 0 && <p className="text-sm text-muted-foreground py-3">No matches yet. You can pitch a brand you found yourself.</p>}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
-                  {MATCHED_BRANDS.map(b => {
-                    const Icon = b.icon;
-                    const selected = form.selectedBrand === b.name;
+                  {matches?.map(b => {
+                    const selected = form.selectedBrand === String(b.brand_raw_id);
                     return (
-                      <button key={b.id} onClick={() => {
-                          const next = selected ? "" : b.name;
-                          const firstLaunch = BRAND_LAUNCHES[next]?.[0] ?? "";
-                          setFormState(p => ({ ...p, selectedBrand: next, recentProductLaunch: firstLaunch }));
+                      <button key={b.brand_raw_id} onClick={() => {
+                          setFormState(p => ({ ...p, selectedBrand: selected ? "" : String(b.brand_raw_id), recentProductLaunch: "" }));
                         }}
                         className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${selected ? "border-primary bg-primary/10 text-white" : "border-border text-muted-foreground hover:border-primary/40 hover:text-white"}`}>
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${b.color}30` }}>
-                          <Icon size={15} style={{ color: b.color }} />
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-primary/15">
+                          <Building2 size={15} className="text-primary" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold truncate">{b.name}</p>
-                          <p className="text-xs text-muted-foreground/70">{b.category}</p>
+                          <p className="text-xs font-semibold truncate">{b.brand_name}</p>
+                          <p className="text-xs text-muted-foreground/70">{b.niche ?? "Brand"}</p>
                         </div>
                       </button>
                     );
@@ -278,7 +248,7 @@ function OutboundMode() {
               placeholder={`e.g. I've used ${brandName || "[brand]"} gear since I was 16 learning in my bedroom studio. My audience of 18–34 producers knows I only mention what I actually use.`}
               className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all resize-none" />
           </div>
-          {form.brandSource === "matched" && form.selectedBrand && (BRAND_LAUNCHES[form.selectedBrand]?.length ?? 0) > 0 && (
+          {brandName && (
             <div>
               <Label>Reference a recent product launch <span className="font-normal text-muted-foreground/50">— optional</span></Label>
               <Input
@@ -286,15 +256,6 @@ function OutboundMode() {
                 onChange={v => set("recentProductLaunch", v)}
                 placeholder="Leave blank to skip, or pick one below"
               />
-              <div className="flex flex-wrap gap-2 mt-2">
-                {(BRAND_LAUNCHES[form.selectedBrand] ?? []).map(launch => (
-                  <button key={launch} type="button"
-                    onClick={() => set("recentProductLaunch", form.recentProductLaunch === launch ? "" : launch)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${form.recentProductLaunch === launch ? "bg-primary/15 border-primary/40 text-primary" : "border-border text-muted-foreground hover:border-primary/30 hover:text-white"}`}>
-                    {launch}
-                  </button>
-                ))}
-              </div>
               <p className="mt-1.5 text-xs text-muted-foreground/60 leading-relaxed">If filled in, it'll be woven into your pitch as a natural reason for the timing — not added as a separate line.</p>
             </div>
           )}
@@ -308,7 +269,9 @@ function OutboundMode() {
             <div className="flex items-start gap-3 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 mt-0.5"><User size={13} className="text-primary" /></div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-white leading-snug mb-0.5">Music producer &amp; gear reviewer · 52K on Instagram</p>
+                 <p className="text-sm font-semibold text-white leading-snug mb-0.5">
+                   {user?.content_niche || "Your creator profile"}{user?.follower_count ? ` · ${user.follower_count.toLocaleString()} followers` : ""}
+                 </p>
                 <p className="text-xs text-muted-foreground leading-relaxed">Keep your profile complete — MAVLIT uses your stats and story to generate the most accurate pitch possible.</p>
               </div>
             </div>
@@ -326,7 +289,9 @@ function OutboundMode() {
             : (<><Sparkles size={16} />✦ Generate pitch email rough draft</>)}
         </button>
 
-        {error && <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
+        {error && <div role="alert" className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}
+          {pitchLogged && <button onClick={() => setLocation("/deals")} className="ml-2 underline">View Pipeline</button>}
+        </div>}
 
         {/* Email output */}
         <AnimatePresence>
@@ -365,7 +330,7 @@ function OutboundMode() {
                     className="flex items-start justify-between gap-3 px-4 py-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
                     <div className="flex items-start gap-2.5">
                       <CheckCircle2 size={15} className="text-emerald-400 mt-0.5 shrink-0" />
-                      <p className="text-sm text-emerald-300 leading-relaxed">Pitch saved to your Pipeline automatically.</p>
+                      <p className="text-sm text-emerald-300 leading-relaxed">Draft saved to your Pipeline. Mark it sent there once you've actually sent the email.</p>
                     </div>
                     <button
                       onClick={() => setLocation("/deals")}
@@ -391,9 +356,7 @@ function OutboundMode() {
               <div className="space-y-1">
                 <p className="text-sm font-bold text-white">{activeContact.name}</p>
                 <p className="text-xs text-muted-foreground">{activeContact.title}</p>
-                <p className="text-xs text-muted-foreground">{activeContact.company}</p>
               </div>
-              <ContactTypeBadge type={activeContact.type} />
               <div className="h-px bg-border" />
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-1.5">To:</p>

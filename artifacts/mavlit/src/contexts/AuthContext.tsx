@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 export interface CreatorProfile {
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<CreatorProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
 
   // On mount — validate session via cookie by calling GET /creator-profile/me
   // Fall back to cache while the request is in flight so the UI doesn't flash
@@ -97,24 +99,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     // Login sets the httpOnly cookie on the server; we receive the profile in the response
     const profile = await api.post<CreatorProfile>("/auth/login", { email, password });
+    queryClient.clear();
     setUser(profile);
     try { localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile)); } catch { /* ignore */ }
 
     navigate("/dashboard");
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
   const logout = useCallback(async () => {
     try { await api.post("/auth/logout", {}); } catch { /* ignore — clear locally regardless */ }
     localStorage.removeItem(PROFILE_CACHE_KEY);
+    queryClient.clear();
     setUser(null);
     navigate("/login");
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
   const updateProfile = useCallback(async (patch: Partial<CreatorProfile>) => {
     const updated = await api.put<CreatorProfile>("/creator-profile/me", patch);
     setUser(updated);
     try { localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(updated)); } catch { /* ignore */ }
-  }, []);
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    queryClient.invalidateQueries({ queryKey: ["pitch-matches"] });
+  }, [queryClient]);
 
   return (
     <AuthContext.Provider value={{ user, isLoading, login, logout, updateProfile }}>

@@ -1,2 +1,3 @@
 - [MAVLIT API integration](mavlit-api-integration.md) — all pages wired to api.mavlit.com; cookie auth only; key patterns for each page
 - [MAVLIT multi-platform profile](mavlit-platform-selection.md) — the API has one platform text field; preserve both UI choices, but backend matching support is unverified.
+- [MAVLIT primary niches](mavlit-primary-niches.md) — multiple selections use comma-separated text because the external API exposes scalar fields; matching support remains unverified.

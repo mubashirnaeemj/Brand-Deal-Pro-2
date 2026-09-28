@@ -3,6 +3,13 @@ export const parsePlatforms = (value: string | null | undefined): PlatformKey[] 
   [...new Set((value ?? "").split(",").map((part) => part.trim().toLowerCase()))]
     .filter((part): part is PlatformKey => part === "instagram" || part === "youtube");
 export const formatPlatforms = (platforms: PlatformKey[]): string => platforms.join(",");
+// The profile API exposes each platform's primary niches as one text field.
+export const parsePrimaryNiches = (value: string | null | undefined): string[] =>
+  [...new Set((value ?? "").split(",").map((part) => part.trim()).filter(Boolean))];
+export const formatPrimaryNiches = (niches: string[]): string | null =>
+  niches.length ? niches.join(", ") : null;
+export const samePrimaryNiches = (saved: string | null | undefined, selected: string[]): boolean =>
+  JSON.stringify(parsePrimaryNiches(saved)) === JSON.stringify(selected);
 export type DescriptionMode = "manual" | "generate";
 
 export type InstagramProfile = {

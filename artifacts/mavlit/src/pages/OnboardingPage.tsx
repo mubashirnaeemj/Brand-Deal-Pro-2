@@ -12,8 +12,11 @@ import ReviewStep from "@/components/onboarding/ReviewStep";
 import {
   EMPTY_ONBOARDING,
   formatPlatforms,
+  formatPrimaryNiches,
   NICHE_OPTIONS,
   parsePlatforms,
+  parsePrimaryNiches,
+  samePrimaryNiches,
   type FieldErrors,
   type OnboardingData,
   type StepKey,
@@ -109,13 +112,13 @@ export default function OnboardingPage() {
         instagram_handle: data.instagram.username.trim().replace(/^@/, ""),
         instagram_followers: Number(data.instagram.followers),
         follower_count: data.creator.platforms[0] === "youtube" ? Number(data.youtube.subscribers) : Number(data.instagram.followers),
-        content_niche: data.instagram.niches[0],
-        instagram_primary_niche: data.instagram.niches[0],
+        content_niche: formatPrimaryNiches(data.instagram.niches),
+        instagram_primary_niche: formatPrimaryNiches(data.instagram.niches),
         instagram_sub_niches: data.instagram.subNiches,
         instagram_excluded_categories: data.instagram.excludedCategories,
         youtube_channel_name: data.youtube.channelName.trim() || null,
         youtube_subscribers: data.youtube.subscribers ? Number(data.youtube.subscribers) : null,
-        youtube_primary_niche: data.youtube.niches[0] || null,
+        youtube_primary_niche: formatPrimaryNiches(data.youtube.niches),
         youtube_sub_niches: data.youtube.subNiches,
         youtube_excluded_categories: data.youtube.excludedCategories,
         instagram_description_mode: data.instagramDescriptionMode,
@@ -213,6 +216,11 @@ export default function OnboardingPage() {
         instagram_description: instagramDescription || null,
         youtube_description: youtubeDescription || null,
       });
+      if (!samePrimaryNiches(updated.instagram_primary_niche, data.instagram.niches) ||
+          (data.creator.platforms.includes("youtube") && !samePrimaryNiches(updated.youtube_primary_niche, data.youtube.niches))) {
+        setSubmitError("The profile API did not keep all selected primary niches. Your selections remain in this draft; please try again.");
+        return;
+      }
       if (!isProfileComplete(updated)) {
         setSubmitError("Your profile was saved, but onboarding is still incomplete. Check your details and try again.");
         return;
@@ -342,7 +350,7 @@ function loadDraft(profile: CreatorProfile | null): SavedDraft {
         username: profile.instagram_handle ?? profile.creator_handle ?? "",
         followers: profile.instagram_followers != null ? String(profile.instagram_followers) :
           parsePlatforms(profile.primary_platform)[0] === "instagram" && profile.follower_count != null ? String(profile.follower_count) : "",
-        niches: profile.instagram_primary_niche ? [profile.instagram_primary_niche] : profile.content_niche ? [profile.content_niche] : [],
+        niches: parsePrimaryNiches(profile.instagram_primary_niche ?? profile.content_niche),
         subNiches: profile.instagram_sub_niches ?? profile.sub_niches ?? [],
         contentDescription: profile.instagram_description ?? "",
         excludedCategories: profile.instagram_excluded_categories ?? profile.excluded_categories ?? [],
@@ -351,7 +359,7 @@ function loadDraft(profile: CreatorProfile | null): SavedDraft {
         ...EMPTY_ONBOARDING.youtube,
         channelName: profile.youtube_channel_name ?? "",
         subscribers: profile.youtube_subscribers != null ? String(profile.youtube_subscribers) : "",
-        niches: profile.youtube_primary_niche ? [profile.youtube_primary_niche] : [],
+        niches: parsePrimaryNiches(profile.youtube_primary_niche),
         subNiches: profile.youtube_sub_niches ?? [],
         contentDescription: profile.youtube_description ?? "",
         excludedCategories: profile.youtube_excluded_categories ?? [],

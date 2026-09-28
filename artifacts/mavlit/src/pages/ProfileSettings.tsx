@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Save, User } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import PlatformSelector from "@/components/onboarding/PlatformSelector";
-import { INPUT_CLASS, parsePlatforms } from "@/components/onboarding/types";
+import { INPUT_CLASS, parsePlatforms, samePrimaryNiches } from "@/components/onboarding/types";
 import { isDescriptionPending, isProfileComplete, type CreatorProfile, type DescriptionJob, type DescriptionPlatform, useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { InstagramSection, YoutubeSection } from "./ProfilePlatformSection";
@@ -207,6 +207,12 @@ export default function ProfileSettings() {
         setProfile(updated);
         setForm(profileToForm(updated));
         setError("The profile API did not keep all selected platforms. Please try again.");
+        return;
+      }
+      if (!samePrimaryNiches(updated.instagram_primary_niche, form.instagram.primaryNiches) ||
+          !samePrimaryNiches(updated.youtube_primary_niche, form.youtube.primaryNiches)) {
+        setProfile(updated);
+        setError("The profile API did not keep all selected primary niches. Please try again.");
         return;
       }
       if (!isProfileComplete(updated)) {

@@ -10,6 +10,7 @@ export default function MultiSelectDropdown({
   searchable = false,
   error,
   closeOnSelect = false,
+  disabled = false,
 }: {
   label: string;
   options: string[];
@@ -19,6 +20,7 @@ export default function MultiSelectDropdown({
   searchable?: boolean;
   error?: string;
   closeOnSelect?: boolean;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -28,6 +30,7 @@ export default function MultiSelectDropdown({
   );
 
   const toggle = (option: string) => {
+    if (disabled) return;
     onChange(selected.includes(option) ? selected.filter((item) => item !== option) : [...selected, option]);
     if (closeOnSelect) setOpen(false);
   };
@@ -39,6 +42,7 @@ export default function MultiSelectDropdown({
       <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</label>
       <button
         type="button"
+        disabled={disabled}
         onClick={() => setOpen((value) => !value)}
         className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border bg-secondary/80 px-4 py-2.5 text-left text-sm transition ${
           error ? "border-red-500/60" : open ? "border-primary/70 ring-2 ring-primary/15" : "border-border"
@@ -56,7 +60,7 @@ export default function MultiSelectDropdown({
           {selected.map((item) => (
             <span key={item} className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-xs text-primary">
               {item}
-              <button type="button" onClick={() => toggle(item)} aria-label={`Remove ${item}`}>
+               <button type="button" disabled={disabled} onClick={() => toggle(item)} aria-label={`Remove ${item}`}>
                 <X size={11} />
               </button>
             </span>

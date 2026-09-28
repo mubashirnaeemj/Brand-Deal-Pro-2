@@ -56,7 +56,7 @@ function SharedDetails({
   const generate = async () => {
     if (pending || generationBusy) return;
     const enteredUsername = platform === "instagram" ? username.trim().replace(/^@/, "") : username.trim();
-    if (!enteredUsername || !NICHE_OPTIONS.includes(value.primaryNiche as typeof NICHE_OPTIONS[number])) {
+    if (!enteredUsername || !NICHE_OPTIONS.includes(value.primaryNiches[0] as typeof NICHE_OPTIONS[number])) {
       setGenerateError(`Add your ${platform === "instagram" ? "Instagram username" : "YouTube channel name"} and primary niche first.`);
       return;
     }
@@ -65,7 +65,7 @@ function SharedDetails({
     onGeneratingChange(true);
     try {
       const savedUsername = await onSaveUsername(enteredUsername);
-      await onStartGeneration(savedUsername, value.primaryNiche);
+      await onStartGeneration(savedUsername, value.primaryNiches[0]);
     } catch (error) {
       setGenerateError(error instanceof Error ? error.message : "Could not generate a description.");
     } finally {
@@ -83,25 +83,22 @@ function SharedDetails({
         Generation failed: {statusError || "Please try again."}
       </p>}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Primary niche">
-          <select disabled={pending || generationBusy} value={NICHE_OPTIONS.includes(value.primaryNiche as typeof NICHE_OPTIONS[number]) ? value.primaryNiche : ""}
-            onChange={(event) => onChange({ ...value, primaryNiche: event.target.value,
-              subNiches: value.subNiches.filter((item) => subNicheOptions([event.target.value]).includes(item)) })}
-            className={INPUT_CLASS}>
-            <option value="">Select a niche</option>
-            {NICHE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          {value.primaryNiche && !NICHE_OPTIONS.includes(value.primaryNiche as typeof NICHE_OPTIONS[number]) && (
-            <span className="mt-1 block text-xs normal-case tracking-normal text-amber-400">
-              Your saved niche ({value.primaryNiche}) is no longer an option. Choose one above to update it.
+        <div>
+          <MultiSelectDropdown label="Primary niche" options={NICHE_OPTIONS} selected={value.primaryNiches}
+            onChange={(items) => onChange({ ...value, primaryNiches: items,
+              subNiches: value.subNiches.filter((item) => subNicheOptions(items).includes(item)) })}
+            placeholder="Select one or more" disabled={pending || generationBusy} />
+          {value.primaryNiches.some((niche) => !NICHE_OPTIONS.includes(niche as typeof NICHE_OPTIONS[number])) && (
+            <span className="mt-1 block text-xs text-amber-400">
+              A saved niche is no longer an option. Remove it before saving.
             </span>
           )}
-        </Field>
+        </div>
         <MultiSelectDropdown
           label="Sub-niches"
           selected={value.subNiches}
           onChange={(subNiches) => set("subNiches", subNiches)}
-          options={subNicheOptions([value.primaryNiche])}
+          options={subNicheOptions(value.primaryNiches)}
           placeholder="Select sub-niches"
           searchable
         />

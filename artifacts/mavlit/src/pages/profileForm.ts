@@ -1,8 +1,8 @@
 import type { CreatorProfile } from "@/contexts/AuthContext";
-import { formatPlatforms, NICHE_OPTIONS, parsePlatforms, type PlatformKey } from "@/components/onboarding/types";
+import { formatPlatforms, formatPrimaryNiches, NICHE_OPTIONS, parsePlatforms, parsePrimaryNiches, type PlatformKey } from "@/components/onboarding/types";
 
 export type PlatformDetails = {
-  primaryNiche: string;
+  primaryNiches: string[];
   subNiches: string[];
   excludedCategories: string[];
   description: string;
@@ -31,7 +31,7 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
     instagram: {
       username: text(profile.instagram_handle),
       followers: numberText(profile.instagram_followers ?? (firstPlatform === "instagram" ? profile.follower_count : null)),
-      primaryNiche: text(profile.instagram_primary_niche ?? profile.content_niche),
+      primaryNiches: parsePrimaryNiches(profile.instagram_primary_niche ?? profile.content_niche),
       subNiches: profile.instagram_sub_niches ?? profile.sub_niches ?? [],
       excludedCategories: profile.instagram_excluded_categories ?? profile.excluded_categories ?? [],
       description: text(profile.instagram_description),
@@ -39,7 +39,7 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
     youtube: {
       channelName: text(profile.youtube_channel_name),
       subscribers: numberText(profile.youtube_subscribers ?? (firstPlatform === "youtube" ? profile.follower_count : null)),
-      primaryNiche: text(profile.youtube_primary_niche),
+      primaryNiches: parsePrimaryNiches(profile.youtube_primary_niche),
       subNiches: profile.youtube_sub_niches ?? [],
       excludedCategories: profile.youtube_excluded_categories ?? [],
       description: text(profile.youtube_description),
@@ -58,18 +58,18 @@ export function validateProfile(form: ProfileForm, profile: CreatorProfile): str
   }
   // The app still gates access on the required onboarding fields.
   if (!form.age.trim() || !form.gender.trim() || !form.instagram.username.trim() ||
-      form.instagram.followers.trim() === "" || !form.instagram.primaryNiche.trim()) {
+      form.instagram.followers.trim() === "" || !form.instagram.primaryNiches.length) {
     return "To keep your profile active, complete age, gender, Instagram username, follower count, and Instagram primary niche.";
   }
-  if (!NICHE_OPTIONS.includes(form.instagram.primaryNiche as typeof NICHE_OPTIONS[number]) ||
-      (form.youtube.primaryNiche && !NICHE_OPTIONS.includes(form.youtube.primaryNiche as typeof NICHE_OPTIONS[number]))) {
+  if (form.instagram.primaryNiches.some((niche) => !NICHE_OPTIONS.includes(niche as typeof NICHE_OPTIONS[number])) ||
+      form.youtube.primaryNiches.some((niche) => !NICHE_OPTIONS.includes(niche as typeof NICHE_OPTIONS[number]))) {
     return "Choose a listed primary niche (Music, Health, Beauty, or Fitness).";
   }
   if (!form.instagram.description.trim() && !form.youtube.description.trim() && !profile.content_description?.trim()) {
     return "Add an Instagram or YouTube description to keep your profile active.";
   }
   if (form.primaryPlatforms.includes("youtube") &&
-      (!form.youtube.channelName.trim() || form.youtube.subscribers.trim() === "" || !form.youtube.primaryNiche.trim())) {
+      (!form.youtube.channelName.trim() || form.youtube.subscribers.trim() === "" || !form.youtube.primaryNiches.length)) {
     return "Complete the YouTube channel name, subscriber count, and primary niche.";
   }
   return null;
@@ -86,15 +86,15 @@ export function profilePatch(form: ProfileForm, profile: CreatorProfile): Partia
     instagram_handle: instagramHandle || null,
     instagram_followers: optionalNumber(form.instagram.followers),
     follower_count: optionalNumber(form.primaryPlatforms[0] === "youtube" ? form.youtube.subscribers : form.instagram.followers),
-    instagram_primary_niche: form.instagram.primaryNiche.trim() || null,
-    content_niche: form.instagram.primaryNiche.trim() || null,
+    instagram_primary_niche: formatPrimaryNiches(form.instagram.primaryNiches),
+    content_niche: formatPrimaryNiches(form.instagram.primaryNiches),
     instagram_sub_niches: form.instagram.subNiches,
     instagram_excluded_categories: form.instagram.excludedCategories,
     instagram_description: form.instagram.description.trim() || null,
     content_description: profile.content_description?.trim() || form.instagram.description.trim() || form.youtube.description.trim() || null,
     youtube_channel_name: form.youtube.channelName.trim() || null,
     youtube_subscribers: optionalNumber(form.youtube.subscribers),
-    youtube_primary_niche: form.youtube.primaryNiche.trim() || null,
+    youtube_primary_niche: formatPrimaryNiches(form.youtube.primaryNiches),
     youtube_sub_niches: form.youtube.subNiches,
     youtube_excluded_categories: form.youtube.excludedCategories,
     youtube_description: form.youtube.description.trim() || null,

@@ -61,33 +61,37 @@ export default function BrandPartnershipPosts({ brandId, brandName }: { brandId:
       ) : !data?.posts.length ? (
         <p className="text-sm text-muted-foreground">No confirmed creator partnership posts for this brand yet.</p>
       ) : (
-        <ul className="space-y-3 overflow-x-auto whitespace-nowrap">
+        <ul className="space-y-3">
           {data.posts.map((post, index) => {
             const url = postUrl(post.post_url);
             const creators = post.creators.map((creator) => creator.trim().replace(/^@/, "")).filter(Boolean);
             const others = Math.max(0, creators.length - 2);
             return (
               <li key={`${post.post_url}-${index}`} className="border-t border-border pt-3 text-sm leading-relaxed text-muted-foreground first:border-t-0 first:pt-0">
-                <span className="font-semibold text-white">{data.brand_name || brandName}</span>
-                {" partnered with "}
-                {creators.length ? creators.slice(0, 2).map((creator, creatorIndex) => (
-                  <span key={`${creator}-${creatorIndex}`}>
-                    {creatorIndex > 0 && (creators.length === 2 ? " and " : ", ")}
-                    <a href={`https://www.instagram.com/${encodeURIComponent(creator)}/`}
-                      target="_blank" rel="noopener noreferrer"
-                      className="font-semibold text-primary hover:underline">
-                      @{creator}
+                <p className="overflow-x-auto whitespace-nowrap">
+                  <span className="font-semibold text-white">{data.brand_name || brandName}</span>
+                  {" partnered with "}
+                  {creators.length ? creators.slice(0, 2).map((creator, creatorIndex) => (
+                    <span key={`${creator}-${creatorIndex}`}>
+                      {creatorIndex > 0 && (creators.length === 2 ? " and " : ", ")}
+                      <a href={`https://www.instagram.com/${encodeURIComponent(creator)}/`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="font-semibold text-primary hover:underline">
+                        @{creator}
+                      </a>
+                    </span>
+                  )) : "a creator (name not provided)"}
+                  {others > 0 && ` and ${others} ${others === 1 ? "other" : "others"}`}
+                </p>
+                <p className="mt-1 whitespace-nowrap text-xs">
+                  {postDate(post.post_date)}{" · "}
+                  {url ? (
+                    <a href={url} target="_blank" rel="noopener noreferrer"
+                      className="text-primary hover:underline">
+                      View post ↗
                     </a>
-                  </span>
-                )) : "a creator (name not provided)"}
-                {others > 0 && ` and ${others} ${others === 1 ? "other" : "others"}`}
-                {" · "}{postDate(post.post_date)}{" · "}
-                {url ? (
-                  <a href={url} target="_blank" rel="noopener noreferrer"
-                    className="text-primary hover:underline">
-                    View post ↗
-                  </a>
-                ) : <span>Post link unavailable</span>}
+                  ) : <span>Post link unavailable</span>}
+                </p>
               </li>
             );
           })}

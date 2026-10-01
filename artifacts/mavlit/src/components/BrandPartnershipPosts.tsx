@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink } from "lucide-react";
 import { api, ApiRequestError, type BrandPartnershipPosts } from "@/lib/api";
 
 function postUrl(value: string): string | null {
@@ -13,10 +12,10 @@ function postUrl(value: string): string | null {
 }
 
 function postDate(value: string | null): string {
-  if (!value) return "Date unknown";
+  if (!value) return "Unknown date";
   const date = new Date(`${value}T00:00:00Z`);
-  return Number.isNaN(date.getTime()) ? "Date unknown" :
-    date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  return Number.isNaN(date.getTime()) ? "Unknown date" :
+    date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
 export default function BrandPartnershipPosts({ brandId, brandName }: { brandId: number; brandName: string }) {
@@ -62,27 +61,33 @@ export default function BrandPartnershipPosts({ brandId, brandName }: { brandId:
       ) : !data?.posts.length ? (
         <p className="text-sm text-muted-foreground">No confirmed creator partnership posts for this brand yet.</p>
       ) : (
-        <ul className="space-y-4">
+        <ul className="space-y-3 overflow-x-auto whitespace-nowrap">
           {data.posts.map((post, index) => {
             const url = postUrl(post.post_url);
-            const creators = post.creators.map((creator) => `@${creator.replace(/^@/, "")}`);
+            const creators = post.creators.map((creator) => creator.trim().replace(/^@/, "")).filter(Boolean);
+            const others = Math.max(0, creators.length - 2);
             return (
-              <li key={`${post.post_url}-${index}`} className="space-y-1.5 border-t border-border pt-3 first:border-t-0 first:pt-0">
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  <span className="font-semibold text-white">{data.brand_name || brandName}</span>
-                  {" collab with "}
-                  {creators.length ? (
-                    <>{creators.length > 1 ? "creators " : "a creator "}<span className="font-semibold text-white">{creators.join(", ")}</span></>
-                  ) : "a creator (name not provided)"}
-                </p>
+              <li key={`${post.post_url}-${index}`} className="border-t border-border pt-3 text-sm leading-relaxed text-muted-foreground first:border-t-0 first:pt-0">
+                <span className="font-semibold text-white">{data.brand_name || brandName}</span>
+                {" partnered with "}
+                {creators.length ? creators.slice(0, 2).map((creator, creatorIndex) => (
+                  <span key={`${creator}-${creatorIndex}`}>
+                    {creatorIndex > 0 && (creators.length === 2 ? " and " : ", ")}
+                    <a href={`https://www.instagram.com/${encodeURIComponent(creator)}/`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="font-semibold text-primary hover:underline">
+                      @{creator}
+                    </a>
+                  </span>
+                )) : "a creator (name not provided)"}
+                {others > 0 && ` and ${others} ${others === 1 ? "other" : "others"}`}
+                {" · "}{postDate(post.post_date)}{" · "}
                 {url ? (
                   <a href={url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-start gap-1.5 text-xs text-primary hover:underline">
-                    <span className="min-w-0 break-all">{post.post_url}</span>
-                    <ExternalLink size={12} className="mt-0.5 shrink-0" />
+                    className="text-primary hover:underline">
+                    View post ↗
                   </a>
-                ) : <p className="text-xs text-muted-foreground">Post link unavailable</p>}
-                <p className="text-xs text-muted-foreground">{postDate(post.post_date)}</p>
+                ) : <span>Post link unavailable</span>}
               </li>
             );
           })}

@@ -12,6 +12,7 @@ import { api, ApiRequestError, getAllMatches, type ApiBrand, type ApiMatch, type
 import { useToast } from "@/hooks/use-toast";
 
 const ACCENT = "#7c3aed";
+const CARD_REASON_LIMIT = 5;
 const TIMING_COPY = "Brand campaign calendars are often planned months in advance. Research upcoming campaigns and reach out early.";
 
 function nicheOf(match: ApiMatch) {
@@ -225,7 +226,7 @@ function BrandCard({ match, index, onOpen, saved, onToggleSave }: {
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Why it's a match</p>
         {match.reasons.length ? (
           <ul className="flex flex-col gap-3">
-            {match.reasons.map((reason, index) => (
+            {match.reasons.slice(0, CARD_REASON_LIMIT).map((reason, index) => (
               <li key={index} className="flex items-start gap-2.5">
                 <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-primary" />
                 <span className="text-sm text-muted-foreground leading-relaxed">{reason}</span>
@@ -233,6 +234,16 @@ function BrandCard({ match, index, onOpen, saved, onToggleSave }: {
             ))}
           </ul>
         ) : <p className="text-sm text-muted-foreground">No match reasons were provided.</p>}
+        {match.reasons.length > CARD_REASON_LIMIT && (
+          <button type="button"
+            data-testid={`button-all-reasons-${id}`}
+            aria-label={`Show all ${match.reasons.length} match reasons for ${match.brand_name}`}
+            onClick={(event) => { event.stopPropagation(); onOpen(); }}
+            onKeyDown={(event) => event.stopPropagation()}
+            className="self-start rounded-md text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card">
+            Show all {match.reasons.length}
+          </button>
+        )}
         <div className="mt-1 px-4 py-3 rounded-xl bg-[hsl(240_10%_8%)] border border-border flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-bold text-white leading-snug">Contact Intel</p>

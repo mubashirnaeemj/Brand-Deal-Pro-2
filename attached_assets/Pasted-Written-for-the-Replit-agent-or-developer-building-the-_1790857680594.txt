@@ -1,0 +1,59 @@
+Written for: the Replit agent or developer building the matches-page pop-up.
+
+---
+
+### `GET /matches/me/brands/{brand_raw_id}/posts`
+
+Returns a matched brand's confirmed creator partnership posts, newest first. Use it when the user clicks a brand on the matches page, and show the result in a pop-up.
+
+**Auth:** uses the logged-in user's `access_token` cookie. Call it with `credentials: 'include'`.
+
+**Path parameter:** `brand_raw_id` (integer). It's the `brand_raw_id` field of each item returned by `GET /matches/me`.
+
+**Example request**
+```js
+fetch(`${API_BASE}/matches/me/brands/${brandRawId}/posts`, { credentials: 'include' })
+```
+
+**Example response (200)**
+```json
+{
+  "brand_raw_id": 2359,
+  "brand_name": "iFIT",
+  "posts": [
+    {
+      "source": "instagram",
+      "post_url": "https://www.instagram.com/p/DdEqfZROKus/",
+      "post_date": "2026-09-09",
+      "sponsorship_confidence": 100,
+      "creators": ["ashkickn"]
+    }
+  ]
+}
+```
+
+**Fields in each post**
+
+| Field | Meaning |
+|---|---|
+| `post_url` | Link to the Instagram post |
+| `post_date` | Date the post was published, `YYYY-MM-DD`, or `null` if unknown |
+| `creators` | Instagram usernames of the creators, without `@`. Can contain more than one. |
+| `source`, `sponsorship_confidence` | Internal only. Don't display them. |
+
+`posts` can be an empty array. In that case, show "No confirmed creator partnership posts for this brand yet."
+
+**Errors**
+- `401`: not logged in. Redirect to sign-in.
+- `403`: the user's profile isn't complete.
+- `404`: brand not found.
+
+**How to display each post**
+> **{brand_name}** collab with a creator **@{username}** on post url: {post_url as clickable link, opens in new tab}
+> {post_date formatted like "Sep 9, 2026"}
+
+If there are several creators, write "collab with creators @a, @b". Format `post_date` in UTC so it doesn't shift by a day.
+
+---
+
+One setup step on your side: the API only accepts cookie requests from websites listed in `FRONTEND_ORIGINS` in your API's `.env` ([config.py:64](config.py#L64)). If the Replit app runs on a different domain from the API, add its URL there, for example `https://your-app.replit.app`, or the browser will block the requests.

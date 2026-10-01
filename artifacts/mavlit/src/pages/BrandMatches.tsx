@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import BrandPartnershipPosts from "@/components/BrandPartnershipPosts";
 import { api, ApiRequestError, getAllMatches, type ApiBrand, type ApiMatch, type MatchesResponse, type SavedBrand } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -156,11 +157,7 @@ function ContactPanel({ match, onClose }: { match: ApiMatch; onClose: () => void
               </ul>
             ) : <p className="text-sm text-muted-foreground">No match reasons were provided.</p>}
           </div>
-          <div className="px-4 py-3 rounded-xl bg-white/[0.03] border border-border">
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              <span className="font-semibold text-white/50">Research tip:</span> Review {match.brand_name}'s previous creator partnerships before you pitch.
-            </p>
-          </div>
+          <BrandPartnershipPosts brandId={match.brand_raw_id} brandName={match.brand_name} />
         </div>
         <div className="px-6 py-5 border-t border-border shrink-0">
           <button type="button" onClick={() => { onClose(); navigate(`/pitch?brand=${encodeURIComponent(match.brand_name)}`); }}

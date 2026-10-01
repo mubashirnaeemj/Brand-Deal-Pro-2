@@ -103,6 +103,16 @@ export interface ApiMatch {
   reasons: string[];
 }
 
+export interface BrandPartnershipPosts {
+  brand_raw_id: number;
+  brand_name: string;
+  posts: {
+    post_url: string;
+    post_date: string | null;
+    creators: string[];
+  }[];
+}
+
 export interface MatchesResponse {
   matches: ApiMatch[];
   total: number;

@@ -5,6 +5,14 @@ description: External API authentication, pitch lifecycle, cookie transport, and
 
 # MAVLIT API Integration
 
+## Match ranking ownership
+
+Preserve the order of matches returned by the external API; do not re-sort them on the frontend.
+
+**Why:** The user states the backend already returns the correct best-first display order. Displayed rounded percentages are not a replacement for that ranking.
+
+**How to apply:** Keep backend ordering when updating match presentation, score breakdowns, or client-side filters.
+
 ## Auth model
 - Cookie-based JWT only — `credentials: "include"` on every request
 - `POST /auth/login` → sets `access_token` httpOnly cookie; response body is full CreatorProfile

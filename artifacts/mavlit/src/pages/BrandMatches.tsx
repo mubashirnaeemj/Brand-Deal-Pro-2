@@ -9,6 +9,7 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BrandPartnershipPosts from "@/components/BrandPartnershipPosts";
+import MatchScoreBreakdown from "@/components/MatchScoreBreakdown";
 import { api, ApiRequestError, getAllMatches, type ApiBrand, type ApiMatch, type MatchesResponse, type SavedBrand } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -29,7 +30,7 @@ function ScoreRing({ match, size = 56 }: { match: ApiMatch; size?: number }) {
   const radius = size / 2 - 6;
   const circumference = 2 * Math.PI * radius;
   const score = percent(Number.isFinite(match.total_score) ? match.total_score : 0);
-  const dimensions = Object.entries(match.dimensions ?? {});
+  const dimensions = match.dimensions ?? {};
 
   return (
     <div className="relative flex items-center justify-center cursor-default"
@@ -41,25 +42,8 @@ function ScoreRing({ match, size = 56 }: { match: ApiMatch; size?: number }) {
           strokeDasharray={`${score / 100 * circumference} ${circumference}`} strokeLinecap="round" />
       </svg>
       <span className="text-xs font-bold text-white z-10">{score}%</span>
-      {hovered && dimensions.length > 0 && (
-        <div className="absolute bottom-[calc(100%+8px)] right-0 z-[100] w-52 rounded-xl border border-border bg-[hsl(240_10%_6%)] shadow-2xl p-3 pointer-events-none">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2.5">Score Breakdown</p>
-          <div className="flex flex-col gap-2">
-            {dimensions.map(([key, detail]) => (
-              <div key={key}>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-[11px] text-muted-foreground">{key.replace(/[_-]/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2")}</span>
-                  <span className="text-[11px] font-bold text-white">{detail.score == null ? "N/A" : `${percent(detail.score)}%`}</span>
-                </div>
-                <div className="h-1 rounded-full bg-white/10 overflow-hidden">
-                  <div className="h-full rounded-full bg-primary transition-all duration-300"
-                    style={{ width: `${percent(detail.score ?? 0)}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="absolute bottom-[-5px] right-3 w-2.5 h-2.5 rotate-45 bg-[hsl(240_10%_6%)] border-r border-b border-border" />
-        </div>
+      {hovered && Object.keys(dimensions).length > 0 && (
+        <MatchScoreBreakdown dimensions={dimensions} />
       )}
     </div>
   );

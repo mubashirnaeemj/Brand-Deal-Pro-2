@@ -1,0 +1,76 @@
+Update the "Score breakdown" tooltip on the matches page (the one shown when hovering a brand's "% match" badge) to match the new backend scoring. Do not change the API calls, the badge, or the order of the brands.
+
+## What the API returns now
+GET /matches/me?limit=100 returns `matches`, already sorted in the correct display order (best first). Do NOT re-sort them on the frontend.
+
+Each match looks like this:
+{
+  "brand_raw_id": 123,
+  "brand_name": "Ulta Beauty",
+  "niche": "Beauty",
+  "total_score": 0.859,
+  "dimensions": {
+    "base":               {"score": 1.0,  "weight": 0.45},
+    "niche_tier":         {"score": 1.0,  "weight": 0.082},
+    "recent_partnership": {"score": 0.75, "weight": 0.065},
+    "niche_creators":     {"score": 1.0,  "weight": 0.057},
+    "similar_partners":   {"score": 0.0,  "weight": 0.049},
+    "same_niche":         {"score": 1.0,  "weight": 0.041},
+    "creator_size":       {"score": 0.56, "weight": 0.041},
+    "follower_range":     {"score": 0.0,  "weight": 0.033},
+    "verified_contact":   {"score": 1.0,  "weight": 0.033},
+    "tag_overlap":        {"score": 0.0,  "weight": 0.016},
+    "youtube_sponsor":    {"score": 1.0,  "weight": 0.016},
+    "brand_tier":         {"score": 0.0,  "weight": 0.008},
+    "latest_product":     {"score": 1.0,  "weight": 0.008}
+  },
+  "reasons": ["...", "..."]
+}
+
+- `total_score` is 0.55–1.0. The badge stays as is: Math.round(total_score * 100) + "% match".
+- `dimensions[key].score` is 0–1 = how much of that signal's own maximum the brand earned (e.g. 0.75 = 75%).
+- Ignore `weight` and ignore the `base` dimension. Do not show them.
+- The old keys (niche_match, sponsorship_activity, creator_tier_fit, semantic_similarity, platform_match) no longer exist. Remove all code and labels for them.
+
+## How to render the tooltip
+Title: "Score breakdown". Then one row per signal, in exactly this order, with these labels:
+
+| key                | label                    | type   |
+|--------------------|--------------------------|--------|
+| niche_tier         | Niche priority           | graded |
+| recent_partnership | Recent paid partnership  | graded |
+| niche_creators     | Niche + creators match   | graded |
+| similar_partners   | Similar partners         | graded |
+| creator_size       | Creator size             | graded |
+| brand_tier         | Brand tier               | graded |
+| same_niche         | Same niche               | yes/no |
+| follower_range     | Follower range           | yes/no |
+| verified_contact   | Verified contact         | yes/no |
+| tag_overlap        | Tag overlap              | yes/no |
+| youtube_sponsor    | YouTube sponsor          | yes/no |
+| latest_product     | Latest product           | yes/no |
+
+Rules:
+1. If a key is missing from `dimensions`, skip that row.
+2. Graded rows: show the percentage Math.round(score * 100) + "%" (e.g. 75%), using the existing value colour. If score is 0, hide the row entirely.
+3. Yes/no rows: ALWAYS show them. If score > 0, show a green tick "✓" (colour #22c55e). If score is 0, show a red cross "✗" (colour #f87171). Add aria-label "yes"/"no" for accessibility.
+4. Keep the existing row layout: label on the left, value on the right.
+
+## Example result for the JSON above
+Score breakdown
+Niche priority            100%
+Recent paid partnership   75%
+Niche + creators match    100%
+Creator size              56%
+Same niche                ✓
+Follower range            ✗
+Verified contact          ✓
+Tag overlap               ✗
+YouTube sponsor           ✓
+Latest product            ✓
+
+(similar_partners and brand_tier are hidden because they are graded with score 0.)
+
+## Done when
+- No reference to the old 5 dimension keys remains.
+- Hovering any brand's badge shows the tooltip exactly as described, and brands appear in the same order the API returns them.

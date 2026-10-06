@@ -223,7 +223,7 @@ function BrandCard({ match, index, onOpen, saved, onToggleSave }: {
             Show all {match.reasons.length}
           </button>
         )}
-        <div className="mt-1 px-4 py-3 rounded-xl bg-[hsl(240_10%_8%)] border border-border flex items-center justify-between gap-3">
+        <div className="mt-auto px-4 py-3 rounded-xl bg-[hsl(240_10%_8%)] border border-border flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-bold text-white leading-snug">Contact Intel</p>
             <p className="text-xs text-muted-foreground leading-snug">Open match for available details</p>

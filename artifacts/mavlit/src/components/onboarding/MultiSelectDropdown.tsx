@@ -1,6 +1,14 @@
 import { useMemo, useState } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 
+export function filterMultiSelectOptions(options: string[], query: string, selected: string[], tagSearch: boolean) {
+  const term = (tagSearch ? query.split(",").at(-1)?.trim() ?? "" : query).toLowerCase();
+  const picked = new Set(selected.map((value) => value.toLowerCase()));
+  return options.filter((option) => tagSearch
+    ? option.toLowerCase().startsWith(term) && !picked.has(option.toLowerCase())
+    : option.toLowerCase().includes(term));
+}
+
 export default function MultiSelectDropdown({
   label,
   options,
@@ -11,6 +19,9 @@ export default function MultiSelectDropdown({
   error,
   closeOnSelect = false,
   disabled = false,
+  hint,
+  tagSearch = false,
+  searchPlaceholder = "Search options",
 }: {
   label: string;
   options: string[];
@@ -21,12 +32,15 @@ export default function MultiSelectDropdown({
   error?: string;
   closeOnSelect?: boolean;
   disabled?: boolean;
+  hint?: string;
+  tagSearch?: boolean;
+  searchPlaceholder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const filtered = useMemo(
-    () => options.filter((option) => option.toLowerCase().includes(query.toLowerCase())),
-    [options, query],
+    () => filterMultiSelectOptions(options, query, selected, tagSearch),
+    [options, query, selected, tagSearch],
   );
 
   const toggle = (option: string) => {
@@ -79,13 +93,14 @@ export default function MultiSelectDropdown({
                   autoFocus
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search options"
+                  placeholder={searchPlaceholder}
                   className="w-full rounded-lg border border-border bg-secondary py-2 pl-9 pr-3 text-sm text-white outline-none focus:border-primary/60"
                 />
               </div>
             )}
             <div className="max-h-56 overflow-y-auto">
-              {filtered.map((option) => {
+              {hint && <p role="status" className="px-3 py-2 text-sm text-[#94a3b8] cursor-default">{hint}</p>}
+              {!hint && filtered.map((option) => {
                 const active = selected.includes(option);
                 return (
                   <button
@@ -101,7 +116,7 @@ export default function MultiSelectDropdown({
                   </button>
                 );
               })}
-              {!filtered.length && <p className="px-3 py-6 text-center text-sm text-muted-foreground">No matching options</p>}
+              {!hint && !filtered.length && <p className="px-3 py-6 text-center text-sm text-muted-foreground">No matching options</p>}
             </div>
             <button type="button" onClick={() => setOpen(false)}
               className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-xs font-semibold text-white hover:bg-secondary">

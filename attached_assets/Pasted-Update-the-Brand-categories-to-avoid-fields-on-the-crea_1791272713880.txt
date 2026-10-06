@@ -1,0 +1,51 @@
+Update the "Brand categories to avoid" fields on the creator profile page. They must now show brand TAGS for the creator's selected primary niche, instead of a list of brand niches. Do not change any other field, the save request shape, or the page layout.
+
+## Background
+There are two "Brand categories to avoid" inputs: one in the Instagram section (saved as `instagram_excluded_categories`) and one in the YouTube section (saved as `youtube_excluded_categories`). Each is a multi-select, comma-separated search-and-pick field. Each platform section also has its own "Primary niche" field (`instagram_primary_niche` / `youtube_primary_niche`, comma-separated, values like "Music", "Health", "Fitness", "Beauty").
+
+The backend now hard-filters matches by these values: any brand carrying one of the selected tags is removed from the creator's matches. So the options must be the real tag values from the API, spelled exactly as returned.
+
+## Stop using
+GET /brand-category-niches. Remove the code that loads it on page load and uses it as the avoid-field options.
+
+## New API
+GET /brand-category-tags?niche=<niche>&niche=<niche>...
+- Repeat `niche` for each niche (e.g. ?niche=music&niche=beauty).
+- Send the niche names lowercased and trimmed.
+- Response:
+  {
+    "tags_by_niche": {
+      "music":  ["A&R feedback", "acoustic guitars", "amplifiers", ...],
+      "beauty": ["acne treatment", "clean beauty", "skincare", ...]
+    }
+  }
+- Each key is exactly the niche string you sent. Each list is already deduped and sorted.
+- With no `niche` param it returns {"tags_by_niche": {}}.
+- Lists can be long (300–800 tags per niche).
+
+## Required behaviour (apply to both the Instagram and YouTube avoid fields, each using ITS OWN section's primary niche)
+1. Options come from the primary niche(s) currently selected in the same platform section: split that field's value on commas, trim, lowercase, drop empties.
+2. If no primary niche is selected, show one non-clickable hint row in the dropdown: "Select a primary niche first to see its brand tags." Show no options.
+3. Cache tags per niche in memory (e.g. an object keyed by lowercased niche). Only call the API for niches not cached yet, in one request with all missing niches. If a request fails, cache those niches as [] so it doesn't refetch on every keystroke.
+4. While fetching, show one non-clickable hint row: "Loading tags…". When the fetch finishes and the input still has focus, re-render the suggestions.
+5. If several primary niches are selected, merge their tag lists, dedupe case-insensitively (keep the first spelling seen), and sort alphabetically (case-insensitive).
+6. Filtering while typing works as it does today: match the text after the last comma against each tag (case-insensitive, starts-with), and hide tags that are already selected in the field.
+7. Clicking a suggestion adds the tag exactly as returned by the API (keep its original spelling and case). Selection, display and removal work exactly as before.
+8. Change the input placeholder of both fields to "Search and select tag(s) to avoid".
+9. Hint rows should look muted (e.g. colour #94a3b8), with no hover highlight and no pointer cursor.
+
+## Saving
+No change. The profile save request still sends:
+- `instagram_excluded_categories`: array of selected tag strings (or null if empty)
+- `youtube_excluded_categories`: same for YouTube
+- `excluded_categories`: the array for the creator's primary platform (first selected platform), as today.
+
+## Done when
+- With Primary niche = "Music", focusing the avoid field shows only Music tags from /brand-category-tags.
+- With no primary niche, the hint row appears and no API call is made.
+- Selecting e.g. "Health" also returns tags (the backend matches "Health" to "Health & Wellness").
+- No remaining references to /brand-category-niches.
+- Saved profiles store the chosen tag strings in the same fields as before.
+
+
+

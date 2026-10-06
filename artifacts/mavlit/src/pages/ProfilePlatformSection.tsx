@@ -103,7 +103,7 @@ function SharedDetails({
           searchable
         />
       </div>
-      <BrandCategoriesToAvoid selected={value.excludedCategories}
+      <BrandCategoriesToAvoid selected={value.excludedCategories} primaryNiches={value.primaryNiches}
         onChange={(excludedCategories) => set("excludedCategories", excludedCategories)} />
       <DescriptionModeSelector platform={platform} mode={descriptionMode}
         onChange={(mode) => {

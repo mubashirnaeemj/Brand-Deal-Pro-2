@@ -54,7 +54,7 @@ export default function InstagramStep({
         </DescriptionModeSelector>
       </div>
       <div className="mt-5">
-        <BrandCategoriesToAvoid selected={value.excludedCategories}
+        <BrandCategoriesToAvoid selected={value.excludedCategories} primaryNiches={value.niches}
           onChange={(excludedCategories) => set("excludedCategories", excludedCategories)} />
       </div>
     </div>

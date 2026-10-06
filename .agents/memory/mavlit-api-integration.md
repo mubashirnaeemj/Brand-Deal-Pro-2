@@ -13,6 +13,14 @@ Preserve the order of matches returned by the external API; do not re-sort them 
 
 **How to apply:** Keep backend ordering when updating match presentation, score breakdowns, or client-side filters.
 
+## Brand exclusion semantics
+
+The profile's "Brand categories to avoid" values are exact brand tags, not brand niches. The user states that the backend hard-filters out any brand carrying a selected tag.
+
+**Why:** Rewriting a tag's spelling or replacing it with a broad niche changes which brands the creator excludes.
+
+**How to apply:** Preserve API-provided tag strings in selections and saves. Each platform's tag suggestions must depend on that platform's own primary niches; do not silently discard existing exclusions when niches change.
+
 ## Auth model
 - Cookie-based JWT only — `credentials: "include"` on every request
 - `POST /auth/login` → sets `access_token` httpOnly cookie; response body is full CreatorProfile

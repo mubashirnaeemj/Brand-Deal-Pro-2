@@ -1,0 +1,59 @@
+Add a V1 / V2 switch to the Matches page. V1 is the existing matches list, which must keep working exactly as it does now. V2 is a new AI-ranked list from a new API. Do not change the creator profile page; the backend starts V2 ranking by itself when a profile is saved.
+
+## 1. Toggle
+- Under the page title and subtitle, add a pill-shaped segmented toggle with two buttons, "V1" and "V2". V1 is selected by default.
+- Selecting one shows that version's section and hides the other. Style the active button as filled (e.g. #0284c7 background, white text) and the inactive one as muted text.
+- Use role="tablist" / role="tab" and aria-selected for accessibility.
+- Remember the last choice in localStorage (key "mavlit_matches_version"; wrap reads and writes in try/catch) and restore it on page load.
+- Load V2 data the first time V2 is opened, not on page load.
+- V1 section: everything that exists today (toolbar, niche filter, Force refresh, cards, score breakdown tooltip), unchanged. Add a small muted note at the top: "V1 — rule-based scoring."
+
+## 2. V2 API
+All calls use credentials: 'include'. On 401, redirect to /signin?return_to=/matches (same as V1).
+
+GET /matches/me/v2 returns:
+{
+  "status": "completed",          // "idle" | "queued" | "running" | "completed" | "failed"
+  "error": null,                  // string when status is "failed"
+  "ranked_at": "2026-10-06T13:02:09+05:00",   // or null if never ranked
+  "total": 9,
+  "matches": [
+    {
+      "brand_raw_id": 1626,
+      "brand_name": "Dr.Reju-All",
+      "niche": "Beauty",          // may be null
+      "rank": 1,                  // 1 = best fit; the list is already sorted by rank
+      "confidence": 90,           // integer 0-100
+      "reason": "Direct beauty match - clinically proven Korean skincare aligns with the creator's focus."   // may be null
+    }
+  ]
+}
+
+POST /matches/me/v2/refresh (no body) starts a new AI ranking run and returns the same shape, usually with status "queued". If a run is already queued or running, it does nothing and returns the current state.
+
+## 3. V2 section layout
+- A muted note at the top: "V2 — AI ranking: an LLM compares your profile (niche, tags, description) with each brand's description and tags."
+- A toolbar, same style as V1's:
+  - left: meta text "Ranked <ranked_at as local date/time> — <total> brands" (empty if ranked_at is null)
+  - right: button "Re-rank with AI"
+- A list of cards in the API's order (do NOT re-sort). Use the same card style as V1. Each card:
+  - Header left: muted "#<rank>", then the brand name as a clickable button. Clicking it opens the existing "partnership posts" modal used by V1 (GET /matches/me/brands/{brand_raw_id}/posts). Reuse that modal and its code.
+  - Header right: a static (non-interactive) badge "<confidence>% fit", same look as V1's "% match" badge but with a default cursor and no tooltip.
+  - Body: the reason as one paragraph (light grey text, ~0.85rem). Omit it if reason is null.
+- Escape all API text before inserting it into HTML.
+
+## 4. V2 states
+- status "queued" or "running":
+  - Show at the top of the list: a small spinner and "AI is ranking your brands — this can take a minute or two." If matches is not empty, add " Showing your previous ranking until it finishes." and render those cards below.
+  - Disable the button and change its label to "Ranking…".
+  - Poll GET /matches/me/v2 every 5 seconds until status is no longer queued/running. Clear the timer before starting a new one, so there is never more than one poll running.
+- status "failed": show "AI ranking failed: <error>. Try "Re-rank with AI"." in the error colour (#f87171), then any previous matches below. Enable the button.
+- status "idle" with no matches: "No AI ranking yet. It runs automatically when you save your creator profile, or click "Re-rank with AI"."
+- status "completed" with no matches: "The AI ranking found no brands for your profile."
+- Re-rank button: POST /matches/me/v2/refresh, render the response, which starts polling. On error, re-enable the button and show the error message.
+
+## Done when
+- The V1 tab looks and behaves exactly as before.
+- The V2 tab shows ranked cards (#rank, brand name, "NN% fit", reason) in API order; clicking a brand opens the posts modal.
+- "Re-rank with AI" shows the progress message, polls, and updates the list when the status becomes "completed".
+- Reloading the page reopens whichever tab was last selected.

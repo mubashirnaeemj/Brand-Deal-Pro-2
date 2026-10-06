@@ -115,7 +115,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unauthorized = () => {
       queryClient.clear();
       setUser(null);
-      navigate("/signin");
+      const matchesPage = /\/(?:brand-matches|matches)\/?$/.test(window.location.pathname);
+      navigate(matchesPage ? "/signin?return_to=/matches" : "/signin");
     };
     const incomplete = () => {
       setUser((current) => current ? { ...current, onboarding_completed: false } : current);

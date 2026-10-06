@@ -13,6 +13,14 @@ Preserve the order of matches returned by the external API; do not re-sort them 
 
 **How to apply:** Keep backend ordering when updating match presentation, score breakdowns, or client-side filters.
 
+## AI match ranking lifecycle
+
+The external backend starts V2 AI ranking when a creator profile is saved; the client should only request a re-rank when the creator explicitly clicks the re-rank control.
+
+**Why:** The user specified that profile saves already trigger V2 ranking automatically. An extra frontend trigger would duplicate potentially expensive ranking work.
+
+**How to apply:** Keep V1 and V2 results separate; never sort either list on the client. Poll an in-progress V2 run until it reaches a final state, while preserving any previous results returned by the API.
+
 ## Brand exclusion semantics
 
 The profile's "Brand categories to avoid" values are exact brand tags, not brand niches. The user states that the backend hard-filters out any brand carrying a selected tag.

@@ -10,6 +10,9 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BrandPartnershipPosts from "@/components/BrandPartnershipPosts";
 import MatchScoreBreakdown from "@/components/MatchScoreBreakdown";
+import AiMatchesSection from "@/components/AiMatchesSection";
+import useAiMatches from "@/hooks/useAiMatches";
+import type { AiRankedMatch } from "@/lib/aiMatches";
 import { api, ApiRequestError, getAllMatches, type ApiBrand, type ApiMatch, type MatchesResponse, type SavedBrand } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -62,7 +65,7 @@ function CopyEmailButton({ email }: { email: string }) {
   );
 }
 
-function ContactPanel({ match, onClose }: { match: ApiMatch; onClose: () => void }) {
+function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onClose: () => void; fitConfidence?: number }) {
   const [, navigate] = useLocation();
   const { data: detail, isLoading } = useQuery<ApiBrand>({
     queryKey: ["brand", match.brand_raw_id],
@@ -97,7 +100,9 @@ function ContactPanel({ match, onClose }: { match: ApiMatch; onClose: () => void
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <ScoreRing match={match} size={44} />
+            {fitConfidence === undefined ? <ScoreRing match={match} size={44} /> : (
+              <span className="rounded-full border border-primary/30 bg-primary/15 px-3 py-1 text-xs font-bold text-white cursor-default">{fitConfidence}% fit</span>
+            )}
             <button type="button" onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-white hover:bg-white/5">
               <X size={16} />
@@ -248,6 +253,18 @@ export default function BrandMatches() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeCategory, setActiveCategory] = useState("All");
+  const [version, setVersion] = useState<"v1" | "v2">(() => {
+    try { return localStorage.getItem("mavlit_matches_version") === "v2" ? "v2" : "v1"; }
+    catch { return "v1"; }
+  });
+  const aiMatches = useAiMatches(version === "v2");
+  const [selectedAiMatch, setSelectedAiMatch] = useState<AiRankedMatch | null>(null);
+  const changeVersion = (next: "v1" | "v2") => {
+    setVersion(next);
+    setSelectedMatch(null);
+    setSelectedAiMatch(null);
+    try { localStorage.setItem("mavlit_matches_version", next); } catch { /* Storage can be unavailable in embedded previews. */ }
+  };
   const [selectedMatch, setSelectedMatch] = useState<ApiMatch | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -334,21 +351,40 @@ export default function BrandMatches() {
             </div>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-4">
               <h1 className="text-4xl font-extrabold text-white tracking-tight">Your Brand Matches</h1>
-              <button type="button" onClick={refreshMatches} disabled={refreshing || isLoading}
+              {version === "v1" && <button type="button" onClick={refreshMatches} disabled={refreshing || isLoading}
                 className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-white transition hover:border-primary/50 hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50">
                 <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
                 {refreshing ? "Refreshing…" : "Refresh matches"}
-              </button>
+              </button>}
             </div>
             <p className="text-muted-foreground text-base max-w-xl">
-              {isLoading ? "Finding your brand matches…" : isError ? "Unable to load your matches." : (
+              {version === "v2" ? "Explore brands ranked by AI for your creator profile." : isLoading ? "Finding your brand matches…" : isError ? "Unable to load your matches." : (
                 <>MAVLIT found <span className="text-white font-semibold">{matches?.length ?? 0} high-fit brands</span> based on your audience data, content style, and engagement metrics.</>
               )}
             </p>
-            {refreshError && <p role="alert" className="mt-3 text-sm text-red-400">{refreshError}</p>}
-            {refreshSuccess && <p role="status" className="mt-3 text-sm text-emerald-400">Matches refreshed.</p>}
+            <div role="tablist" aria-label="Matches version" className="mt-5 inline-flex gap-1 rounded-full border border-border bg-card p-1"
+              onKeyDown={(event) => {
+                if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                event.preventDefault();
+                const next = event.key === "Home" ? "v1" : event.key === "End" ? "v2" : version === "v1" ? "v2" : "v1";
+                changeVersion(next);
+                event.currentTarget.querySelector<HTMLButtonElement>(`#matches-tab-${next}`)?.focus();
+              }}>
+              {(["v1", "v2"] as const).map((item) => (
+                <button key={item} id={`matches-tab-${item}`} type="button" role="tab"
+                  aria-selected={version === item} aria-controls={`matches-panel-${item}`}
+                  tabIndex={version === item ? 0 : -1} onClick={() => changeVersion(item)}
+                  className={`rounded-full px-5 py-2 text-sm font-semibold transition ${version === item ? "bg-[#0284c7] text-white" : "text-muted-foreground hover:text-white"}`}>
+                  {item.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            {version === "v1" && refreshError && <p role="alert" className="mt-3 text-sm text-red-400">{refreshError}</p>}
+            {version === "v1" && refreshSuccess && <p role="status" className="mt-3 text-sm text-emerald-400">Matches refreshed.</p>}
           </motion.div>
 
+          <section id="matches-panel-v1" role="tabpanel" aria-labelledby="matches-tab-v1" hidden={version !== "v1"}>
+          <p className="mb-5 text-xs text-muted-foreground">V1 — rule-based scoring.</p>
           {!isLoading && !isError && matches && (
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.15 }} className="flex items-center gap-3 mb-8 flex-wrap">
@@ -368,7 +404,6 @@ export default function BrandMatches() {
               </span>
             </motion.div>
           )}
-
           {isLoading ? (
             <p role="status" className="py-24 text-center text-muted-foreground">Loading matches…</p>
           ) : isError ? (
@@ -401,11 +436,21 @@ export default function BrandMatches() {
               )}
             </AnimatePresence>
           )}
+          </section>
+          {version === "v2" && <section id="matches-panel-v2" role="tabpanel" aria-labelledby="matches-tab-v2">
+            <AiMatchesSection data={aiMatches.data} loading={aiMatches.loading} error={aiMatches.error}
+              refreshing={aiMatches.refreshing} onRefresh={aiMatches.refresh} onOpen={setSelectedAiMatch} />
+          </section>}
         </div>
       </main>
       <Footer />
       <AnimatePresence>
         {selectedMatch && <ContactPanel match={selectedMatch} onClose={() => setSelectedMatch(null)} />}
+        {selectedAiMatch && <ContactPanel fitConfidence={selectedAiMatch.confidence}
+          match={{ brand_raw_id: selectedAiMatch.brand_raw_id, brand_name: selectedAiMatch.brand_name,
+            niche: selectedAiMatch.niche, total_score: selectedAiMatch.confidence / 100, dimensions: {},
+            reasons: selectedAiMatch.reason ? [selectedAiMatch.reason] : [] }}
+          onClose={() => setSelectedAiMatch(null)} />}
       </AnimatePresence>
     </div>
   );

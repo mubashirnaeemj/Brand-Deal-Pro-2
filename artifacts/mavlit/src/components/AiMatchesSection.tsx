@@ -1,5 +1,5 @@
 import { RefreshCw, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AiMatchesResponse, AiRankedMatch } from "@/lib/aiMatches";
 import AiMatchCard from "./AiMatchCard";
 
@@ -10,6 +10,38 @@ interface Props {
   refreshing: boolean;
   onRefresh: () => void;
   onOpen: (match: AiRankedMatch) => void;
+}
+
+const RANKING_MESSAGES = [
+  "AI is organizing brands according to your profile…",
+  "Matching your niche and content with every brand…",
+  "Reading brand descriptions and tags…",
+  "Organizing brands by relevance to your content…",
+  "Finding the brands that fit you best…",
+  "Refining your top matches…",
+];
+
+function AiRankingStatus() {
+  const [messageIndex, setMessageIndex] = useState(0);
+
+  useEffect(() => {
+    let current = Math.floor(Math.random() * RANKING_MESSAGES.length);
+    setMessageIndex(current);
+    const timer = window.setInterval(() => {
+      // Choose a different message without restarting on API polling updates.
+      current = (current + 1 + Math.floor(Math.random() * (RANKING_MESSAGES.length - 1))) % RANKING_MESSAGES.length;
+      setMessageIndex(current);
+    }, 3_500);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <p role="status" aria-live="polite" aria-atomic="true" data-testid="status-ai-pending"
+      className="mb-5 flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 size={14} aria-hidden="true" className="animate-spin shrink-0" />
+      <span>{RANKING_MESSAGES[messageIndex]}</span>
+    </p>
+  );
 }
 
 function formatRanked(value: string | null | undefined) {
@@ -48,15 +80,7 @@ export default function AiMatchesSection({ data, loading, error, refreshing, onR
         <p role="status" className="py-16 text-center text-muted-foreground">Loading AI matches…</p>
       ) : (
         <>
-          {pending && (
-            <p role="status" data-testid="status-ai-pending" className="mb-5 flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 size={14} className="animate-spin shrink-0" />
-              <span>
-                AI is ranking your brands — this can take a minute or two.
-                {matches.length > 0 ? " Showing your previous ranking until it finishes." : ""}
-              </span>
-            </p>
-          )}
+          {busy && <AiRankingStatus />}
           {status === "failed" && (
             <p role="alert" data-testid="text-ai-failed" className="mb-5 text-sm" style={{ color: "#f87171" }}>
               AI ranking failed: {data?.error ?? "Unknown error"}. Try "Re-rank with AI".

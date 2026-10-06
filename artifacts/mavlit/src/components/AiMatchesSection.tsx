@@ -1,46 +1,38 @@
 import { RefreshCw, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import type { AiMatchesResponse, AiRankedMatch } from "@/lib/aiMatches";
+import { motion, useReducedMotion } from "framer-motion";
+import type { AiMatchesResponse, AiRankedMatch, AiMatchesVersion } from "@/lib/aiMatches";
 import AiMatchCard from "./AiMatchCard";
 
 interface Props {
+  version: AiMatchesVersion;
   data?: AiMatchesResponse;
   loading: boolean;
   error: string | null;
   refreshing: boolean;
   onRefresh: () => void;
   onOpen: (match: AiRankedMatch) => void;
+  progressMessage: string;
+  expandedByBrand: Record<number, boolean>;
+  onToggleReasons: (brandId: number) => void;
 }
 
-const RANKING_MESSAGES = [
-  "AI is organizing brands according to your profile…",
-  "Matching your niche and content with every brand…",
-  "Reading brand descriptions and tags…",
-  "Organizing brands by relevance to your content…",
-  "Finding the brands that fit you best…",
-  "Refining your top matches…",
-];
-
-function AiRankingStatus() {
-  const [messageIndex, setMessageIndex] = useState(0);
-
-  useEffect(() => {
-    let current = Math.floor(Math.random() * RANKING_MESSAGES.length);
-    setMessageIndex(current);
-    const timer = window.setInterval(() => {
-      // Choose a different message without restarting on API polling updates.
-      current = (current + 1 + Math.floor(Math.random() * (RANKING_MESSAGES.length - 1))) % RANKING_MESSAGES.length;
-      setMessageIndex(current);
-    }, 3_500);
-    return () => window.clearInterval(timer);
-  }, []);
-
+function AiRankingStatus({ message, hasPreviousMatches }: { message: string; hasPreviousMatches: boolean }) {
+  const reducedMotion = useReducedMotion();
   return (
-    <p role="status" aria-live="polite" aria-atomic="true" data-testid="status-ai-pending"
-      className="mb-5 flex items-center gap-2 text-sm text-muted-foreground">
-      <Loader2 size={14} aria-hidden="true" className="animate-spin shrink-0" />
-      <span>{RANKING_MESSAGES[messageIndex]}</span>
-    </p>
+    <div role="status" aria-live="polite" aria-atomic="true" data-testid="status-ai-pending" className="mb-5">
+      <div className="flex items-center gap-2 text-sm text-[#e2e8f0]">
+        <Loader2 size={14} aria-hidden="true" className="animate-spin shrink-0" />
+        <motion.span key={message} initial={{ opacity: reducedMotion ? 1 : 0 }} animate={{ opacity: 1 }}
+          transition={{ duration: reducedMotion ? 0 : 0.35 }}>
+          {message}
+        </motion.span>
+      </div>
+      <p className="mt-1 ml-[22px] text-xs text-[#64748b]">
+        {hasPreviousMatches
+          ? "This can take a minute or two — your previous ranking is shown below until it finishes."
+          : "This can take a minute or two."}
+      </p>
+    </div>
   );
 }
 
@@ -51,8 +43,8 @@ function formatRanked(value: string | null | undefined) {
   return date.toLocaleString();
 }
 
-export default function AiMatchesSection({ data, loading, error, refreshing, onRefresh, onOpen }: Props) {
-  const [expandedByBrand, setExpandedByBrand] = useState<Record<number, boolean>>({});
+export default function AiMatchesSection({ version, data, loading, error, refreshing, onRefresh, onOpen,
+  progressMessage, expandedByBrand, onToggleReasons }: Props) {
   const status = data?.status;
   const pending = status === "queued" || status === "running";
   const matches = data?.matches ?? [];
@@ -61,9 +53,11 @@ export default function AiMatchesSection({ data, loading, error, refreshing, onR
   const meta = ranked ? `Ranked ${ranked} — ${data?.total ?? matches.length} brands` : "";
 
   return (
-    <section data-testid="section-matches-v2">
+    <section data-testid={`section-matches-${version}`}>
       <p className="mb-4 text-xs text-muted-foreground">
-        V2 — AI ranking: an LLM compares your profile (niche, tags, description) with each brand's description and tags.
+        {version === "v3"
+          ? "V3 — AI ranking that weighs how well each brand fits your profile and its match evidence (the reasons under each brand) equally."
+          : "V2 — AI ranking: an LLM compares your profile (niche, tags, description) with each brand's description and tags."}
       </p>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm text-muted-foreground" data-testid="text-ai-meta">{meta}</span>
@@ -80,7 +74,7 @@ export default function AiMatchesSection({ data, loading, error, refreshing, onR
         <p role="status" className="py-16 text-center text-muted-foreground">Loading AI matches…</p>
       ) : (
         <>
-          {busy && <AiRankingStatus />}
+          {busy && <AiRankingStatus message={progressMessage} hasPreviousMatches={matches.length > 0} />}
           {status === "failed" && (
             <p role="alert" data-testid="text-ai-failed" className="mb-5 text-sm" style={{ color: "#f87171" }}>
               AI ranking failed: {data?.error ?? "Unknown error"}. Try "Re-rank with AI".
@@ -99,9 +93,7 @@ export default function AiMatchesSection({ data, loading, error, refreshing, onR
               {matches.map((match) => (
                 <AiMatchCard key={match.brand_raw_id} match={match}
                   expanded={expandedByBrand[match.brand_raw_id] ?? false}
-                  onToggle={() => setExpandedByBrand((previous) => ({
-                    ...previous, [match.brand_raw_id]: !previous[match.brand_raw_id],
-                  }))}
+                  onToggle={() => onToggleReasons(match.brand_raw_id)}
                   onOpen={() => onOpen(match)} />
               ))}
             </div>

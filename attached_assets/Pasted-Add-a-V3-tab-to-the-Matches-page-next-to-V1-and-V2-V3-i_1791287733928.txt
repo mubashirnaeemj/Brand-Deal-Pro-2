@@ -1,0 +1,60 @@
+Add a V3 tab to the Matches page, next to V1 and V2. V3 is a second AI ranking with exactly the same API shape and card layout as V2. Also add rotating progress messages to both V2 and V3 while a ranking runs. Do not change V1, the creator profile page, or any other page. The backend starts V3 ranking by itself when a profile is saved.
+
+## 1. Toggle and section
+- Add a third button "V3" to the existing V1/V2 pill toggle (same style, role="tab", aria-selected).
+- Add a V3 section, hidden unless V3 is selected, with the same structure as the V2 section:
+  - Muted note at the top: "V3 — AI ranking that weighs how well each brand fits your profile and its match evidence (the reasons under each brand) equally."
+  - Toolbar: left = meta text "Ranked <ranked_at as local date/time> — <total> brands" (empty if ranked_at is null); right = button "Re-rank with AI".
+  - A list container for the cards.
+- Selecting a tab shows only that tab's section. Save the choice in localStorage key "mavlit_matches_version" (values "v1", "v2", "v3"; wrap reads and writes in try/catch) and restore it on page load.
+- Load V3 data the first time the V3 tab is opened (same as V2), not on page load.
+
+## 2. V3 API (same response shape as V2)
+GET /matches/me/v3 and POST /matches/me/v3/refresh return exactly what the V2 endpoints return:
+{
+  "status": "completed",            // "idle" | "queued" | "running" | "completed" | "failed"
+  "error": null,
+  "ranked_at": "2026-10-06T15:10:00+05:00",
+  "total": 22,
+  "matches": [
+    {
+      "brand_raw_id": 1594, "brand_name": "IcyHot", "niche": "Health",
+      "rank": 1, "confidence": 85,
+      "reason": "Topical pain relief fits athlete recovery content, and they ran a paid partnership in the last 3 months.",
+      "reasons": ["IcyHot ran a paid partnership within the last 3 months.", "..."]
+    }
+  ]
+}
+Use credentials: 'include'. On 401, redirect to /signin?return_to=/matches.
+
+## 3. Share the V2 code, don't copy it
+Refactor the existing V2 logic into functions that take a version ("v2" or "v3") and use them for both tabs:
+- loadAi(version): GET /matches/me/<version>
+- rerankAi(version): POST /matches/me/<version>/refresh
+- renderAi(version, data)
+- toggleAiReasons(version, brandId)
+Keep separate state per version: loaded flag, poll timer, last response, expanded brand ids. Expanding a card in V2 must not affect V3, and vice versa.
+Render V3 exactly like V2: card header "#<rank>" + brand name button (opens the existing partnership-posts modal) + static "<confidence>% fit" badge; then the AI `reason` paragraph; then the `reasons` tagline list with the same 5-item preview and "Show all N reasons" / "Show less" toggle as V1/V2. Escape all API text. Do NOT re-sort; keep the API order.
+States are the same as V2 for each version: busy (queued/running) → poll every 5s and disable the button with label "Ranking…"; failed → error message plus enabled button; idle with no matches → "No AI ranking yet. It runs automatically when you save your creator profile, or click "Re-rank with AI"."; completed with no matches → "The AI ranking found no brands for your profile."
+
+## 4. Rotating progress messages (V2 and V3)
+While a version's status is queued or running, replace the old one-line busy text with:
+- Line 1: a small spinner, then a rotating message (light text, #e2e8f0), with aria-live="polite".
+- Line 2 (small, muted #64748b, indented to line up with the text): "This can take a minute or two — your previous ranking is shown below until it finishes." If there are no previous matches, show just "This can take a minute or two."
+Rotating messages (pick a random one every 5 seconds, never the same one twice in a row):
+  1. AI is organizing brands according to your profile…
+  2. Matching your niche and content with every brand…
+  3. Reading brand descriptions and tags…
+  4. Shuffling brands into the perfect order…
+  5. Finding the brands that fit you best…
+  6. Polishing your top matches…
+Requirements:
+- Fade between messages (opacity 0 → 1 over ~0.35s).
+- Use ONE shared rotation timer for both versions (V2 and V3 can run at the same time after a profile save). It must keep running across the 5-second polling re-renders: render the current message from shared state instead of restarting the rotation on each render.
+- Start the timer when any version is busy; stop it when none is.
+
+## Done when
+- V1, V2 and V3 tabs switch correctly, and the page reopens on the last-selected tab.
+- V3 shows ranked cards from /matches/me/v3 with AI reason + taglines, exactly like V2.
+- "Re-rank with AI" on V3 shows the rotating messages, polls, and refreshes the list when the status becomes "completed". The same rotating messages appear on V2 while it ranks.
+- V1 looks and behaves exactly as before.

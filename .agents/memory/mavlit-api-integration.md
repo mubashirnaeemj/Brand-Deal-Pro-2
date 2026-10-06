@@ -15,11 +15,11 @@ Preserve the order of matches returned by the external API; do not re-sort them 
 
 ## AI match ranking lifecycle
 
-The external backend starts V2 AI ranking when a creator profile is saved; the client should only request a re-rank when the creator explicitly clicks the re-rank control.
+The external backend starts both V2 and V3 AI ranking when a creator profile is saved; the client should only request a re-rank when the creator explicitly clicks the re-rank control.
 
-**Why:** The user specified that profile saves already trigger V2 ranking automatically. An extra frontend trigger would duplicate potentially expensive ranking work.
+**Why:** The user specified that profile saves already trigger V2 and V3 ranking automatically. An extra frontend trigger would duplicate potentially expensive ranking work.
 
-**How to apply:** Keep V1 and V2 results separate; never sort either list on the client. The user repeatedly specifies that V2-only updates must leave V1's appearance and behavior unchanged. Poll an in-progress V2 run until it reaches a final state, while preserving any previous results returned by the API.
+**How to apply:** Keep all versions' results separate; never sort their lists on the client. The user repeatedly specifies that AI-tab updates must leave V1's appearance and behavior unchanged. AI tabs load lazily when opened; keep known in-progress runs polling until final states, including when another Matches tab is selected, while preserving previous results. Use one shared progress-message rotation for both AI versions, not one per tab.
 
 ## Brand exclusion semantics
 

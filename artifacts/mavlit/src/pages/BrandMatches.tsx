@@ -13,12 +13,15 @@ import BrandMatchReasons, { CARD_REASON_LIMIT } from "@/components/BrandMatchRea
 import MatchScoreBreakdown from "@/components/MatchScoreBreakdown";
 import AiMatchesSection from "@/components/AiMatchesSection";
 import useAiMatches from "@/hooks/useAiMatches";
-import type { AiRankedMatch } from "@/lib/aiMatches";
+import useAiRankingMessage from "@/hooks/useAiRankingMessage";
+import { isAiRanking, type AiRankedMatch, type AiMatchesVersion } from "@/lib/aiMatches";
 import { api, ApiRequestError, getAllMatches, type ApiBrand, type ApiMatch, type MatchesResponse, type SavedBrand } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 const ACCENT = "#7c3aed";
 const TIMING_COPY = "Brand campaign calendars are often planned months in advance. Research upcoming campaigns and reach out early.";
+const MATCH_VERSIONS = ["v1", "v2", "v3"] as const;
+type MatchesVersion = typeof MATCH_VERSIONS[number];
 
 function nicheOf(match: ApiMatch) {
   return match.niche?.trim() || "Uncategorized";
@@ -246,13 +249,30 @@ export default function BrandMatches() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeCategory, setActiveCategory] = useState("All");
-  const [version, setVersion] = useState<"v1" | "v2">(() => {
-    try { return localStorage.getItem("mavlit_matches_version") === "v2" ? "v2" : "v1"; }
+  const [version, setVersion] = useState<MatchesVersion>(() => {
+    try {
+      const stored = localStorage.getItem("mavlit_matches_version");
+      return stored === "v2" || stored === "v3" ? stored : "v1";
+    }
     catch { return "v1"; }
   });
-  const aiMatches = useAiMatches(version === "v2");
+  const v2Matches = useAiMatches("v2", version === "v2");
+  const v3Matches = useAiMatches("v3", version === "v3");
+  const aiMatchesByVersion = { v2: v2Matches, v3: v3Matches };
+  const progressMessage = useAiRankingMessage(
+    v2Matches.refreshing || v3Matches.refreshing || isAiRanking(v2Matches.data) || isAiRanking(v3Matches.data),
+  );
+  const [expandedAiReasons, setExpandedAiReasons] = useState<Record<AiMatchesVersion, Record<number, boolean>>>({
+    v2: {}, v3: {},
+  });
+  const toggleAiReasons = (aiVersion: AiMatchesVersion, brandId: number) => {
+    setExpandedAiReasons((previous) => ({
+      ...previous,
+      [aiVersion]: { ...previous[aiVersion], [brandId]: !previous[aiVersion][brandId] },
+    }));
+  };
   const [selectedAiMatch, setSelectedAiMatch] = useState<AiRankedMatch | null>(null);
-  const changeVersion = (next: "v1" | "v2") => {
+  const changeVersion = (next: MatchesVersion) => {
     setVersion(next);
     setSelectedMatch(null);
     setSelectedAiMatch(null);
@@ -329,6 +349,13 @@ export default function BrandMatches() {
   const categories = ["All", ...new Set((matches ?? []).map(nicheOf))];
   const filtered = activeCategory === "All" ? matches ?? [] : (matches ?? []).filter((match) => nicheOf(match) === activeCategory);
 
+  const renderAi = (aiVersion: AiMatchesVersion, data: ReturnType<typeof useAiMatches>) => (
+    <AiMatchesSection version={aiVersion} data={data.data} loading={data.loading} error={data.error}
+      refreshing={data.refreshing} onRefresh={data.refresh} onOpen={setSelectedAiMatch}
+      progressMessage={progressMessage} expandedByBrand={expandedAiReasons[aiVersion]}
+      onToggleReasons={(brandId) => toggleAiReasons(aiVersion, brandId)} />
+  );
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <Navbar />
@@ -351,7 +378,7 @@ export default function BrandMatches() {
               </button>}
             </div>
             <p className="text-muted-foreground text-base max-w-xl">
-              {version === "v2" ? "Explore brands ranked by AI for your creator profile." : isLoading ? "Finding your brand matches…" : isError ? "Unable to load your matches." : (
+              {version !== "v1" ? "Explore brands ranked by AI for your creator profile." : isLoading ? "Finding your brand matches…" : isError ? "Unable to load your matches." : (
                 <>MAVLIT found <span className="text-white font-semibold">{matches?.length ?? 0} high-fit brands</span> based on your audience data, content style, and engagement metrics.</>
               )}
             </p>
@@ -359,11 +386,14 @@ export default function BrandMatches() {
               onKeyDown={(event) => {
                 if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
                 event.preventDefault();
-                const next = event.key === "Home" ? "v1" : event.key === "End" ? "v2" : version === "v1" ? "v2" : "v1";
+                const index = MATCH_VERSIONS.indexOf(version);
+                const offset = event.key === "ArrowLeft" ? -1 : 1;
+                const next = event.key === "Home" ? "v1" : event.key === "End" ? "v3"
+                  : MATCH_VERSIONS[(index + offset + MATCH_VERSIONS.length) % MATCH_VERSIONS.length];
                 changeVersion(next);
                 event.currentTarget.querySelector<HTMLButtonElement>(`#matches-tab-${next}`)?.focus();
               }}>
-              {(["v1", "v2"] as const).map((item) => (
+              {MATCH_VERSIONS.map((item) => (
                 <button key={item} id={`matches-tab-${item}`} type="button" role="tab"
                   aria-selected={version === item} aria-controls={`matches-panel-${item}`}
                   tabIndex={version === item ? 0 : -1} onClick={() => changeVersion(item)}
@@ -430,10 +460,12 @@ export default function BrandMatches() {
             </AnimatePresence>
           )}
           </section>
-          {version === "v2" && <section id="matches-panel-v2" role="tabpanel" aria-labelledby="matches-tab-v2">
-            <AiMatchesSection data={aiMatches.data} loading={aiMatches.loading} error={aiMatches.error}
-              refreshing={aiMatches.refreshing} onRefresh={aiMatches.refresh} onOpen={setSelectedAiMatch} />
-          </section>}
+          {(["v2", "v3"] as const).map((aiVersion) => (
+            <section key={aiVersion} id={`matches-panel-${aiVersion}`} role="tabpanel"
+              aria-labelledby={`matches-tab-${aiVersion}`} hidden={version !== aiVersion}>
+              {version === aiVersion && renderAi(aiVersion, aiMatchesByVersion[aiVersion])}
+            </section>
+          ))}
         </div>
       </main>
       <Footer />

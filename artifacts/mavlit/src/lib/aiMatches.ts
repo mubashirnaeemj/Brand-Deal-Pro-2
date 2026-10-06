@@ -1,5 +1,7 @@
 import { api } from "./api";
 
+export type AiMatchesVersion = "v2" | "v3";
+
 export interface AiRankedMatch {
   brand_raw_id: number;
   brand_name: string;
@@ -36,10 +38,10 @@ export function validateAiMatches(value: AiMatchesResponse): AiMatchesResponse {
 
 export const isAiRanking = (data?: AiMatchesResponse) => data?.status === "queued" || data?.status === "running";
 
-export async function getAiMatches(signal?: AbortSignal) {
-  return validateAiMatches(await api.get<AiMatchesResponse>("/matches/me/v2", { signal }));
+export async function loadAi(version: AiMatchesVersion, signal?: AbortSignal) {
+  return validateAiMatches(await api.get<AiMatchesResponse>(`/matches/me/${version}`, { signal }));
 }
 
-export async function refreshAiMatches() {
-  return validateAiMatches(await api.post<AiMatchesResponse>("/matches/me/v2/refresh"));
+export async function rerankAi(version: AiMatchesVersion) {
+  return validateAiMatches(await api.post<AiMatchesResponse>(`/matches/me/${version}/refresh`));
 }

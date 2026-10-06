@@ -9,6 +9,7 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BrandPartnershipPosts from "@/components/BrandPartnershipPosts";
+import BrandMatchReasons, { CARD_REASON_LIMIT } from "@/components/BrandMatchReasons";
 import MatchScoreBreakdown from "@/components/MatchScoreBreakdown";
 import AiMatchesSection from "@/components/AiMatchesSection";
 import useAiMatches from "@/hooks/useAiMatches";
@@ -17,7 +18,6 @@ import { api, ApiRequestError, getAllMatches, type ApiBrand, type ApiMatch, type
 import { useToast } from "@/hooks/use-toast";
 
 const ACCENT = "#7c3aed";
-const CARD_REASON_LIMIT = 5;
 const TIMING_COPY = "Brand campaign calendars are often planned months in advance. Research upcoming campaigns and reach out early.";
 
 function nicheOf(match: ApiMatch) {
@@ -211,14 +211,7 @@ function BrandCard({ match, index, onOpen, saved, onToggleSave }: {
         <div className="h-px bg-border" />
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Why it's a match</p>
         {match.reasons.length ? (
-          <ul className="flex flex-col gap-3">
-            {match.reasons.slice(0, CARD_REASON_LIMIT).map((reason, index) => (
-              <li key={index} className="flex items-start gap-2.5">
-                <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-primary" />
-                <span className="text-sm text-muted-foreground leading-relaxed">{reason}</span>
-              </li>
-            ))}
-          </ul>
+          <BrandMatchReasons reasons={match.reasons.slice(0, CARD_REASON_LIMIT)} />
         ) : <p className="text-sm text-muted-foreground">No match reasons were provided.</p>}
         {match.reasons.length > CARD_REASON_LIMIT && (
           <button type="button"

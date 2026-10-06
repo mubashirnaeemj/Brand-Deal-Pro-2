@@ -7,6 +7,7 @@ export interface AiRankedMatch {
   rank: number;
   confidence: number;
   reason: string | null;
+  reasons?: string[];
 }
 
 export interface AiMatchesResponse {
@@ -26,7 +27,8 @@ export function validateAiMatches(value: AiMatchesResponse): AiMatchesResponse {
       && typeof match.brand_name === "string" && (match.niche === null || typeof match.niche === "string")
       && Number.isInteger(match.rank) && match.rank > 0
       && Number.isInteger(match.confidence) && match.confidence >= 0 && match.confidence <= 100
-      && (match.reason === null || typeof match.reason === "string"))) {
+      && (match.reason === null || typeof match.reason === "string")
+      && (match.reasons === undefined || (Array.isArray(match.reasons) && match.reasons.every((reason) => typeof reason === "string"))))) {
     throw new Error("Invalid AI ranking response");
   }
   return value;

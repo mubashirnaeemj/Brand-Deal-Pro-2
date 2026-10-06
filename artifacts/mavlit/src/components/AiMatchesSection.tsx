@@ -1,5 +1,7 @@
 import { RefreshCw, Loader2 } from "lucide-react";
+import { useState } from "react";
 import type { AiMatchesResponse, AiRankedMatch } from "@/lib/aiMatches";
+import AiMatchCard from "./AiMatchCard";
 
 interface Props {
   data?: AiMatchesResponse;
@@ -18,6 +20,7 @@ function formatRanked(value: string | null | undefined) {
 }
 
 export default function AiMatchesSection({ data, loading, error, refreshing, onRefresh, onOpen }: Props) {
+  const [expandedByBrand, setExpandedByBrand] = useState<Record<number, boolean>>({});
   const status = data?.status;
   const pending = status === "queued" || status === "running";
   const matches = data?.matches ?? [];
@@ -70,25 +73,12 @@ export default function AiMatchesSection({ data, loading, error, refreshing, onR
           {matches.length > 0 && (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {matches.map((match) => (
-                <article key={match.brand_raw_id} data-testid={`card-ai-brand-${match.brand_raw_id}`}
-                  className="flex flex-col rounded-2xl border border-border bg-card p-6">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-baseline gap-2">
-                      <span className="text-xs font-semibold text-muted-foreground">#{match.rank}</span>
-                      <button type="button" onClick={() => onOpen(match)}
-                        data-testid={`button-ai-brand-${match.brand_raw_id}`}
-                        className="min-w-0 truncate text-left text-sm font-bold text-white hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">
-                        {match.brand_name}
-                      </button>
-                    </div>
-                    <span className="shrink-0 cursor-default rounded-md bg-primary/15 px-2 py-0.5 text-xs font-bold text-primary">
-                      {match.confidence}% fit
-                    </span>
-                  </div>
-                  {match.reason && (
-                    <p className="mt-3 text-[0.85rem] leading-relaxed text-muted-foreground">{match.reason}</p>
-                  )}
-                </article>
+                <AiMatchCard key={match.brand_raw_id} match={match}
+                  expanded={expandedByBrand[match.brand_raw_id] ?? false}
+                  onToggle={() => setExpandedByBrand((previous) => ({
+                    ...previous, [match.brand_raw_id]: !previous[match.brand_raw_id],
+                  }))}
+                  onOpen={() => onOpen(match)} />
               ))}
             </div>
           )}

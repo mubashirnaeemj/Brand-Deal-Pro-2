@@ -19,7 +19,7 @@ The external backend starts V2 AI ranking when a creator profile is saved; the c
 
 **Why:** The user specified that profile saves already trigger V2 ranking automatically. An extra frontend trigger would duplicate potentially expensive ranking work.
 
-**How to apply:** Keep V1 and V2 results separate; never sort either list on the client. Poll an in-progress V2 run until it reaches a final state, while preserving any previous results returned by the API.
+**How to apply:** Keep V1 and V2 results separate; never sort either list on the client. The user repeatedly specifies that V2-only updates must leave V1's appearance and behavior unchanged. Poll an in-progress V2 run until it reaches a final state, while preserving any previous results returned by the API.
 
 ## Brand exclusion semantics
 

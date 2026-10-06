@@ -1,0 +1,58 @@
+Update the V2 tab on the Matches page: each V2 brand card must show the same "why it's a match" reason list that V1 cards show, below the AI's short reason. Do not change V1, the V1/V2 toggle, the API calls, polling, or anything else on the page.
+
+## API change
+GET /matches/me/v2 (and POST /matches/me/v2/refresh) now return a `reasons` array on every match:
+{
+  "status": "completed",
+  "error": null,
+  "ranked_at": "2026-10-06T13:02:09+05:00",
+  "total": 9,
+  "matches": [
+    {
+      "brand_raw_id": 1626,
+      "brand_name": "Ulta Beauty",
+      "niche": "Beauty",
+      "rank": 2,
+      "confidence": 88,
+      "reason": "A broad beauty retailer fits her beauty looks plus haircare and fragrance content.",
+      "reasons": [
+        "Ulta Beauty ran a paid partnership within the last 3 months.",
+        "MAVLIT has a verified contact for Ulta Beauty's partnerships team.",
+        "Ulta Beauty's target audience gender (male) which is same as yours.",
+        "Ulta Beauty's products are made for both male and female.",
+        "Ulta Beauty also sponsors YouTube creators.",
+        "Ulta Beauty has partnered with creators average (224,960 followers), creators close to your size with content type same as yours.",
+        "Ulta Beauty is a Beauty brand, the same niche as you.",
+        "Ulta Beauty's latest product is The Protector, a timely hook for your pitch."
+      ]
+    }
+  ]
+}
+- `reason` (singular) = the AI's one-line fit explanation. Already shown; keep it.
+- `reasons` (plural) = the tagline list, already sorted in display order. It may be an empty array. Treat a missing field as [].
+
+## New V2 card layout (top to bottom)
+1. Header (unchanged): "#<rank>" + brand name button (opens the existing partnership-posts modal) on the left, "<confidence>% fit" badge on the right.
+2. The AI `reason` paragraph (unchanged; omit if null). Add a small bottom margin (~0.4rem) so it is separated from the list.
+3. NEW: the `reasons` list, rendered exactly like V1 cards render theirs. Reuse the same <ul class="reasons"> / <li> markup, styles and helper that V1 uses:
+   - Show the first 5 reasons (use the same preview constant as V1, currently 5).
+   - If there are more than 5, show a toggle button under the list: "Show all N reasons" (N = total count). When expanded, show all reasons and change the label to "Show less". Set aria-expanded on the button.
+   - Keep the expanded/collapsed state per brand (keyed by brand_raw_id) in a V2-specific object, separate from V1's. It must survive re-renders, e.g. while the V2 tab is polling during "Ranking…".
+   - Re-render from the last V2 response held in memory when toggling. Do NOT re-fetch the API to expand or collapse.
+   - If `reasons` is empty, render no list and no toggle.
+4. Escape every reason string before inserting it into HTML (same escaping as V1).
+
+## Example result for the JSON above
+#2  Ulta Beauty                                        88% fit
+A broad beauty retailer fits her beauty looks plus haircare and fragrance content.
+• Ulta Beauty ran a paid partnership within the last 3 months.
+• MAVLIT has a verified contact for Ulta Beauty's partnerships team.
+• Ulta Beauty's target audience gender (male) which is same as yours.
+• Ulta Beauty's products are made for both male and female.
+• Ulta Beauty also sponsors YouTube creators.
+Show all 8 reasons
+
+## Done when
+- Every V2 card shows the AI reason, then up to 5 taglines, then "Show all N reasons" when there are more than 5.
+- Expanding or collapsing one V2 card doesn't affect other cards or V1, and it survives the V2 auto-refresh while ranking is in progress.
+- V1 cards look and behave exactly as before.

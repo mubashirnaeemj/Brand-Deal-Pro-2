@@ -1,0 +1,26 @@
+On the Matches page, show each matched brand's logo next to its name in all three tabs (V1, V2, V3). Use the brand's website icon (favicon) — e.g. facebook.com shows the blue "f", sennheiser.com shows the Sennheiser mark. Do not change anything else on the page.
+
+## Data
+Every match object from these endpoints now has a `website` field (string or null), e.g. "https://www.sennheiser.com/en-gb", "http://www.vitoppa.com/", "krk-music.com", or null:
+- GET /matches/me?limit=100 (V1)
+- GET /matches/me/v2 and GET /matches/me/v3 (V2, V3)
+
+## Logo source
+1. Get the domain from `website`:
+   - trim it; if it doesn't start with http:// or https://, prepend "https://"
+   - parse with `new URL(...)` and take `hostname`, then strip a leading "www."
+   - if parsing fails, or the scheme isn't http/https, treat it as "no website"
+2. Logo URL: `https://www.google.com/s2/favicons?domain=<domain>&sz=64` (URL-encode the domain).
+3. Fallback avatar: used when there is no website, or the image fails to load (use the <img> onerror event — replace it with the avatar, and don't retry). It's a circle showing the first letter of the brand name, uppercase, white text, with a background colour picked deterministically from the brand name (e.g. hash the name into one of 8 muted colours), so the same brand always gets the same colour.
+   - Also treat Google's generic globe placeholder as a failure: after onload, if naturalWidth <= 16, swap to the fallback avatar.
+
+## Layout
+- Logo: a 28×28px circle (border-radius 50%, object-fit: contain, white or very light background so dark logos stay visible on the dark theme, 1px subtle border), placed to the LEFT of the brand name block, vertically centred with it, with ~10px gap.
+- Keep everything else in the card header as it is: V2/V3 "#rank" stays before the brand name; the website link (if you already show it) stays under the name; the score/fit badge stays on the right.
+- Use alt="" plus aria-hidden="true" on the image (the brand name next to it is already the text), loading="lazy", referrerpolicy="no-referrer".
+- On phones the logo must not push the badge off-screen — the name block should shrink/ellipsis, not the logo.
+
+## Done when
+- V1, V2 and V3 cards each show a round logo before the brand name; facebook.com brands show the Facebook "f".
+- Brands with no website, a broken favicon, or Google's default globe show a coloured letter avatar instead (same colour every time for the same brand).
+- Nothing else on the cards changes; clicking the brand name still opens the partnership-posts modal.

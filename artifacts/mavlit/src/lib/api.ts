@@ -98,6 +98,7 @@ export interface ApiMatch {
   brand_raw_id: number;
   brand_name: string;
   niche: string | null;
+  website?: string | null;
   total_score: number;
   dimensions: Record<string, { score: number | null; weight: number }>;
   reasons: string[];

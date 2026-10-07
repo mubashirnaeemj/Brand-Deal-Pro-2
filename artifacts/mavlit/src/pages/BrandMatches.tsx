@@ -10,6 +10,9 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BrandPartnershipPosts from "@/components/BrandPartnershipPosts";
 import BrandMatchReasons, { CARD_REASON_LIMIT } from "@/components/BrandMatchReasons";
+import BrandLogo from "@/components/BrandLogo";
+import BrandMatchSearch from "@/components/BrandMatchSearch";
+import { filterBrandMatches } from "@/lib/matchSearch";
 import MatchScoreBreakdown from "@/components/MatchScoreBreakdown";
 import AiMatchesSection from "@/components/AiMatchesSection";
 import useAiMatches from "@/hooks/useAiMatches";
@@ -180,13 +183,13 @@ function BrandCard({ match, index, onOpen, saved, onToggleSave }: {
       className="group relative flex flex-col bg-card border border-border rounded-2xl overflow-visible hover:z-20 hover:border-primary/50 transition-colors duration-300 cursor-pointer">
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
         style={{ boxShadow: `inset 0 0 40px 0 ${ACCENT}18` }} />
-      <div className="p-6 flex items-start gap-4">
-        <div className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0 shadow-lg"
-          style={{ background: `linear-gradient(135deg, ${ACCENT}cc, ${ACCENT}66)` }}
-          data-testid={`img-logo-${id}`}><Building2 size={24} /></div>
-        <div className="flex-1 min-w-0">
+      <div className="p-6">
+        <div className="min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-white font-bold text-sm leading-snug" data-testid={`text-brandname-${id}`}>{match.brand_name}</h3>
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              <BrandLogo name={match.brand_name} website={match.website} testId={`img-logo-${id}`} />
+              <h3 title={match.brand_name} className="min-w-0 truncate text-white font-bold text-sm leading-snug" data-testid={`text-brandname-${id}`}>{match.brand_name}</h3>
+            </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <button type="button" onClick={onToggleSave} title={saved ? "Remove from shortlist" : "Save to shortlist"}
                 className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${saved ? "text-primary bg-primary/15" : "text-muted-foreground hover:text-white hover:bg-white/5"}`}>
@@ -195,6 +198,7 @@ function BrandCard({ match, index, onOpen, saved, onToggleSave }: {
               <ScoreRing match={match} />
             </div>
           </div>
+          <div className="pl-[38px]">
           <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-md text-xs font-semibold"
             style={{ background: `${ACCENT}22`, color: ACCENT }} data-testid={`text-category-${id}`}>{nicheOf(match)}</span>
           <button type="button" onClick={(event) => { event.stopPropagation(); setTimingOpen((open) => !open); }}
@@ -208,6 +212,7 @@ function BrandCard({ match, index, onOpen, saved, onToggleSave }: {
               exit={{ opacity: 0, height: 0, marginTop: 0 }} transition={{ duration: 0.25 }}
               className="text-xs text-muted-foreground leading-relaxed overflow-hidden">{TIMING_COPY}</motion.p>}
           </AnimatePresence>
+          </div>
         </div>
       </div>
       <div className="px-6 pb-4 flex flex-col gap-3 flex-1">
@@ -249,6 +254,7 @@ export default function BrandMatches() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeCategory, setActiveCategory] = useState("All");
+  const [searchByVersion, setSearchByVersion] = useState<Record<MatchesVersion, string>>({ v1: "", v2: "", v3: "" });
   const [version, setVersion] = useState<MatchesVersion>(() => {
     try {
       const stored = localStorage.getItem("mavlit_matches_version");
@@ -347,12 +353,14 @@ export default function BrandMatches() {
   }, [savedBrandIds, queryClient, toast]);
 
   const categories = ["All", ...new Set((matches ?? []).map(nicheOf))];
-  const filtered = activeCategory === "All" ? matches ?? [] : (matches ?? []).filter((match) => nicheOf(match) === activeCategory);
+  const categoryMatches = activeCategory === "All" ? matches ?? [] : (matches ?? []).filter((match) => nicheOf(match) === activeCategory);
+  const filtered = filterBrandMatches(categoryMatches, searchByVersion.v1);
 
   const renderAi = (aiVersion: AiMatchesVersion, data: ReturnType<typeof useAiMatches>) => (
     <AiMatchesSection version={aiVersion} data={data.data} loading={data.loading} error={data.error}
       refreshing={data.refreshing} onRefresh={data.refresh} onOpen={setSelectedAiMatch}
       progressMessage={progressMessage} expandedByBrand={expandedAiReasons[aiVersion]}
+      search={searchByVersion[aiVersion]}
       onToggleReasons={(brandId) => toggleAiReasons(aiVersion, brandId)} />
   );
 
@@ -406,6 +414,10 @@ export default function BrandMatches() {
             {version === "v1" && refreshSuccess && <p role="status" className="mt-3 text-sm text-emerald-400">Matches refreshed.</p>}
           </motion.div>
 
+          <BrandMatchSearch id={`matches-search-${version}`} label={`Search ${version.toUpperCase()} brand matches`}
+            value={searchByVersion[version]}
+            onChange={(value) => setSearchByVersion((previous) => ({ ...previous, [version]: value }))} />
+
           <section id="matches-panel-v1" role="tabpanel" aria-labelledby="matches-tab-v1" hidden={version !== "v1"}>
           <p className="mb-5 text-xs text-muted-foreground">V1 — rule-based scoring.</p>
           {!isLoading && !isError && matches && (
@@ -452,9 +464,15 @@ export default function BrandMatches() {
                 <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   className="flex flex-col items-center justify-center py-24 text-center">
                   <p className="text-muted-foreground text-lg font-medium">
-                    {matches?.length ? "No matches in this category yet." : "No brand matches yet."}
+                    {matches?.length
+                      ? searchByVersion.v1.trim() ? `No brands match “${searchByVersion.v1.trim()}”.` : "No matches in this category yet."
+                      : "No brand matches yet."}
                   </p>
-                  <p className="text-muted-foreground text-sm mt-1">Try a different filter or check back after your next content upload.</p>
+                  <p className="text-muted-foreground text-sm mt-1">
+                    {searchByVersion.v1.trim() && matches?.length
+                      ? "Try a different search or clear the search."
+                      : "Try a different filter or check back after your next content upload."}
+                  </p>
                 </motion.div>
               )}
             </AnimatePresence>

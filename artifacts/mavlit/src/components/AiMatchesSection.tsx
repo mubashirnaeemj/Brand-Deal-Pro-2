@@ -2,6 +2,7 @@ import { RefreshCw, Loader2 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { AiMatchesResponse, AiRankedMatch, AiMatchesVersion } from "@/lib/aiMatches";
 import AiMatchCard from "./AiMatchCard";
+import { filterBrandMatches } from "@/lib/matchSearch";
 
 interface Props {
   version: AiMatchesVersion;
@@ -14,6 +15,7 @@ interface Props {
   progressMessage: string;
   expandedByBrand: Record<number, boolean>;
   onToggleReasons: (brandId: number) => void;
+  search: string;
 }
 
 function AiRankingStatus({ message, hasPreviousMatches }: { message: string; hasPreviousMatches: boolean }) {
@@ -44,10 +46,11 @@ function formatRanked(value: string | null | undefined) {
 }
 
 export default function AiMatchesSection({ version, data, loading, error, refreshing, onRefresh, onOpen,
-  progressMessage, expandedByBrand, onToggleReasons }: Props) {
+  progressMessage, expandedByBrand, onToggleReasons, search }: Props) {
   const status = data?.status;
   const pending = status === "queued" || status === "running";
   const matches = data?.matches ?? [];
+  const filtered = filterBrandMatches(matches, search);
   const busy = refreshing || pending;
   const ranked = formatRanked(data?.ranked_at);
   const meta = ranked ? `Ranked ${ranked} — ${data?.total ?? matches.length} brands` : "";
@@ -89,14 +92,28 @@ export default function AiMatchesSection({ version, data, loading, error, refres
             <p className="py-16 text-center text-muted-foreground">The AI ranking found no brands for your profile.</p>
           )}
           {matches.length > 0 && (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {matches.map((match) => (
-                <AiMatchCard key={match.brand_raw_id} match={match}
-                  expanded={expandedByBrand[match.brand_raw_id] ?? false}
-                  onToggle={() => onToggleReasons(match.brand_raw_id)}
-                  onOpen={() => onOpen(match)} />
-              ))}
-            </div>
+            <>
+              {search.trim() && (
+                <p role="status" className="mb-4 text-xs text-muted-foreground">
+                  Showing {filtered.length} of {matches.length} brands
+                </p>
+              )}
+              {filtered.length > 0 ? (
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {filtered.map((match) => (
+                    <AiMatchCard key={match.brand_raw_id} match={match}
+                      expanded={expandedByBrand[match.brand_raw_id] ?? false}
+                      onToggle={() => onToggleReasons(match.brand_raw_id)}
+                      onOpen={() => onOpen(match)} />
+                  ))}
+                </div>
+              ) : (
+                <div className="py-16 text-center text-muted-foreground">
+                  <p>No brands match “{search.trim()}”.</p>
+                  <p className="mt-1 text-sm">Try a different search or clear the search.</p>
+                </div>
+              )}
+            </>
           )}
         </>
       )}

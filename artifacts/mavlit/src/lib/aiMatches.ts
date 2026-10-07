@@ -6,6 +6,7 @@ export interface AiRankedMatch {
   brand_raw_id: number;
   brand_name: string;
   niche: string | null;
+  website?: string | null;
   rank: number;
   confidence: number;
   reason: string | null;
@@ -27,6 +28,7 @@ export function validateAiMatches(value: AiMatchesResponse): AiMatchesResponse {
     || !Number.isInteger(value.total) || value.total < 0 || !Array.isArray(value.matches)
     || !value.matches.every((match) => match && Number.isInteger(match.brand_raw_id)
       && typeof match.brand_name === "string" && (match.niche === null || typeof match.niche === "string")
+      && (match.website === undefined || match.website === null || typeof match.website === "string")
       && Number.isInteger(match.rank) && match.rank > 0
       && Number.isInteger(match.confidence) && match.confidence >= 0 && match.confidence <= 100
       && (match.reason === null || typeof match.reason === "string")

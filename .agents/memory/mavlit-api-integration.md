@@ -5,6 +5,14 @@ description: External API authentication, pitch lifecycle, cookie transport, and
 
 # MAVLIT API Integration
 
+## V1 complete-list contract
+
+The user states that the external API no longer limits V1 matches: it returns all matched brands in one response.
+
+**Why:** The user removed the API limit and clarified this after the frontend's pagination guard rejected an empty follow-up page.
+
+**How to apply:** Treat the V1 response as the complete match list, not a page. Do not add limit/offset requests or infer additional pages from `total`, even if older API documentation still describes pagination.
+
 ## Match ranking ownership
 
 Preserve the order of matches returned by the external API; do not re-sort them on the frontend.

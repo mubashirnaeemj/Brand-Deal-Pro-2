@@ -122,16 +122,11 @@ export interface MatchesResponse {
 }
 
 export async function getAllMatches(): Promise<ApiMatch[]> {
-  const matches: ApiMatch[] = [];
-  while (true) {
-    const page = await api.get<MatchesResponse>(matches.length ? `/matches/me?offset=${matches.length}` : "/matches/me");
-    if (!Array.isArray(page.matches) || !Number.isInteger(page.total) || page.total < 0) {
-      throw new Error("Invalid matches response");
-    }
-    matches.push(...page.matches);
-    if (matches.length >= page.total) return matches;
-    if (page.matches.length === 0) throw new Error("Matches ended before the reported total");
+  const response = await api.get<MatchesResponse>("/matches/me");
+  if (!Array.isArray(response.matches) || !Number.isInteger(response.total) || response.total < 0) {
+    throw new Error("Invalid matches response");
   }
+  return response.matches;
 }
 
 export interface SavedBrand {

@@ -313,7 +313,7 @@ export default function BrandMatches() {
     setRefreshSuccess(false);
     setRefreshing(true);
     try {
-      const response = await api.post<MatchesResponse>("/matches/me/refresh?limit=100", {});
+      const response = await api.post<MatchesResponse>("/matches/me/refresh", {});
       if (!Array.isArray(response.matches)) throw new Error("Invalid refreshed matches response");
       const result = await refetch();
       if (result.isError) throw result.error ?? new Error("Could not reload matches.");

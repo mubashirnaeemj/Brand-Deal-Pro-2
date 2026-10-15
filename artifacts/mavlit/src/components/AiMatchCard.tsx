@@ -1,14 +1,23 @@
-import type { AiRankedMatch } from "@/lib/aiMatches";
+import type { AiRankedMatch, AiMatchesVersion } from "@/lib/aiMatches";
 import BrandMatchReasons, { CARD_REASON_LIMIT } from "./BrandMatchReasons";
 import BrandLogo from "./BrandLogo";
 
-export default function AiMatchCard({ match, expanded, onToggle, onOpen }: {
+export default function AiMatchCard({ match, expanded, onToggle, onOpen, version = "v2" }: {
   match: AiRankedMatch;
   expanded: boolean;
   onToggle: () => void;
   onOpen: () => void;
+  version?: AiMatchesVersion;
 }) {
   const reasons = match.reasons ?? [];
+  let website: string | null = null;
+  if (version === "v3" && match.website?.trim()) {
+    const value = match.website.trim();
+    try {
+      const url = new URL(/^[a-z][a-z\d+.-]*:/i.test(value) ? value : `https://${value}`);
+      if (url.protocol === "https:" || url.protocol === "http:") website = url.href;
+    } catch { /* Invalid websites keep the existing brand-details action. */ }
+  }
   return (
     <article data-testid={`card-ai-brand-${match.brand_raw_id}`}
       className="flex flex-col rounded-2xl border border-border bg-card transition-colors duration-300 hover:border-primary/50">
@@ -18,11 +27,17 @@ export default function AiMatchCard({ match, expanded, onToggle, onOpen }: {
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-baseline gap-2">
               <span className="shrink-0 text-xs font-semibold text-muted-foreground">#{match.rank}</span>
-              <button type="button" onClick={onOpen} title={match.brand_name}
+              {website ? (
+                <a href={website} target="_blank" rel="noopener noreferrer" title={match.brand_name}
+                  data-testid={`button-ai-brand-${match.brand_raw_id}`}
+                  className="min-w-0 truncate rounded text-left text-sm font-bold text-white hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  {match.brand_name}
+                </a>
+              ) : <button type="button" onClick={onOpen} title={match.brand_name}
                 data-testid={`button-ai-brand-${match.brand_raw_id}`}
                 className="min-w-0 truncate rounded text-left text-sm font-bold text-white hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 {match.brand_name}
-              </button>
+              </button>}
             </div>
             {match.niche && (
               <span className="mt-1 inline-flex max-w-full truncate rounded-md bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
@@ -31,9 +46,16 @@ export default function AiMatchCard({ match, expanded, onToggle, onOpen }: {
             )}
           </div>
         </div>
-        <span className="shrink-0 cursor-default rounded-md bg-primary/15 px-2 py-0.5 text-xs font-bold text-primary">
+        <div className="shrink-0">
+        <span className="inline-block cursor-default rounded-md bg-primary/15 px-2 py-0.5 text-xs font-bold text-primary">
           {match.confidence}% fit
         </span>
+        {version === "v3" && <div role="progressbar" aria-label={`${match.brand_name} confidence`}
+          aria-valuemin={0} aria-valuemax={100} aria-valuenow={match.confidence}
+          className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-primary/15">
+          <div className="h-full rounded-full bg-primary" style={{ width: `${match.confidence}%` }} />
+        </div>}
+        </div>
       </div>
       <div className="flex flex-1 flex-col gap-3 px-6 pb-6">
         <div className="h-px bg-border" />
@@ -54,6 +76,10 @@ export default function AiMatchCard({ match, expanded, onToggle, onOpen }: {
             {expanded ? "Show less" : `Show all ${reasons.length} reasons`}
           </button>
         )}
+        {version === "v3" && website && <button type="button" onClick={onOpen}
+          className="mt-auto self-start pt-2 text-xs font-semibold text-primary hover:underline">
+          View brand details
+        </button>}
       </div>
     </article>
   );

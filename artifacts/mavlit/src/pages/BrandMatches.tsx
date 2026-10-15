@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -20,6 +20,7 @@ import useAiRankingMessage from "@/hooks/useAiRankingMessage";
 import { isAiRanking, type AiRankedMatch, type AiMatchesVersion } from "@/lib/aiMatches";
 import { api, ApiRequestError, getAllMatches, type ApiBrand, type ApiMatch, type MatchesResponse, type SavedBrand } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const ACCENT = "#7c3aed";
 const TIMING_COPY = "Brand campaign calendars are often planned months in advance. Research upcoming campaigns and reach out early.";
@@ -251,17 +252,26 @@ function BrandCard({ match, index, onOpen, saved, onToggleSave }: {
 }
 
 export default function BrandMatches() {
+  const { user } = useAuth();
+  const [, navigate] = useLocation();
+  const searchParams = useSearch();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchByVersion, setSearchByVersion] = useState<Record<MatchesVersion, string>>({ v1: "", v2: "", v3: "" });
   const [version, setVersion] = useState<MatchesVersion>(() => {
+    const requested = new URLSearchParams(window.location.search).get("version");
+    if (requested === "v1" || requested === "v2" || requested === "v3") return requested;
     try {
       const stored = localStorage.getItem("mavlit_matches_version");
       return stored === "v2" || stored === "v3" ? stored : "v1";
     }
     catch { return "v1"; }
   });
+  useEffect(() => {
+    const requested = new URLSearchParams(searchParams).get("version");
+    if (requested === "v1" || requested === "v2" || requested === "v3") setVersion(requested);
+  }, [searchParams]);
   const v2Matches = useAiMatches("v2", version === "v2");
   const v3Matches = useAiMatches("v3", version === "v3");
   const aiMatchesByVersion = { v2: v2Matches, v3: v3Matches };
@@ -283,6 +293,7 @@ export default function BrandMatches() {
     setSelectedMatch(null);
     setSelectedAiMatch(null);
     try { localStorage.setItem("mavlit_matches_version", next); } catch { /* Storage can be unavailable in embedded previews. */ }
+    navigate(`/brand-matches?version=${next}`, { replace: true });
   };
   const [selectedMatch, setSelectedMatch] = useState<ApiMatch | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -359,6 +370,7 @@ export default function BrandMatches() {
   const renderAi = (aiVersion: AiMatchesVersion, data: ReturnType<typeof useAiMatches>) => (
     <AiMatchesSection version={aiVersion} data={data.data} loading={data.loading} error={data.error}
       refreshing={data.refreshing} onRefresh={data.refresh} onOpen={setSelectedAiMatch}
+      timedOut={data.timedOut} preferences={aiVersion === "v3" ? user?.brand_preferences : undefined}
       progressMessage={progressMessage} expandedByBrand={expandedAiReasons[aiVersion]}
       search={searchByVersion[aiVersion]}
       onToggleReasons={(brandId) => toggleAiReasons(aiVersion, brandId)} />

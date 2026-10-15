@@ -12,6 +12,7 @@ export type ProfileForm = {
   fullName: string;
   age: string;
   gender: string;
+  brandPreferences: string;
   primaryPlatforms: PlatformKey[];
   instagram: PlatformDetails & { username: string; followers: string };
   youtube: PlatformDetails & { channelName: string; subscribers: string };
@@ -27,6 +28,7 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
     fullName: text(profile.full_name),
     age: numberText(profile.age),
     gender: text(profile.gender),
+    brandPreferences: text(profile.brand_preferences),
     primaryPlatforms: parsePlatforms(profile.primary_platform),
     instagram: {
       username: text(profile.instagram_handle),
@@ -48,6 +50,7 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
 }
 
 export function validateProfile(form: ProfileForm, profile: CreatorProfile): string | null {
+  if (form.brandPreferences.length > 1000) return "Brand preferences must be 1000 characters or fewer.";
   if (!form.fullName.trim()) return "Full name is required.";
   if (!form.primaryPlatforms.length) return "Choose at least one primary platform.";
   if (form.age.trim() && (!Number.isInteger(Number(form.age)) || Number(form.age) < 13 || Number(form.age) > 120)) {
@@ -75,10 +78,11 @@ export function validateProfile(form: ProfileForm, profile: CreatorProfile): str
   return null;
 }
 
-export function profilePatch(form: ProfileForm, profile: CreatorProfile): Partial<CreatorProfile> {
+function profileValues(form: ProfileForm, profile: CreatorProfile): Partial<CreatorProfile> {
   const instagramHandle = form.instagram.username.trim().replace(/^@/, "");
   return {
     full_name: form.fullName.trim(),
+    brand_preferences: form.brandPreferences.trim() || null,
     creator_handle: instagramHandle || profile.creator_handle || "",
     age: optionalNumber(form.age),
     gender: form.gender.trim() || null,
@@ -99,4 +103,12 @@ export function profilePatch(form: ProfileForm, profile: CreatorProfile): Partia
     youtube_excluded_categories: form.youtube.excludedCategories,
     youtube_description: form.youtube.description.trim() || null,
   };
+}
+
+export function profilePatch(form: ProfileForm, profile: CreatorProfile): Partial<CreatorProfile> {
+  const values = profileValues(form, profile);
+  const original = profileValues(profileToForm(profile), profile);
+  // Do not normalize or overwrite unrelated fields during a preferences-only edit.
+  return Object.fromEntries(Object.entries(values).filter(([key, value]) =>
+    key === "brand_preferences" || JSON.stringify(value) !== JSON.stringify(original[key as keyof CreatorProfile])));
 }

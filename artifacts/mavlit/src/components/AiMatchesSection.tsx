@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import type { AiMatchesResponse, AiRankedMatch, AiMatchesVersion } from "@/lib/aiMatches";
 import AiMatchCard from "./AiMatchCard";
 import { filterBrandMatches } from "@/lib/matchSearch";
+import { Link } from "wouter";
 
 interface Props {
   version: AiMatchesVersion;
@@ -16,6 +17,8 @@ interface Props {
   expandedByBrand: Record<number, boolean>;
   onToggleReasons: (brandId: number) => void;
   search: string;
+  timedOut?: boolean;
+  preferences?: string | null;
 }
 
 function AiRankingStatus({ message, hasPreviousMatches }: { message: string; hasPreviousMatches: boolean }) {
@@ -46,7 +49,7 @@ function formatRanked(value: string | null | undefined) {
 }
 
 export default function AiMatchesSection({ version, data, loading, error, refreshing, onRefresh, onOpen,
-  progressMessage, expandedByBrand, onToggleReasons, search }: Props) {
+  progressMessage, expandedByBrand, onToggleReasons, search, timedOut = false, preferences }: Props) {
   const status = data?.status;
   const pending = status === "queued" || status === "running";
   const matches = data?.matches ?? [];
@@ -59,7 +62,7 @@ export default function AiMatchesSection({ version, data, loading, error, refres
     <section data-testid={`section-matches-${version}`}>
       <p className="mb-4 text-xs text-muted-foreground">
         {version === "v3"
-          ? "V3 — AI ranking that weighs how well each brand fits your profile and its match evidence (the reasons under each brand) equally."
+          ? "V3 — AI ranking using your profile, match evidence, and brand preferences. Brands you want rank higher; brands you don't want are shown last, not removed."
           : "V2 — AI ranking: an LLM compares your profile (niche, tags, description) with each brand's description and tags."}
       </p>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -67,9 +70,18 @@ export default function AiMatchesSection({ version, data, loading, error, refres
         <button type="button" data-testid="button-ai-rerank" onClick={onRefresh} disabled={busy || loading}
           className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-white transition hover:border-primary/50 hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50">
           <RefreshCw size={15} className={busy ? "animate-spin" : ""} />
-          {busy ? "Ranking…" : "Re-rank with AI"}
+          {busy ? "Ranking…" : version === "v3" ? "Refresh matches" : "Re-rank with AI"}
         </button>
       </div>
+      {version === "v3" && preferences?.trim() && (
+        <aside data-testid="card-brand-preferences" className="mb-5 rounded-2xl border border-border bg-card p-5">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-bold text-white">Your brand preferences</h2>
+            <Link href="/creator-profile" className="text-sm font-semibold text-primary hover:underline">Edit</Link>
+          </div>
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{preferences}</p>
+        </aside>
+      )}
 
       {error && <p role="alert" className="mb-4 text-sm" style={{ color: "#f87171" }}>{error}</p>}
 
@@ -77,18 +89,36 @@ export default function AiMatchesSection({ version, data, loading, error, refres
         <p role="status" className="py-16 text-center text-muted-foreground">Loading AI matches…</p>
       ) : (
         <>
-          {busy && <AiRankingStatus message={progressMessage} hasPreviousMatches={matches.length > 0} />}
+          {busy && (version === "v3" ? (
+            <div role="status" aria-live="polite" data-testid="status-v3-updating"
+              className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4">
+              <p className="flex items-center gap-2 text-sm font-semibold text-white">
+                {!timedOut && <Loader2 size={16} aria-hidden="true" className="animate-spin" />}
+                {timedOut ? "Still working — check back shortly" : "Updating your matches…"}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {timedOut ? "Automatic checks have paused. Your ranking continues in the background."
+                  : `${progressMessage}${matches.length ? " Previous results below are not final." : ""}`}
+              </p>
+            </div>
+          ) : <AiRankingStatus message={progressMessage} hasPreviousMatches={matches.length > 0} />)}
           {status === "failed" && (
             <p role="alert" data-testid="text-ai-failed" className="mb-5 text-sm" style={{ color: "#f87171" }}>
-              AI ranking failed: {data?.error ?? "Unknown error"}. Try "Re-rank with AI".
+              AI ranking failed: {data?.error ?? "Unknown error"}.
+              {version === "v3" ? (
+                <button type="button" onClick={onRefresh} disabled={busy} className="ml-2 font-semibold underline">Try again</button>
+              ) : ' Try "Re-rank with AI".'}
             </p>
           )}
-          {status === "idle" && matches.length === 0 && (
+          {version === "v3" && !busy && status !== "failed" && data?.total === 0 && matches.length === 0 && (
+            <p className="py-16 text-center text-muted-foreground">No matches yet — complete your profile and save to generate them.</p>
+          )}
+          {version !== "v3" && status === "idle" && matches.length === 0 && (
             <p className="py-16 text-center text-muted-foreground">
               No AI ranking yet. It runs automatically when you save your creator profile, or click "Re-rank with AI".
             </p>
           )}
-          {status === "completed" && matches.length === 0 && (
+          {version !== "v3" && status === "completed" && matches.length === 0 && (
             <p className="py-16 text-center text-muted-foreground">The AI ranking found no brands for your profile.</p>
           )}
           {matches.length > 0 && (
@@ -99,9 +129,10 @@ export default function AiMatchesSection({ version, data, loading, error, refres
                 </p>
               )}
               {filtered.length > 0 ? (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div aria-busy={version === "v3" && busy}
+                  className={`grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 ${version === "v3" && busy ? "opacity-50" : ""}`}>
                   {filtered.map((match) => (
-                    <AiMatchCard key={match.brand_raw_id} match={match}
+                    <AiMatchCard key={match.brand_raw_id} match={match} version={version}
                       expanded={expandedByBrand[match.brand_raw_id] ?? false}
                       onToggle={() => onToggleReasons(match.brand_raw_id)}
                       onOpen={() => onOpen(match)} />

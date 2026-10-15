@@ -1,0 +1,83 @@
+Add a "Brand preferences" feature to the MAVLIT creator app and make the Matches v3 page use it.
+
+BACKEND (already built — do NOT change it). Base URL = the MAVLIT API origin. Auth is a session
+cookie, so every fetch must use credentials: "include". Unauthenticated calls return 401; a
+creator whose profile is not complete gets 403 on the /matches endpoints.
+
+1) GET /creator-profile/me  ->  the creator's profile JSON. It now includes:
+     "brand_preferences": string | null      // free text, max 1000 characters
+
+2) PUT /creator-profile/me  ->  saves the WHOLE profile (it is a full replace, not a patch).
+   Send the complete profile object you got from GET, changing only the fields you edited,
+   including the new field:
+     "brand_preferences": "I want more guitar brands and sunscreen brands. I don't want lipstick."
+   - Max 1000 characters (longer returns 422). Empty string or null clears it.
+   - Required fields must stay filled (full_name, creator_handle, age, gender, primary_platform,
+     follower_count, content_niche, plus a description) or it returns 422 with a "detail" message.
+   - Saving automatically queues a fresh Matches v2 and then v3 ranking in the background.
+     The PUT response is the updated profile; the ranking is NOT finished when it returns.
+
+3) GET /matches/me/v3  ->
+   {
+     "status": "idle" | "queued" | "running" | "completed" | "failed",
+     "error": string | null,
+     "ranked_at": string | null,
+     "total": number,
+     "matches": [
+       { "brand_raw_id": number, "brand_name": string, "website": string | null,
+         "niche": string | null, "rank": number,          // 1 = best
+         "confidence": number,                            // 0-100
+         "reason": string | null,                         // one-line LLM explanation
+         "reasons": string[] }                            // "why it's a match" taglines
+     ]
+   }
+   Already sorted by rank ascending.
+
+4) POST /matches/me/v3/refresh -> same shape as (3). Queues a new v3 ranking (no-op if one is
+   already queued or running). Use it for a manual "Refresh matches" button.
+
+HOW PREFERENCES AFFECT THE RANKING (so the UI copy is accurate)
+- Brands matching what the creator wants (e.g. guitar brands, sunscreen brands) are ranked higher.
+- Brands the creator says they don't want (e.g. lipstick brands) are ranked last.
+- All other brands keep their normal ranking. It is a ranking signal, not a hard filter — a
+  disliked brand still appears, at the bottom.
+- It only affects Matches v3 (not v1/v2).
+
+FRONTEND TASKS
+A) Creator profile page: add a "Brand preferences" card with a multi-line textarea
+   (maxlength 1000, 4 rows) with a live "N / 1000" counter, and helper text:
+   "Optional. Tell us which brands you'd like to see more of, and which you don't want.
+   Brands you don't want are shown last."
+   Placeholder: "e.g. I want more guitar and amp brands. I'd love sunscreen brands.
+   I don't want lipstick or makeup brands."
+   - Fill it from profile.brand_preferences on load.
+   - Include it as brand_preferences in the PUT body (trim it; send null when empty).
+   - Keep the rest of the profile payload unchanged.
+
+B) After a successful save, redirect/navigate to the Matches v3 page and show a
+   "Updating your matches…" banner while status is "queued" or "running":
+   - Poll GET /matches/me/v3 every 3 seconds until status is "completed" or "failed"
+     (stop after ~3 minutes; show "Still working — check back shortly").
+   - On "completed": render the list. On "failed": show `error` and a "Try again" button that
+     calls POST /matches/me/v3/refresh then resumes polling.
+   - Don't show the old list as if it were final while status is queued/running — dim it or
+     show it with the "Updating…" banner.
+
+C) Matches v3 page:
+   - Show above the list (when set) a small card "Your brand preferences" with the saved text and
+     an "Edit" link to the profile page.
+   - Render each match: rank, brand_name (link to website if present), niche, confidence as a
+     percentage bar, `reason`, and `reasons` as small chips/bullets.
+   - Add a "Refresh matches" button that calls POST /matches/me/v3/refresh and polls as in (B).
+   - Empty state when total = 0: "No matches yet — complete your profile and save to generate them."
+
+D) Error handling: show the API's `detail` message for 4xx; 401 -> go to login; 403 -> go to the
+   profile page to complete it. Never discard the user's typed text if a save fails.
+
+ACCEPTANCE CHECKS
+1. Typing "I don't want lipstick brands" and saving, then waiting for the status to become
+   "completed", shows lipstick/makeup brands at the very bottom of the list.
+2. Typing "I want more guitar brands" and saving moves guitar brands to the top.
+3. Clearing the box and saving restores the normal ordering.
+4. Reloading the profile page shows the saved text.
+5. A 1001-character entry cannot be submitted (counter blocks it).

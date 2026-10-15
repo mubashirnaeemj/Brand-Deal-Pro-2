@@ -31,6 +31,12 @@ The external backend starts both V2 and V3 AI ranking when a creator profile is 
 
 ## Brand exclusion semantics
 
+Brand preferences are optional free text and affect V3 ranking only: wanted brands move up, unwanted brands move to the bottom but remain visible. This is distinct from the hard exclusions below.
+
+**Why:** The user explicitly described preferences as a ranking signal, not a filter, and stated that V1/V2 do not use it.
+
+**How to apply:** Display backend ranking order unchanged; never remove or reorder brands locally to simulate preferences.
+
 The profile's "Brand categories to avoid" values are exact brand tags, not brand niches. The user states that the backend hard-filters out any brand carrying a selected tag.
 
 **Why:** Rewriting a tag's spelling or replacing it with a broad niche changes which brands the creator excludes.
@@ -42,6 +48,12 @@ The profile's "Brand categories to avoid" values are exact brand tags, not brand
 - `POST /auth/login` → sets `access_token` httpOnly cookie; response body is full CreatorProfile
 - `POST /auth/logout` → clears cookie
 - `GET /creator-profile/me` — session validation on mount in AuthContext
+
+Profile PUT is a full replacement, not a patch. Preserve the entire latest GET object and merge the edited fields before saving, including preferences during unrelated profile/username edits.
+
+**Why:** The user clarified the full-replacement contract when adding brand preferences; omitted fields can be lost.
+
+**How to apply:** Do not send partial profile objects directly to PUT or trigger extra AI refresh POSTs after saving; the backend queues V2 and then V3 itself.
 
 ## Route gate
 - All app pages require login; an incomplete creator can only access creator onboarding until their account profile is saved with the required fields.

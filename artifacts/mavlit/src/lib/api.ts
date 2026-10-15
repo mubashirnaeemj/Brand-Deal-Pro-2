@@ -27,7 +27,9 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
       err.detail === "profile_incomplete" ||
       (typeof err.detail === "object" && err.detail !== null && "error" in err.detail && err.detail.error === "profile_incomplete")
     )) window.dispatchEvent(new Event("mavlit:profile-incomplete"));
-    const detail = typeof err.detail === "string" ? err.detail : typeof err.message === "string" ? err.message : null;
+    const validationDetail = Array.isArray(err.detail) ? err.detail.map((item) =>
+      item && typeof item === "object" && "msg" in item ? String(item.msg) : "").filter(Boolean).join("; ") : null;
+    const detail = typeof err.detail === "string" ? err.detail : validationDetail || (typeof err.message === "string" ? err.message : null);
     throw new ApiRequestError(detail ?? `Request failed (${res.status})`, res.status);
   }
   return res.json() as Promise<T>;

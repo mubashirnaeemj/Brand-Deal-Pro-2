@@ -30,6 +30,7 @@ export interface CreatorProfile {
   content_niche: string | null;
   sub_niches: string[] | null;
   content_description: string | null;
+  brand_preferences?: string | null;
   instagram_description: string | null;
   instagram_sub_niches: string[] | null;
   instagram_excluded_categories: string[] | null;
@@ -178,10 +179,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [navigate, queryClient]);
 
   const updateProfile = useCallback(async (patch: Partial<CreatorProfile>) => {
-    const updated = await api.put<CreatorProfile>("/creator-profile/me", patch);
+    // PUT replaces the whole profile, including fields outside the current editor.
+    const current = await api.get<CreatorProfile>("/creator-profile/me");
+    const updated = await api.put<CreatorProfile>("/creator-profile/me", { ...current, ...patch });
     setUser(updated);
     queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     queryClient.invalidateQueries({ queryKey: ["pitch-matches"] });
+    for (const version of ["v2", "v3"]) {
+      await queryClient.cancelQueries({ queryKey: ["ai-brand-matches", version] });
+      queryClient.setQueryData(["ai-brand-matches", version], (previous: Record<string, unknown> | undefined) => ({
+        ranked_at: null, total: 0, matches: [], ...previous, status: "queued", error: null,
+      }));
+      queryClient.invalidateQueries({ queryKey: ["ai-brand-matches", version] });
+    }
     return updated;
   }, [queryClient]);
 

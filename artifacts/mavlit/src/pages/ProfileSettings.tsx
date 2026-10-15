@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { Save, User } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import PlatformSelector from "@/components/onboarding/PlatformSelector";
@@ -10,6 +11,7 @@ import { profilePatch, profileToForm, validateProfile, type ProfileForm } from "
 
 export default function ProfileSettings() {
   const { updateProfile } = useAuth();
+  const [, navigate] = useLocation();
   const [profile, setProfile] = useState<CreatorProfile | null>(null);
   const [form, setForm] = useState<ProfileForm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,7 +30,12 @@ export default function ProfileSettings() {
       .then((response) => {
         if (!active) return;
         setProfile(response);
-        setForm(profileToForm(response));
+        const initial = profileToForm(response);
+        try {
+          const draft = JSON.parse(sessionStorage.getItem(`mavlit_profile_draft:${response.id}`) ?? "null");
+          setForm(draft && typeof draft.fullName === "string" && typeof draft.brandPreferences === "string" &&
+            Array.isArray(draft.primaryPlatforms) && draft.instagram && draft.youtube ? draft : initial);
+        } catch { setForm(initial); }
       })
       .catch((cause) => {
         if (active) setError(cause instanceof Error ? cause.message : "Could not load your profile.");
@@ -202,10 +209,11 @@ export default function ProfileSettings() {
     }
     setSaving(true);
     try {
+      // Retain failed submissions even if an expired session navigates to sign-in.
+      try { sessionStorage.setItem(`mavlit_profile_draft:${profile.id}`, JSON.stringify(form)); } catch { /* Storage may be unavailable. */ }
       const updated = await updateProfile(profilePatch(form, profile));
       if (form.primaryPlatforms.some((platform) => !parsePlatforms(updated.primary_platform).includes(platform))) {
         setProfile(updated);
-        setForm(profileToForm(updated));
         setError("The profile API did not keep all selected platforms. Please try again.");
         return;
       }
@@ -215,13 +223,20 @@ export default function ProfileSettings() {
         setError("The profile API did not keep all selected primary niches. Please try again.");
         return;
       }
+      if ((updated.brand_preferences?.trim() || "") !== form.brandPreferences.trim()) {
+        setProfile(updated);
+        setError("The profile API did not keep your brand preferences. Please try again.");
+        return;
+      }
       if (!isProfileComplete(updated)) {
         setError("Your profile was saved, but it is still incomplete. Check the required creator details.");
         return;
       }
       setProfile(updated);
       setForm(profileToForm(updated));
+      try { sessionStorage.removeItem(`mavlit_profile_draft:${profile.id}`); } catch { /* Storage may be unavailable. */ }
       setSaved(true);
+      navigate("/brand-matches?version=v3");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save your profile.");
     } finally {
@@ -295,11 +310,31 @@ export default function ProfileSettings() {
               statusError={profile.youtube_description_error}
               onGeneratingChange={(active) => setGeneratingCount((count) => count + (active ? 1 : -1))} />
 
+            <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+              <h2 className="mb-2 text-lg font-bold text-white">
+                <label htmlFor="brand-preferences">Brand preferences</label>
+              </h2>
+              <p id="brand-preferences-help" className="mb-4 text-sm leading-relaxed text-muted-foreground">
+                Optional. Tell us which brands you'd like to see more of, and which you don't want.
+                {" "}Brands you don't want are shown last.
+              </p>
+              <textarea id="brand-preferences" data-testid="input-brand-preferences" rows={4} maxLength={1000}
+                value={form.brandPreferences} aria-describedby="brand-preferences-help brand-preferences-count"
+                aria-invalid={form.brandPreferences.length > 1000}
+                placeholder={"e.g. I want more guitar and amp brands. I'd love sunscreen brands.\nI don't want lipstick or makeup brands."}
+                onChange={(event) => change({ ...form, brandPreferences: event.target.value })}
+                className={`${INPUT_CLASS} resize-y normal-case`} />
+              <p id="brand-preferences-count" aria-live="polite"
+                className={`mt-2 text-right text-xs ${form.brandPreferences.length > 1000 ? "text-red-400" : "text-muted-foreground"}`}>
+                {form.brandPreferences.length} / 1000
+              </p>
+            </section>
+
             {pollError && <p role="alert" className="text-sm text-amber-400">{pollError}</p>}
             {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>}
             {saved && <p role="status" className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">Profile saved.</p>}
             <div className="flex justify-end">
-              <button type="submit" disabled={saving || generatingCount > 0 || jobPending}
+              <button type="submit" disabled={saving || generatingCount > 0 || jobPending || form.brandPreferences.length > 1000}
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50">
                 <Save size={16} /> {saving ? "Saving…" : generatingCount > 0 || jobPending ? "Generating…" : "Save Profile"}
               </button>

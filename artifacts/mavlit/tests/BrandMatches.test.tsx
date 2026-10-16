@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Switch } from "wouter";
 import BrandMatches from "@/pages/BrandMatches";
@@ -27,6 +27,158 @@ function mountMatches(path = "/brand-matches?version=v3") {
   window.history.replaceState(null, "", path);
   return renderProfile(<BrandMatches />);
 }
+
+// Exercise HTTP/transport/schema failures independently of job status "failed".
+describe("Matches page request errors and expired sessions", () => {
+  const cardOrder = () => screen.getAllByRole("article").map((card) => card.getAttribute("data-testid"));
+  const previousCards = ["card-ai-brand-30", "card-ai-brand-10", "card-ai-brand-20"];
+
+  it("recovers from a transient GET failure without showing a terminal error or starting a ranking", async () => {
+    let attempts = 0;
+    fixture.handle("GET", () => ++attempts === 1
+      ? { body: { detail: "Matches temporarily unavailable" }, status: 503 }
+      : { body: ranking("completed") });
+    mountMatches();
+    await settle();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading AI matches");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
+    await tick(999);
+    expect(fixture.calls("GET")).toHaveLength(1);
+    await tick(1);
+    expect(cardOrder()).toEqual(previousCards);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
+    await tick(180_000);
+    expect(fixture.calls("GET")).toHaveLength(2);
+    expect(fixture.calls("POST")).toHaveLength(0);
+  });
+
+  it.each([
+    { name: "network failure", fail: () => { throw new TypeError("Failed to fetch"); }, message: "Failed to fetch" },
+    { name: "HTTP 503", fail: () => ({ body: { detail: "Matches temporarily unavailable" }, status: 503 }), message: "Matches temporarily unavailable" },
+    { name: "invalid ranking", fail: () => ({ body: { status: "completed", matches: null } }), message: "Invalid AI ranking response" },
+  ])("shows a readable $name error after the bounded GET retry, not a spinner or backend-job failure", async ({ fail, message }) => {
+    fixture.handle("GET", fail);
+    mountMatches();
+    await settle();
+    await tick(1_000);
+    expect(screen.getByRole("alert")).toHaveTextContent(message);
+    expect(screen.queryByText("Loading AI matches…")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("status-v3-updating")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("text-ai-failed")).not.toBeInTheDocument();
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
+    await tick(180_000);
+    expect(fixture.calls("GET")).toHaveLength(2);
+    expect(fixture.calls("POST")).toHaveLength(0);
+  });
+
+  it.each([
+    { name: "HTTP 503", body: { detail: "Cannot check matches right now" }, status: 503, message: "Cannot check matches right now" },
+    { name: "invalid ranking", body: ranking("completed", { matches: null as never }), status: 200, message: "Invalid AI ranking response" },
+  ])("keeps prior cards and their order after a $name GET refetch failure", async ({ body, status, message }) => {
+    const page = mountMatches();
+    await settle();
+    fixture.respond("GET", body, "v3", status);
+    act(() => { void page.queryClient.refetchQueries({ queryKey: ["ai-brand-matches", "v3"] }); });
+    await settle();
+    await tick(1_000);
+    expect(screen.getByRole("alert")).toHaveTextContent(message);
+    expect(cardOrder()).toEqual(previousCards);
+    expect(screen.getByTestId("text-ai-meta")).toHaveTextContent("3 brands");
+    expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
+    await tick(180_000);
+    expect(fixture.calls("GET")).toHaveLength(3);
+    expect(fixture.calls("POST")).toHaveLength(0);
+  });
+
+  it.each([
+    { name: "network failure", fail: () => { throw new TypeError("Failed to fetch"); }, message: "Failed to fetch" },
+    { name: "HTTP 503", fail: () => ({ body: { detail: "Unable to refresh matches right now" }, status: 503 }), message: "Unable to refresh matches right now" },
+    { name: "invalid ranking", fail: () => ({ body: { status: "queued", matches: "not-an-array" } }), message: "Invalid AI ranking response" },
+  ])("retains cards after a refresh POST $name and recovers on the next explicit refresh", async ({ fail, message }) => {
+    mountMatches();
+    await settle();
+    fixture.handle("POST", fail);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh matches" }));
+    await settle();
+    expect(screen.getByRole("alert")).toHaveTextContent(message);
+    expect(cardOrder()).toEqual(previousCards);
+    expect(screen.queryByTestId("text-ai-failed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("status-v3-updating")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
+    await tick(180_000);
+    expect(fixture.calls("POST")).toHaveLength(1);
+
+    fixture.respond("POST", ranking("queued"));
+    fixture.respond("GET", ranking("queued"));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh matches" }));
+    await settle();
+    expect(fixture.calls("POST")).toHaveLength(2);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(cardOrder()).toEqual(previousCards);
+    expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
+    expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Previous results below are not final.");
+    fixture.respond("GET", ranking("completed", { matches: rankedBrands.slice(1), total: 2 }));
+    await tick(3_000);
+    expect(cardOrder()).toEqual(previousCards.slice(1));
+    expect(screen.getByTestId("text-ai-meta")).toHaveTextContent("2 brands");
+    expect(screen.queryByTestId("status-v3-updating")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
+    const reads = fixture.calls("GET").length;
+    await tick(180_000);
+    expect(fixture.calls("POST")).toHaveLength(2);
+    expect(fixture.calls("GET")).toHaveLength(reads);
+  });
+
+  it.each([
+    { method: "GET", status: 401 },
+    { method: "GET", status: 403 },
+    { method: "POST", status: 401 },
+    { method: "POST", status: 403 },
+  ] as const)("$method $status redirects through the real auth listener without retrying or leaving stale matches", async ({ method, status }) => {
+    const dispatch = vi.spyOn(window, "dispatchEvent");
+    const body = status === 401
+      ? { detail: "Your session has expired. Please sign in again." }
+      : { detail: { error: "profile_incomplete" }, message: "Complete your creator profile." };
+    if (method === "GET") fixture.respond("GET", body, "v3", status);
+    window.history.replaceState(null, "", "/brand-matches?version=v3");
+    const page = renderProfile(
+      <Switch>
+        <Route path="/brand-matches"><BrandMatches /></Route>
+        <Route path="/signin"><h1>Sign in to continue</h1></Route>
+        <Route path="/creator-profile"><h1>Complete your creator profile</h1></Route>
+      </Switch>,
+    );
+    await settle();
+    if (method === "POST") {
+      expect(cardOrder()).toEqual(previousCards);
+      fixture.respond("POST", body, "v3", status);
+      fireEvent.click(screen.getByRole("button", { name: "Refresh matches" }));
+      await settle();
+    }
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+      type: status === 401 ? "mavlit:unauthorized" : "mavlit:profile-incomplete",
+    }));
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({
+      type: status === 401 ? "mavlit:profile-incomplete" : "mavlit:unauthorized",
+    }));
+    expect(window.location.pathname).toBe(status === 401 ? "/signin" : "/creator-profile");
+    expect(screen.getByRole("heading", {
+      name: status === 401 ? "Sign in to continue" : "Complete your creator profile",
+    })).toBeInTheDocument();
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("section-matches-v3")).not.toBeInTheDocument();
+    if (status === 401) {
+      expect(window.location.search).toBe("?return_to=/matches");
+      expect(page.queryClient.getQueryData(["ai-brand-matches", "v3"])).toBeUndefined();
+    }
+    await tick(180_000);
+    expect(fixture.calls("GET")).toHaveLength(1);
+    expect(fixture.calls("POST")).toHaveLength(method === "POST" ? 1 : 0);
+  });
+});
 
 describe("Matches page V3 integration", () => {
   it("a successful profile save opens V3 despite stored V1 and polls without an extra ranking POST", async () => {

@@ -1,5 +1,5 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import useAiMatches from "@/hooks/useAiMatches";
 import { installAiMatchesApi, ranking } from "./fixtures/aiMatchesApi";
 import { matchesWrapper, settle, startMatchesClock, stopMatchesClock, tick } from "./aiMatchesTestUtils";
@@ -236,6 +236,214 @@ describe("V3 ranking lifecycle (mocked fetch and accelerated clock)", () => {
     expect(hook.result.current.data?.status).toBe("completed");
     await tick(6_000);
     expect(fixture.calls("GET")).toHaveLength(2);
+  });
+});
+
+// Request/validation errors are not backend job-status "failed" responses.
+describe("V3 request failures (fully intercepted fetch)", () => {
+  it.each(["network", "503"] as const)("recovers from a transient %s GET with one delayed retry and no POST", async (failure) => {
+    let attempts = 0;
+    fixture.handle("GET", () => {
+      if (++attempts === 1) {
+        if (failure === "network") throw new TypeError("Failed to fetch");
+        return { body: { detail: "Rankings temporarily unavailable" }, status: 503 };
+      }
+      return { body: ranking("completed") };
+    });
+    const hook = mount();
+    await settle();
+    expect(hook.result.current.loading).toBe(true);
+    expect(hook.result.current.error).toBeNull();
+    await tick(999);
+    expect(fixture.calls("GET")).toHaveLength(1);
+    await tick(1);
+    expect(fixture.calls("GET").map(({ at }) => at - fixture.calls("GET")[0].at)).toEqual([0, 1_000]);
+    expect(hook.result.current.data).toEqual(ranking("completed"));
+    expect(hook.result.current.loading).toBe(false);
+    expect(hook.result.current.error).toBeNull();
+    await tick(180_000);
+    expect(fixture.calls("GET")).toHaveLength(2);
+    expect(fixture.calls("POST")).toHaveLength(0);
+  });
+
+  it.each(["network", "503"] as const)("stops after one retry of a persistent %s GET and exposes a readable error", async (failure) => {
+    const message = failure === "network" ? "Failed to fetch" : "Rankings temporarily unavailable";
+    fixture.handle("GET", () => {
+      if (failure === "network") throw new TypeError(message);
+      return { body: { detail: message }, status: 503 };
+    });
+    const hook = mount();
+    await settle();
+    await tick(1_000);
+    expect(hook.result.current.loading).toBe(false);
+    expect(hook.result.current.error).toBe(message);
+    expect(hook.result.current.data).toBeUndefined();
+    await tick(180_000);
+    expect(fixture.calls("GET")).toHaveLength(2);
+    expect(fixture.calls("POST")).toHaveLength(0);
+  });
+
+  it("retains prior running data across a transient polling failure and resumes normal polling", async () => {
+    const previous = ranking("running");
+    fixture.respond("GET", previous);
+    const hook = mount();
+    await settle();
+    fixture.respond("GET", { detail: "Status service unavailable" }, "v3", 503);
+    await tick(3_000);
+    expect(hook.result.current.data).toEqual(previous);
+    fixture.respond("GET", ranking("running", { matches: [], total: 0 }));
+    await tick(999);
+    expect(fixture.calls("GET")).toHaveLength(2);
+    await tick(1);
+    expect(hook.result.current.error).toBeNull();
+    expect(hook.result.current.data?.matches).toEqual([]);
+    fixture.respond("GET", ranking("completed"));
+    await tick(3_000);
+    expect(hook.result.current.data).toEqual(ranking("completed"));
+    await tick(180_000);
+    expect(fixture.calls("GET")).toHaveLength(4);
+    expect(fixture.calls("POST")).toHaveLength(0);
+  });
+
+  it.each(["network", "503"] as const)("retains cached results after a %s refetch exhausts its retry", async (failure) => {
+    const hook = mount();
+    await settle();
+    const previous = hook.result.current.data;
+    const message = failure === "network" ? "Failed to fetch" : "Cannot check rankings right now";
+    fixture.handle("GET", () => {
+      if (failure === "network") throw new TypeError(message);
+      return { body: { detail: message }, status: 503 };
+    });
+    act(() => { void hook.queryClient.refetchQueries({ queryKey: ["ai-brand-matches", "v3"] }); });
+    await settle();
+    await tick(1_000);
+    expect(hook.result.current.error).toBe(message);
+    expect(hook.result.current.data).toEqual(previous);
+    expect(hook.queryClient.getQueryData(["ai-brand-matches", "v3"])).toEqual(previous);
+    await tick(180_000);
+    expect(fixture.calls("GET")).toHaveLength(3);
+    expect(fixture.calls("POST")).toHaveLength(0);
+  });
+
+  it.each(["network", "503"] as const)("does not retry a failed %s refresh POST, retains results, and permits a new explicit refresh", async (failure) => {
+    const hook = mount();
+    await settle();
+    const previous = hook.result.current.data;
+    const message = failure === "network" ? "Failed to fetch" : "Unable to refresh matches right now";
+    fixture.handle("POST", () => {
+      if (failure === "network") throw new TypeError(message);
+      return { body: { detail: message }, status: 503 };
+    });
+    act(() => hook.result.current.refresh());
+    await settle();
+    expect(hook.result.current.refreshing).toBe(false);
+    expect(hook.result.current.error).toBe(message);
+    expect(hook.result.current.data).toEqual(previous);
+    await tick(180_000);
+    expect(fixture.calls("POST")).toHaveLength(1);
+    const reads = fixture.calls("GET").length;
+
+    fixture.respond("POST", ranking("queued"));
+    fixture.respond("GET", ranking("queued"));
+    act(() => hook.result.current.refresh());
+    await settle();
+    expect(fixture.calls("POST")).toHaveLength(2);
+    expect(hook.result.current.error).toBeNull();
+    expect(hook.result.current.data?.status).toBe("queued");
+    expect(fixture.calls("GET")).toHaveLength(reads + 1);
+    fixture.respond("GET", ranking("completed", { matches: [], total: 0 }));
+    await tick(3_000);
+    expect(hook.result.current.data?.matches).toEqual([]);
+    expect(hook.result.current.data?.status).toBe("completed");
+    await tick(180_000);
+    expect(fixture.calls("POST")).toHaveLength(2);
+    expect(fixture.calls("GET")).toHaveLength(reads + 2);
+  });
+
+  const invalidRankings = [
+    { name: "null envelope", body: null },
+    { name: "unknown status", body: ranking("completed", { status: "unknown" as never }) },
+    { name: "missing matches", body: { status: "completed", error: null, ranked_at: null, total: 0 } },
+    { name: "invalid ranked date", body: ranking("completed", { ranked_at: "not-a-date" }) },
+    { name: "negative total", body: ranking("completed", { total: -1 }) },
+    { name: "invalid brand confidence", body: ranking("completed", {
+      matches: [{ ...ranking("completed").matches[0], confidence: 101 }],
+    }) },
+  ];
+
+  it.each(invalidRankings)("rejects a 200 GET with $name, retries only once, and never caches it", async ({ body }) => {
+    fixture.respond("GET", body);
+    const hook = mount();
+    await settle();
+    await tick(1_000);
+    expect(hook.result.current.error).toBe("Invalid AI ranking response");
+    expect(hook.result.current.loading).toBe(false);
+    expect(hook.result.current.data).toBeUndefined();
+    expect(hook.queryClient.getQueryData(["ai-brand-matches", "v3"])).toBeUndefined();
+    await tick(180_000);
+    expect(fixture.calls("GET")).toHaveLength(2);
+    expect(fixture.calls("POST")).toHaveLength(0);
+  });
+
+  it.each(invalidRankings)("rejects a 200 refresh POST with $name without overwriting prior results", async ({ body }) => {
+    const hook = mount();
+    await settle();
+    const previous = hook.result.current.data;
+    fixture.respond("POST", body);
+    act(() => hook.result.current.refresh());
+    await settle();
+    expect(hook.result.current.error).toBe("Invalid AI ranking response");
+    expect(hook.result.current.refreshing).toBe(false);
+    expect(hook.result.current.data).toEqual(previous);
+    expect(hook.queryClient.getQueryData(["ai-brand-matches", "v3"])).toEqual(previous);
+    await tick(180_000);
+    expect(fixture.calls("POST")).toHaveLength(1);
+    fixture.respond("POST", ranking("queued"));
+    fixture.respond("GET", ranking("queued"));
+    act(() => hook.result.current.refresh());
+    await settle();
+    expect(fixture.calls("POST")).toHaveLength(2);
+    expect(hook.result.current.error).toBeNull();
+    expect(hook.result.current.data?.status).toBe("queued");
+  });
+
+  it.each([
+    { status: 401, body: { detail: "Your session has expired. Please sign in again." }, event: "mavlit:unauthorized" },
+    { status: 403, body: { detail: "Complete your creator profile to view matches." }, event: "mavlit:profile-incomplete" },
+    { status: 403, body: { detail: { error: "profile_incomplete" }, message: "Complete your creator profile." }, event: "mavlit:profile-incomplete" },
+  ])("does not retry GET $status ($event) and emits the expected session event", async ({ status, body, event }) => {
+    const dispatch = vi.spyOn(window, "dispatchEvent");
+    fixture.respond("GET", body, "v3", status);
+    const hook = mount();
+    await settle();
+    expect(hook.result.current.loading).toBe(false);
+    expect(hook.result.current.error).toBe(body.message ?? body.detail);
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: event }));
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({
+      type: status === 401 ? "mavlit:profile-incomplete" : "mavlit:unauthorized",
+    }));
+    await tick(180_000);
+    expect(fixture.calls("GET")).toHaveLength(1);
+    expect(fixture.calls("POST")).toHaveLength(0);
+  });
+
+  it.each([401, 403])("does not retry refresh POST %s, retains prior data, and emits the expected session event", async (status) => {
+    const hook = mount();
+    await settle();
+    const previous = hook.result.current.data;
+    const dispatch = vi.spyOn(window, "dispatchEvent");
+    const message = status === 401 ? "Your session has expired. Please sign in again." : "Complete your creator profile.";
+    fixture.respond("POST", { detail: message }, "v3", status);
+    act(() => hook.result.current.refresh());
+    await settle();
+    expect(hook.result.current.error).toBe(message);
+    expect(hook.result.current.refreshing).toBe(false);
+    expect(hook.result.current.data).toEqual(previous);
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+      type: status === 401 ? "mavlit:unauthorized" : "mavlit:profile-incomplete",
+    }));
+    await tick(180_000);
+    expect(fixture.calls("POST")).toHaveLength(1);
   });
 });
 

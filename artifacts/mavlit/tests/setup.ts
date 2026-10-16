@@ -8,7 +8,7 @@ beforeEach(() => {
   window.history.replaceState(null, "", "/profile");
   // Even tests without a fixture must never fall through to a real API.
   vi.stubGlobal("fetch", vi.fn(() => {
-    throw new Error("Network access is forbidden in profile regression tests.");
+    throw new Error("Network access is forbidden in regression tests.");
   }));
 });
 

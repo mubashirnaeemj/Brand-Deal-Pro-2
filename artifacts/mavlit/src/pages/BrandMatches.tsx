@@ -17,14 +17,14 @@ import MatchScoreBreakdown from "@/components/MatchScoreBreakdown";
 import AiMatchesSection from "@/components/AiMatchesSection";
 import useAiMatches from "@/hooks/useAiMatches";
 import useAiRankingMessage from "@/hooks/useAiRankingMessage";
-import { isAiRanking, type AiRankedMatch, type AiMatchesVersion } from "@/lib/aiMatches";
+import { isAiRanking, type AiRankedMatch } from "@/lib/aiMatches";
 import { api, ApiRequestError, getAllMatches, type ApiBrand, type ApiMatch, type MatchesResponse, type SavedBrand } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
 const ACCENT = "#7c3aed";
 const TIMING_COPY = "Brand campaign calendars are often planned months in advance. Research upcoming campaigns and reach out early.";
-const MATCH_VERSIONS = ["v1", "v2", "v3"] as const;
+const MATCH_VERSIONS = ["v1", "v3"] as const;
 type MatchesVersion = typeof MATCH_VERSIONS[number];
 
 function nicheOf(match: ApiMatch) {
@@ -258,30 +258,34 @@ export default function BrandMatches() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeCategory, setActiveCategory] = useState("All");
-  const [searchByVersion, setSearchByVersion] = useState<Record<MatchesVersion, string>>({ v1: "", v2: "", v3: "" });
+  const [searchByVersion, setSearchByVersion] = useState<Record<MatchesVersion, string>>({ v1: "", v3: "" });
   const [version, setVersion] = useState<MatchesVersion>(() => {
     const requested = new URLSearchParams(window.location.search).get("version");
-    if (requested === "v1" || requested === "v2" || requested === "v3") return requested;
+    if (requested === "v2") return "v3";
+    if (requested === "v1" || requested === "v3") return requested;
     try {
       const stored = localStorage.getItem("mavlit_matches_version");
-      return stored === "v2" || stored === "v3" ? stored : "v1";
+      return stored === "v2" || stored === "v3" ? "v3" : "v1";
     }
     catch { return "v1"; }
   });
   useEffect(() => {
     const requested = new URLSearchParams(searchParams).get("version");
-    if (requested === "v1" || requested === "v2" || requested === "v3") setVersion(requested);
-  }, [searchParams]);
-  const v2Matches = useAiMatches("v2", version === "v2");
+    if (requested === "v2") {
+      setVersion("v3");
+      try { localStorage.setItem("mavlit_matches_version", "v3"); } catch { /* Storage can be unavailable in embedded previews. */ }
+      navigate("/brand-matches?version=v3", { replace: true });
+    } else if (requested === "v1" || requested === "v3") setVersion(requested);
+  }, [searchParams, navigate]);
   const v3Matches = useAiMatches("v3", version === "v3");
-  const aiMatchesByVersion = { v2: v2Matches, v3: v3Matches };
+  const aiMatchesByVersion = { v3: v3Matches };
   const progressMessage = useAiRankingMessage(
-    v2Matches.refreshing || v3Matches.refreshing || isAiRanking(v2Matches.data) || isAiRanking(v3Matches.data),
+    v3Matches.refreshing || isAiRanking(v3Matches.data),
   );
-  const [expandedAiReasons, setExpandedAiReasons] = useState<Record<AiMatchesVersion, Record<number, boolean>>>({
-    v2: {}, v3: {},
+  const [expandedAiReasons, setExpandedAiReasons] = useState<Record<Exclude<MatchesVersion, "v1">, Record<number, boolean>>>({
+    v3: {},
   });
-  const toggleAiReasons = (aiVersion: AiMatchesVersion, brandId: number) => {
+  const toggleAiReasons = (aiVersion: Exclude<MatchesVersion, "v1">, brandId: number) => {
     setExpandedAiReasons((previous) => ({
       ...previous,
       [aiVersion]: { ...previous[aiVersion], [brandId]: !previous[aiVersion][brandId] },
@@ -367,7 +371,7 @@ export default function BrandMatches() {
   const categoryMatches = activeCategory === "All" ? matches ?? [] : (matches ?? []).filter((match) => nicheOf(match) === activeCategory);
   const filtered = filterBrandMatches(categoryMatches, searchByVersion.v1);
 
-  const renderAi = (aiVersion: AiMatchesVersion, data: ReturnType<typeof useAiMatches>) => (
+  const renderAi = (aiVersion: Exclude<MatchesVersion, "v1">, data: ReturnType<typeof useAiMatches>) => (
     <AiMatchesSection version={aiVersion} data={data.data} loading={data.loading} error={data.error}
       refreshing={data.refreshing} onRefresh={data.refresh} onOpen={setSelectedAiMatch}
       timedOut={data.timedOut} preferences={aiVersion === "v3" ? user?.brand_preferences : undefined}
@@ -490,7 +494,7 @@ export default function BrandMatches() {
             </AnimatePresence>
           )}
           </section>
-          {(["v2", "v3"] as const).map((aiVersion) => (
+          {(["v3"] as const).map((aiVersion) => (
             <section key={aiVersion} id={`matches-panel-${aiVersion}`} role="tabpanel"
               aria-labelledby={`matches-tab-${aiVersion}`} hidden={version !== aiVersion}>
               {version === aiVersion && renderAi(aiVersion, aiMatchesByVersion[aiVersion])}

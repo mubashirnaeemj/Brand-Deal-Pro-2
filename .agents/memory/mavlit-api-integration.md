@@ -23,6 +23,12 @@ Preserve the order of matches returned by the external API; do not re-sort them 
 
 ## AI match ranking lifecycle
 
+Only V1 and V3 should be available in the Matches UI; legacy V2 selections should lead to V3. Leave the external backend's V2 ranking lifecycle unchanged.
+
+**Why:** The user asked to remove V2 from Matches, not to change the external backend.
+
+**How to apply:** Do not restore a V2 tab or activate V2 requests from the Matches page.
+
 The external backend starts both V2 and V3 AI ranking when a creator profile is saved; the client should only request a re-rank when the creator explicitly clicks the re-rank control.
 
 **Why:** The user specified that profile saves already trigger V2 and V3 ranking automatically. An extra frontend trigger would duplicate potentially expensive ranking work.

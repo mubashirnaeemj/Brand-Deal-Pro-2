@@ -90,11 +90,65 @@ describe("Matches page V3 integration", () => {
     await tick(1);
     expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Still working — check back shortly");
     expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Automatic checks have paused.");
+    expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Previous results below are not final.");
+    expect(screen.getByRole("button", { name: "Check status" })).toBeEnabled();
+    expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
     const reads = fixture.calls("GET").length;
     await tick(30_000);
     expect(fixture.calls("GET")).toHaveLength(reads);
     expect(fixture.calls("POST")).toHaveLength(0);
     expect(screen.getAllByRole("article")).toHaveLength(3);
+  });
+
+  it.each(["completed", "failed"] as const)("checks a paused job without POSTing and handles %s", async (status) => {
+    fixture.respond("GET", ranking("queued"));
+    mountMatches();
+    await settle();
+    await tick(180_000);
+    const reads = fixture.calls("GET").length;
+    fixture.respond("GET", ranking("running"));
+    fireEvent.click(screen.getByRole("button", { name: "Check status" }));
+    await settle();
+    expect(fixture.calls("GET")).toHaveLength(reads + 1);
+    expect(fixture.calls("POST")).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Check status" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Updating your matches");
+    expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Previous results below are not final.");
+    expect(screen.getAllByRole("article")[0].parentElement).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
+
+    fixture.respond("GET", ranking(status, {
+      matches: rankedBrands.slice(1), total: 2,
+    }));
+    await tick(3_000);
+    expect(screen.queryByTestId("status-v3-updating")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("article")[0].parentElement).toHaveAttribute("aria-busy", "false");
+    expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+    if (status === "failed") {
+      expect(screen.getByTestId("text-ai-failed")).toHaveTextContent("Fixture ranking failed");
+      expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+    } else {
+      expect(screen.queryByTestId("text-ai-failed")).not.toBeInTheDocument();
+    }
+    await tick(180_000);
+    expect(fixture.calls("GET")).toHaveLength(reads + 2);
+    expect(fixture.calls("POST")).toHaveLength(0);
+  });
+
+  it("offers Check status again after another bounded window, including an empty previous ranking", async () => {
+    fixture.respond("GET", ranking("running", { total: 0, matches: [] }));
+    mountMatches();
+    await settle();
+    await tick(180_000);
+    fireEvent.click(screen.getByRole("button", { name: "Check status" }));
+    await settle();
+    expect(screen.queryByRole("button", { name: "Check status" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
+    await tick(180_000);
+    expect(screen.getByRole("button", { name: "Check status" })).toBeEnabled();
+    expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
+    expect(fixture.calls("POST")).toHaveLength(0);
   });
 
   it.each(["retry", "manual refresh"] as const)("%s sends one POST and resumes polling through completion", async (action) => {

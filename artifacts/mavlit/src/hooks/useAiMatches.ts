@@ -6,6 +6,7 @@ import { loadAi, isAiRanking, rerankAi, type AiMatchesVersion } from "@/lib/aiMa
 export default function useAiMatches(version: AiMatchesVersion, active: boolean) {
   const [loaded, setLoaded] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
+  const [checkCycle, setCheckCycle] = useState(0);
   const queryKey = ["ai-brand-matches", version];
   const queryClient = useQueryClient();
   useEffect(() => {
@@ -40,7 +41,7 @@ export default function useAiMatches(version: AiMatchesVersion, active: boolean)
     }
     const timer = setTimeout(() => setTimedOut(true), 180_000);
     return () => clearTimeout(timer);
-  }, [pending, version]);
+  }, [pending, version, checkCycle]);
   useEffect(() => {
     if (error instanceof ApiRequestError && error.status === 403) {
       window.dispatchEvent(new Event("mavlit:profile-incomplete"));
@@ -53,6 +54,14 @@ export default function useAiMatches(version: AiMatchesVersion, active: boolean)
     error: error instanceof Error ? error.message : error ? "Could not load AI rankings." : null,
     refreshing: refresh.isPending,
     timedOut,
+    checkStatus: () => {
+      if (version !== "v3" || !timedOut || !pending || refresh.isPending) return;
+      setTimedOut(false);
+      setCheckCycle((cycle) => cycle + 1);
+      // Read the existing backend job; never start another ranking. Reuse any
+      // slow GET still in flight at the deadline instead of cancelling it.
+      void query.refetch({ cancelRefetch: false });
+    },
     refresh: () => {
       if (refresh.isPending || isAiRanking(query.data)) return;
       refresh.mutate();

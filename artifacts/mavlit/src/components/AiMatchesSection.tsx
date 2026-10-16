@@ -12,6 +12,7 @@ interface Props {
   error: string | null;
   refreshing: boolean;
   onRefresh: () => void;
+  onCheckStatus: () => void;
   onOpen: (match: AiRankedMatch) => void;
   progressMessage: string;
   expandedByBrand: Record<number, boolean>;
@@ -48,7 +49,7 @@ function formatRanked(value: string | null | undefined) {
   return date.toLocaleString();
 }
 
-export default function AiMatchesSection({ version, data, loading, error, refreshing, onRefresh, onOpen,
+export default function AiMatchesSection({ version, data, loading, error, refreshing, onRefresh, onCheckStatus, onOpen,
   progressMessage, expandedByBrand, onToggleReasons, search, timedOut = false, preferences }: Props) {
   const status = data?.status;
   const pending = status === "queued" || status === "running";
@@ -97,9 +98,15 @@ export default function AiMatchesSection({ version, data, loading, error, refres
                 {timedOut ? "Still working — check back shortly" : "Updating your matches…"}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {timedOut ? "Automatic checks have paused. Your ranking continues in the background."
-                  : `${progressMessage}${matches.length ? " Previous results below are not final." : ""}`}
+                {timedOut ? "Automatic checks have paused. Your ranking continues in the background." : progressMessage}
+                {matches.length > 0 && " Previous results below are not final."}
               </p>
+              {timedOut && pending && (
+                <button type="button" data-testid="button-ai-check-status" onClick={onCheckStatus}
+                  className="mt-3 rounded-lg border border-primary/50 px-3 py-2 text-sm font-semibold text-white hover:bg-primary/10">
+                  Check status
+                </button>
+              )}
             </div>
           ) : <AiRankingStatus message={progressMessage} hasPreviousMatches={matches.length > 0} />)}
           {status === "failed" && (

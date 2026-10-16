@@ -65,6 +65,9 @@ Coverage:
   described as non-final; final results remove that warning and busy state.
 - The 3-minute deadline survives queued → running transitions, pauses GETs,
   and shows the paused-check message without implying the backend job stopped.
+- Check status immediately resumes GET-only checks for a fresh 3-minute window,
+  reuses slow in-flight reads, preserves non-final cards, and stops on completion,
+  failure, or unmount. A second pause offers Check status again.
 - Failure retry and completed manual refresh each send one POST and resume GET
   polling through completion. Pending POSTs and queued/running jobs reject
   further refresh actions.

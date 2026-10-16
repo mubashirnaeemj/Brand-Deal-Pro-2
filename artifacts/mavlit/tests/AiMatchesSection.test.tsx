@@ -7,7 +7,7 @@ import { rankedBrands, ranking } from "./fixtures/aiMatchesApi";
 function mount(overrides: Partial<ComponentProps<typeof AiMatchesSection>> = {}) {
   const props: ComponentProps<typeof AiMatchesSection> = {
     version: "v3", data: ranking("completed"), loading: false, error: null,
-    refreshing: false, onRefresh: vi.fn(), onOpen: vi.fn(),
+    refreshing: false, onRefresh: vi.fn(), onCheckStatus: vi.fn(), onOpen: vi.fn(),
     progressMessage: "Reading brand evidence…", expandedByBrand: {},
     onToggleReasons: vi.fn(), search: "", preferences: "Avoid Unwanted Amplifiers",
     ...overrides,

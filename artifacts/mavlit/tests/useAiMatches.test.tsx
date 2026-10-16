@@ -127,6 +127,91 @@ describe("V3 ranking lifecycle (mocked fetch and accelerated clock)", () => {
     expect(fixture.calls("POST")).toHaveLength(0);
   });
 
+  it("resumes immediately with GET only and grants each check cycle a fresh bounded window", async () => {
+    fixture.respond("GET", ranking("queued"));
+    const hook = mount();
+    await settle();
+    // Checking is not a second way to start or refresh a ranking.
+    act(() => hook.result.current.checkStatus());
+    await settle();
+    expect(fixture.calls("GET")).toHaveLength(1);
+    await tick(180_000);
+    expect(hook.result.current.timedOut).toBe(true);
+    await tick(30_000);
+    const reads = fixture.calls("GET").length;
+
+    fixture.respond("GET", ranking("running"));
+    act(() => {
+      hook.result.current.checkStatus();
+      hook.result.current.checkStatus();
+      hook.result.current.refresh();
+    });
+    await settle();
+    expect(fixture.calls("GET")).toHaveLength(reads + 1);
+    expect(hook.result.current.timedOut).toBe(false);
+    expect(hook.result.current.data).toEqual(ranking("running"));
+    await tick(2_999);
+    expect(fixture.calls("GET")).toHaveLength(reads + 1);
+    await tick(1);
+    expect(fixture.calls("GET")).toHaveLength(reads + 2);
+    await tick(176_999);
+    expect(hook.result.current.timedOut).toBe(false);
+    await tick(1);
+    expect(hook.result.current.timedOut).toBe(true);
+    const pausedReads = fixture.calls("GET").length;
+    await tick(60_000);
+    expect(fixture.calls("GET")).toHaveLength(pausedReads);
+    act(() => hook.result.current.checkStatus());
+    await settle();
+    expect(fixture.calls("GET")).toHaveLength(pausedReads + 1);
+    expect(hook.result.current.timedOut).toBe(false);
+    hook.unmount();
+    await tick(180_000);
+    expect(fixture.calls("GET")).toHaveLength(pausedReads + 1);
+    expect(fixture.calls("POST")).toHaveLength(0);
+  });
+
+  it.each(["completed", "failed"] as const)("stops resumed checks when the backend returns %s", async (status) => {
+    fixture.respond("GET", ranking("running"));
+    const hook = mount();
+    await settle();
+    await tick(180_000);
+    act(() => hook.result.current.checkStatus());
+    await settle();
+    const reads = fixture.calls("GET").length;
+    fixture.respond("GET", ranking(status));
+    await tick(3_000);
+    expect(hook.result.current.data).toEqual(ranking(status));
+    expect(hook.result.current.timedOut).toBe(false);
+    await tick(180_000);
+    expect(fixture.calls("GET")).toHaveLength(reads + 1);
+    act(() => hook.result.current.checkStatus());
+    await settle();
+    expect(fixture.calls("GET")).toHaveLength(reads + 1);
+    expect(fixture.calls("POST")).toHaveLength(0);
+  });
+
+  it("reuses a slow status GET when resuming rather than aborting or overlapping it", async () => {
+    fixture.respond("GET", ranking("running"));
+    const hook = mount();
+    await settle();
+    let release!: (reply: { body: unknown }) => void;
+    fixture.handle("GET", () => new Promise((resolve) => { release = resolve; }));
+    await tick(3_000);
+    await tick(177_000);
+    expect(hook.result.current.timedOut).toBe(true);
+    act(() => hook.result.current.checkStatus());
+    await settle();
+    await tick(6_000);
+    expect(fixture.calls("GET")).toHaveLength(2);
+    expect(fixture.calls("GET")[1].signal?.aborted).toBe(false);
+    await act(async () => { release({ body: ranking("completed") }); });
+    await settle();
+    expect(hook.result.current.data?.status).toBe("completed");
+    expect(hook.result.current.timedOut).toBe(false);
+    expect(fixture.calls("POST")).toHaveLength(0);
+  });
+
   it("cleans up polling on unmount", async () => {
     fixture.respond("GET", ranking("running"));
     const hook = mount();

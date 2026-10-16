@@ -23,17 +23,17 @@ Preserve the order of matches returned by the external API; do not re-sort them 
 
 ## AI match ranking lifecycle
 
-Only V1 and V3 should be available in the Matches UI; legacy V2 selections should lead to V3. Leave the external backend's V2 ranking lifecycle unchanged.
+Only V3 should be available in the Matches UI; legacy V1 and V2 selections should lead to V3. Leave the external backend's ranking lifecycle unchanged.
 
-**Why:** The user asked to remove V2 from Matches, not to change the external backend.
+**Why:** The user asked to remove both V2 and V1 from Matches, not to change the external backend.
 
-**How to apply:** Do not restore a V2 tab or activate V2 requests from the Matches page.
+**How to apply:** Do not restore V1/V2 tabs or activate their match requests from the Matches page. Matches should open directly to V3 without a version selector.
 
 The external backend starts both V2 and V3 AI ranking when a creator profile is saved; the client should only request a re-rank when the creator explicitly clicks the re-rank control.
 
 **Why:** The user specified that profile saves already trigger V2 and V3 ranking automatically. An extra frontend trigger would duplicate potentially expensive ranking work.
 
-**How to apply:** Keep all versions' results separate; never sort their lists on the client. The user repeatedly specifies that AI-tab updates must leave V1's appearance and behavior unchanged. AI tabs load lazily when opened; keep known in-progress runs polling until final states, including when another Matches tab is selected, while preserving previous results. Use one shared progress-message rotation for both AI versions, not one per tab.
+**How to apply:** Never sort results on the client. Keep known in-progress runs polling until final states while preserving previous results. Only expose V3 on the Matches page; backend V2 jobs are not a reason to restore a V2 UI.
 
 ## Brand exclusion semantics
 

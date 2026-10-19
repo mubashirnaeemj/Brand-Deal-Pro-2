@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { profilePatch, profileToForm, validateProfile } from "@/pages/profileForm";
 import { creatorProfile } from "./fixtures/creatorProfile";
 
+const emptyAudienceWrites = {
+  instagram_audience_gender: null, instagram_audience_age_min: null, instagram_audience_age_max: null,
+  youtube_audience_gender: null, youtube_audience_age_min: null, youtube_audience_age_max: null,
+};
+
 describe("profile form replacement patches", () => {
   it("loads separate audience demographics without falling back to legacy shared fields", () => {
     const form = profileToForm(creatorProfile({
@@ -19,6 +24,7 @@ describe("profile form replacement patches", () => {
     Object.assign(form[platform], { audienceGender: "male", audienceAgeMin: "18", audienceAgeMax: "45" });
     expect(validateProfile(form, profile)).toBeNull();
     expect(profilePatch(form, profile)).toEqual({
+      ...emptyAudienceWrites,
       brand_preferences: profile.brand_preferences,
       [`${platform}_audience_gender`]: "male",
       [`${platform}_audience_age_min`]: 18,
@@ -28,6 +34,7 @@ describe("profile form replacement patches", () => {
     const cleared = profileToForm(saved);
     Object.assign(cleared[platform], { audienceGender: "", audienceAgeMin: "", audienceAgeMax: "" });
     expect(profilePatch(cleared, saved)).toEqual({
+      ...emptyAudienceWrites,
       brand_preferences: saved.brand_preferences,
       [`${platform}_audience_gender`]: null,
       [`${platform}_audience_age_min`]: null,
@@ -61,13 +68,13 @@ describe("profile form replacement patches", () => {
     const profile = creatorProfile();
     const form = { ...profileToForm(profile), brandPreferences: "  More sunscreen brands.  " };
     expect(validateProfile(form, profile)).toBeNull();
-    expect(profilePatch(form, profile)).toEqual({ brand_preferences: "More sunscreen brands." });
+    expect(profilePatch(form, profile)).toEqual({ ...emptyAudienceWrites, brand_preferences: "More sunscreen brands." });
   });
 
   it.each(["", " ", "\n\t  "])("blank preferences %j explicitly clear the field with null", (blank) => {
     const profile = creatorProfile();
     expect(profilePatch({ ...profileToForm(profile), brandPreferences: blank }, profile))
-      .toEqual({ brand_preferences: null });
+      .toEqual({ ...emptyAudienceWrites, brand_preferences: null });
   });
 
   it.each([999, 1000, 1001])("validates the exact %i-character boundary", (length) => {
@@ -86,6 +93,7 @@ describe("profile form replacement patches", () => {
   it("keeps an unrelated edit as a small patch rather than a reconstructed profile", () => {
     const profile = creatorProfile();
     expect(profilePatch({ ...profileToForm(profile), fullName: "Updated Creator" }, profile)).toEqual({
+      ...emptyAudienceWrites,
       full_name: "Updated Creator",
       brand_preferences: profile.brand_preferences,
     });

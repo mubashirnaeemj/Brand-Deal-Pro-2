@@ -1,0 +1,22 @@
+Bug: when I use "Let MAVLIT generate my description", the audience gender and the audience age min/max are not filled in, but on my local version they are. Find the cause in this app and fix it. Do not change the backend.
+
+How the backend works (already live):
+1) POST /creator-profile/me/generate-description with {platform, username, niche} returns immediately with {status: "queued"|"running", job_id}. The AI runs in the background.
+2) When the job finishes it saves, on the logged-in user's profile, ALL of these together:
+   <platform>_description, <platform>_audience_gender ("male"|"female"|"both"),
+   <platform>_audience_age_min, <platform>_audience_age_max  (platform = instagram or youtube).
+3) The generate endpoint's own response does NOT contain the audience values. The only place to read them is GET /creator-profile/me, once <platform>_description_status is "completed".
+4) PUT /creator-profile/me REPLACES every profile field with what the request body contains. Any field missing from the body, or sent as null/empty, is cleared on the server.
+
+Check each of these in the code and fix what is wrong:
+A) After POST generate-description, the app must poll GET /creator-profile/me (every 1-2 s, stop on "failed" or when <platform>_description_job_id no longer equals the job_id) until <platform>_description_status === "completed". Do not use only the POST response.
+B) On "completed", copy BOTH the description AND the 3 audience fields from that polled profile into the form state:
+   <platform>_audience_gender, <platform>_audience_age_min, <platform>_audience_age_max.
+   Only fill a field if it is currently empty, so values the user typed or chose are never overwritten. Leave a field empty if the server value is null.
+C) The audience gender dropdown must accept exactly "male", "female", "both" (lowercase). The age inputs are whole numbers 13-100 (send numbers, not strings).
+D) The save request (PUT /creator-profile/me) must include the audience fields for every selected platform: instagram_audience_gender, instagram_audience_age_min, instagram_audience_age_max, and the youtube_ ones. They must come from the current form state (including the generated values). Never leave them out and never send null when the form has a value, or the server clears them.
+E) Wait for the generation to finish BEFORE saving: do not call PUT while the status is "queued" or "running". If the app saves first and the job finishes later, the form on screen stays empty and the next save wipes the generated values.
+F) After a save, reload the profile with GET /creator-profile/me and show what the server has, including the audience fields.
+G) The Audience block (gender dropdown + age min + age max, per selected platform) must be visible when the description mode is "Let MAVLIT generate", not only for manual descriptions.
+
+When done, test: create/edit a profile with an Instagram username, choose "Let MAVLIT generate", save, and confirm that the audience gender and the two ages appear in the form, are included in the PUT body (check the browser network tab), and are still there after a page reload. Tell me which of A-G was wrong.

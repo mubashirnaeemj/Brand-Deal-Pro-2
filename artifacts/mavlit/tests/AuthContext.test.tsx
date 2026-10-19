@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "@/contexts/AuthContext";
 import { creatorProfile, freshCreatorProfile } from "./fixtures/creatorProfile";
 import { installProfileApi } from "./fixtures/profileApi";
@@ -17,6 +17,36 @@ async function mountAuth() {
 }
 
 describe("AuthContext.updateProfile full-replacement contract", () => {
+  it.each(["instagram", "youtube"] as const)("blocks all replacement writes while %s generation is pending", async (platform) => {
+    const { result } = await mountAuth();
+    for (const status of ["queued", "running"] as const) {
+      fixture.replaceOnServer({ ...fixture.persisted, [`${platform}_description_status`]: status });
+      await act(async () => {
+        await expect(result.current.updateProfile({ full_name: "Must wait" })).rejects.toThrow("still in progress");
+      });
+    }
+    expect(fixture.writes).toHaveLength(0);
+  });
+
+  it("uses the post-save GET even if PUT only returns an acknowledgement", async () => {
+    const { result } = await mountAuth();
+    const fetchFixture = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await fetchFixture(input, init);
+      if (init?.method !== "PUT") return response;
+      fixture.replaceOnServer({
+        ...fixture.persisted, instagram_audience_gender: "both",
+        instagram_audience_age_min: 21, instagram_audience_age_max: 40,
+      });
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    }));
+    await act(async () => { await result.current.updateProfile({ full_name: "Updated Name" }); });
+    expect(result.current.user).toMatchObject({
+      full_name: "Updated Name", instagram_audience_gender: "both",
+      instagram_audience_age_min: 21, instagram_audience_age_max: 40,
+    });
+  });
+
   it.each([
     { full_name: "Updated Name" },
     { instagram_handle: "new_username", creator_handle: "new_username" },
@@ -28,7 +58,7 @@ describe("AuthContext.updateProfile full-replacement contract", () => {
     let returned;
     await act(async () => { returned = await result.current.updateProfile(patch); });
     const expected = { ...fresh, ...patch };
-    expect(fixture.requests.slice(requestStart).map(({ method }) => method)).toEqual(["GET", "PUT"]);
+    expect(fixture.requests.slice(requestStart).map(({ method }) => method)).toEqual(["GET", "PUT", "GET"]);
     expect(fixture.writes).toHaveLength(1);
     expect(fixture.writes[0].body).toEqual(expected);
     expect(fixture.persisted).toEqual(expected);

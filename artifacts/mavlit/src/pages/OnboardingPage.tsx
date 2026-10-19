@@ -150,7 +150,7 @@ export default function OnboardingPage() {
         ...previous,
         [platform]: {
           ...fillEmptyAudience(previous[platform], completed, platform),
-          contentDescription: completed[`${platform}_description`]!.trim(),
+          contentDescription: previous[platform].contentDescription.trim() ? previous[platform].contentDescription : completed[`${platform}_description`]!.trim(),
         },
       }));
       setEstimatedPlatforms((previous) => ({ ...previous, [platform]: true }));
@@ -324,7 +324,7 @@ export default function OnboardingPage() {
 async function waitForDescription(platform: DescriptionPlatform, jobId: string, onProgress: (message: string) => void, signal: AbortSignal): Promise<CreatorProfile> {
   if (!jobId) throw new Error("MAVLIT did not return a generation job ID.");
   while (true) {
-    await new Promise((resolve) => setTimeout(resolve, 2500));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
     if (signal.aborted) throw new Error("Generation progress checks stopped.");
     const profile = await api.get<CreatorProfile>("/creator-profile/me", { signal });
     if (profile[`${platform}_description_job_id`] !== jobId) throw new Error("The generation job changed. Progress checks stopped. Please try again.");
@@ -372,7 +372,18 @@ function loadDraft(profile: CreatorProfile | null): SavedDraft {
     if (raw) {
       const parsed = JSON.parse(raw) as SavedDraft;
       if (parsed.data?.creator && parsed.data.instagram && parsed.data.youtube) {
-        return { data: currentFields(parsed.data), step: parsed.step === "welcome" ? "creator" : parsed.step };
+        let data = currentFields(parsed.data);
+        for (const platform of ["instagram", "youtube"] as const) {
+          if (profile?.[`${platform}_description_status`] === "completed" &&
+              data[`${platform}DescriptionMode`] === "generate") {
+            data = { ...data, [platform]: {
+              ...fillEmptyAudience(data[platform], profile, platform),
+              contentDescription: data[platform].contentDescription.trim()
+                ? data[platform].contentDescription : profile[`${platform}_description`] || "",
+            } };
+          }
+        }
+        return { data, step: parsed.step === "welcome" ? "creator" : parsed.step };
       }
     }
   } catch {

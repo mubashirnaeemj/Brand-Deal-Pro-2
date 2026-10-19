@@ -89,7 +89,8 @@ export default function ProfileSettings() {
             if (wasPending && latest[`${platform}_description_status`] === "completed") {
               const description = latest[`${platform}_description`]?.trim();
               if (description) next = { ...next, [platform]: {
-                ...fillEmptyAudience(next[platform], latest, platform), description,
+                ...fillEmptyAudience(next[platform], latest, platform),
+                description: next[platform].description.trim() ? next[platform].description : description,
               } };
             }
           }
@@ -97,15 +98,15 @@ export default function ProfileSettings() {
         });
         setProfile(latest);
         if (isDescriptionPending(latest.instagram_description_status) || isDescriptionPending(latest.youtube_description_status)) {
-          timer = setTimeout(poll, 2500);
+          timer = setTimeout(poll, 1500);
         }
       } catch {
         if (stopped) return;
         setPollError("Could not check description progress. Retrying…");
-        timer = setTimeout(poll, 3000);
+        timer = setTimeout(poll, 1500);
       }
     };
-    timer = setTimeout(poll, 2500);
+    timer = setTimeout(poll, 1500);
     return () => { stopped = true; clearTimeout(timer); };
   }, [jobPending, instagramStatus, youtubeStatus, instagramJobId, youtubeJobId]);
 
@@ -118,7 +119,7 @@ export default function ProfileSettings() {
   const generated = (platform: "instagram" | "youtube", completed: CreatorProfile) => {
     setForm((current) => current ? { ...current, [platform]: {
       ...fillEmptyAudience(current[platform], completed, platform),
-      description: completed[`${platform}_description`]?.trim() || current[platform].description,
+      description: current[platform].description.trim() ? current[platform].description : completed[`${platform}_description`]?.trim() || "",
     } } : current);
     setSaved(false);
     setError(null);
@@ -182,29 +183,9 @@ export default function ProfileSettings() {
 
     // Use persisted values, not the other unsaved fields in the editor, when saving a name before generation.
     const updated = await updateProfile({
-      full_name: current.full_name,
       creator_handle: creatorHandle,
-      age: current.age,
-      gender: current.gender,
-      primary_platform: current.primary_platform,
-      follower_count: current.follower_count,
-      content_niche: current.content_niche,
-      content_description: current.content_description,
-      excluded_categories: current.excluded_categories,
-      instagram_handle: platform === "instagram" ? enteredUsername : current.instagram_handle,
-      instagram_followers: current.instagram_followers,
-      instagram_primary_niche: current.instagram_primary_niche,
-      instagram_sub_niches: current.instagram_sub_niches,
-      instagram_excluded_categories: current.instagram_excluded_categories,
-      instagram_description: current.instagram_description,
-      instagram_description_mode: platform === "instagram" ? "generate" : current.instagram_description_mode,
-      youtube_channel_name: platform === "youtube" ? enteredUsername : current.youtube_channel_name,
-      youtube_subscribers: current.youtube_subscribers,
-      youtube_primary_niche: current.youtube_primary_niche,
-      youtube_sub_niches: current.youtube_sub_niches,
-      youtube_excluded_categories: current.youtube_excluded_categories,
-      youtube_description: current.youtube_description,
-      youtube_description_mode: platform === "youtube" ? "generate" : current.youtube_description_mode,
+      [platform === "instagram" ? "instagram_handle" : "youtube_channel_name"]: enteredUsername,
+      [`${platform}_description_mode`]: "generate",
     });
     setProfile(updated);
     const savedUsername = platform === "instagram"
@@ -238,9 +219,45 @@ export default function ProfileSettings() {
     }
     setSaving(true);
     try {
-      // Retain failed submissions even if an expired session navigates to sign-in.
       try { sessionStorage.setItem(`mavlit_profile_draft:${profile.id}`, JSON.stringify(form)); } catch { /* Storage may be unavailable. */ }
-      const patch = profilePatch(form, profile);
+      const latest = await api.get<CreatorProfile>("/creator-profile/me");
+      if (isDescriptionPending(latest.instagram_description_status) || isDescriptionPending(latest.youtube_description_status)) {
+        setProfile(latest);
+        setError("Description generation is still in progress. Wait for it to finish before saving.");
+        return;
+      }
+      // A job may have finished in another tab or while this view was offline.
+      // Recover its values before composing a replacement write.
+      let saveForm = form;
+      const baseline = profileToForm(profile);
+      const fresh = profileToForm(latest);
+      for (const platform of ["instagram", "youtube"] as const) {
+        // An untouched empty input is not a request to clear a value that
+        // arrived on the server since this editor loaded.
+        const fields = { ...saveForm[platform] };
+        for (const key of ["audienceGender", "audienceAgeMin", "audienceAgeMax"] as const) {
+          if (!fields[key].trim() && fields[key] === baseline[platform][key]) fields[key] = fresh[platform][key];
+        }
+        saveForm = { ...saveForm, [platform]: fields };
+        if (latest[`${platform}_description_status`] === "completed" &&
+            (profile[`${platform}_description_status`] !== "completed" ||
+             latest[`${platform}_description_job_id`] !== profile[`${platform}_description_job_id`]) &&
+            form[platform].descriptionMode === "generate") {
+          saveForm = { ...saveForm, [platform]: {
+            ...fillEmptyAudience(saveForm[platform], latest, platform),
+            description: saveForm[platform].description.trim() ? saveForm[platform].description : latest[`${platform}_description`] || "",
+          } };
+        }
+      }
+      setForm(saveForm);
+      const recoveredError = validateProfile(saveForm, latest);
+      if (recoveredError) {
+        setError(recoveredError);
+        return;
+      }
+      // Retain failed submissions even if an expired session navigates to sign-in.
+      try { sessionStorage.setItem(`mavlit_profile_draft:${profile.id}`, JSON.stringify(saveForm)); } catch { /* Storage may be unavailable. */ }
+      const patch = profilePatch(saveForm, profile);
       const updated = await updateProfile(patch);
       if (form.primaryPlatforms.some((platform) => !parsePlatforms(updated.primary_platform).includes(platform))) {
         setProfile(updated);
@@ -259,7 +276,7 @@ export default function ProfileSettings() {
         return;
       }
       for (const platform of ["instagram", "youtube"] as const) {
-        const audience = form[platform];
+        const audience = saveForm[platform];
         if ((`${platform}_audience_gender` in patch &&
               (updated[`${platform}_audience_gender`] || "") !== audience.audienceGender) ||
             (`${platform}_audience_age_min` in patch &&

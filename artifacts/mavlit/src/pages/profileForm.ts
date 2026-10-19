@@ -129,5 +129,7 @@ export function profilePatch(form: ProfileForm, profile: CreatorProfile): Partia
   const original = profileValues(profileToForm(profile), profile);
   // Do not normalize or overwrite unrelated fields during a preferences-only edit.
   return Object.fromEntries(Object.entries(values).filter(([key, value]) =>
-    key === "brand_preferences" || JSON.stringify(value) !== JSON.stringify(original[key as keyof CreatorProfile])));
+    key === "brand_preferences" ||
+    form.primaryPlatforms.some((platform) => key.startsWith(`${platform}_audience_`)) ||
+    JSON.stringify(value) !== JSON.stringify(original[key as keyof CreatorProfile])));
 }

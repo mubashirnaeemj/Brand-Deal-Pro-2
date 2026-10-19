@@ -57,7 +57,7 @@ describe("description audience auto-fill", () => {
     const rendered = await mount(platform);
     expect(fixture.requests.filter((request) => request.method === "POST")).toHaveLength(1);
     const initialReads = fixture.requests.filter((request) => request.method === "GET").length;
-    await tick(2499);
+    await tick(1499);
     expect(fixture.requests.filter((request) => request.method === "GET")).toHaveLength(initialReads);
     finish(platform);
     await tick(1);
@@ -91,16 +91,60 @@ describe("description audience auto-fill", () => {
     fireEvent.change(field("instagram", "gender"), { target: { value: "male" } });
     fireEvent.change(field("instagram", "age from"), { target: { value: "21" } });
     finish("instagram", { instagram_audience_age_max: null });
-    await tick(2500);
+    await tick(1500);
     expect(field("instagram", "gender")).toHaveValue("male");
     expect(field("instagram", "age from")).toHaveValue(21);
     expect(field("instagram", "age to")).toHaveValue(null);
   });
 
+  it("keeps a description typed during generation as well as typed audience values", async () => {
+    await mount();
+    fireEvent.click(screen.getByRole("radio", { name: /Write it myself/ }));
+    fireEvent.change(screen.getByRole("textbox", { name: /instagram description/i }), { target: { value: "My own description" } });
+    finish("instagram");
+    await tick(1500);
+    expect(screen.getByRole("textbox", { name: /instagram description/i })).toHaveValue("My own description");
+    expect(field("instagram", "age from")).toHaveValue(18);
+  });
+
+  it("detects a job started elsewhere before saving, waits, and then saves all generated fields", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    fixture = installProfileApi(creatorProfile({ primary_platform: "instagram", instagram_description_mode: "generate", instagram_description: null }));
+    renderProfile(<ProfileSettings />);
+    await settle();
+    fixture.replaceOnServer({ ...fixture.persisted, instagram_description_status: "running", instagram_description_job_id: "other-tab-job" });
+    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    await settle();
+    expect(fixture.writes).toHaveLength(0);
+    for (const button of screen.getAllByRole("button", { name: "Generating…" })) expect(button).toBeDisabled();
+    finish("instagram");
+    await tick(1500);
+    expect(field("instagram", "gender")).toHaveValue("female");
+    expect(screen.getByRole("textbox", { name: /instagram description/i })).toHaveValue("Generated creator description");
+    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    await settle();
+    expect(fixture.writes).toHaveLength(1);
+    expect(fixture.writes[0].body).toMatchObject({
+      instagram_audience_gender: "female", instagram_audience_age_min: 18, instagram_audience_age_max: 34,
+    });
+  });
+
+  it("allows intentionally clearing completed estimates without refilling them during save", async () => {
+    await mount();
+    finish("instagram");
+    await tick(1500);
+    for (const name of ["gender", "age from", "age to"]) fireEvent.change(field("instagram", name), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    await settle();
+    expect(fixture.persisted).toMatchObject({
+      instagram_audience_gender: null, instagram_audience_age_min: null, instagram_audience_age_max: null,
+    });
+  });
+
   it("stops when the watched job ID changes, without filling from the other job", async () => {
     await mount();
     finish("instagram", { instagram_description_job_id: "replacement-job" });
-    await tick(2500);
+    await tick(1500);
     expect(field("instagram", "gender")).toHaveValue("");
     expect(screen.getByText(/generation job changed/)).toBeInTheDocument();
     const reads = fixture.requests.length;
@@ -111,7 +155,7 @@ describe("description audience auto-fill", () => {
   it("shows the backend failure and stops polling", async () => {
     await mount();
     fixture.replaceOnServer({ ...fixture.persisted, instagram_description_status: "failed", instagram_description_error: "Unable to read this bio." });
-    await tick(2500);
+    await tick(1500);
     expect(screen.getByText(/Unable to read this bio/)).toBeInTheDocument();
     const reads = fixture.requests.length;
     await tick(10000);
@@ -121,7 +165,7 @@ describe("description audience auto-fill", () => {
   it("shows inline range errors and blocks save", async () => {
     await mount();
     finish("instagram");
-    await tick(2500);
+    await tick(1500);
     fireEvent.change(field("instagram", "age from"), { target: { value: "45" } });
     expect(screen.getByText(/Audience age from must be less/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
@@ -179,7 +223,7 @@ describe("description audience auto-fill", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate description" }));
     await settle();
     finish("instagram");
-    await tick(2500);
+    await tick(1500);
     expect(field("instagram", "gender")).toHaveValue("female");
     fireEvent.change(field("instagram", "gender"), { target: { value: "both" } });
     fireEvent.change(field("instagram", "age from"), { target: { value: "25" } });

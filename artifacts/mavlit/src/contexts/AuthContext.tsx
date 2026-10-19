@@ -181,7 +181,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = useCallback(async (patch: Partial<CreatorProfile>) => {
     // PUT replaces the whole profile, including fields outside the current editor.
     const current = await api.get<CreatorProfile>("/creator-profile/me");
-    const updated = await api.put<CreatorProfile>("/creator-profile/me", { ...current, ...patch });
+    if (isDescriptionPending(current.instagram_description_status) || isDescriptionPending(current.youtube_description_status)) {
+      throw new Error("Description generation is still in progress. Wait for it to finish before saving.");
+    }
+    await api.put<CreatorProfile>("/creator-profile/me", { ...current, ...patch });
+    // PUT is a replacement write; display and validate the persisted profile,
+    // not an acknowledgement or an echo of the submitted body.
+    const updated = await api.get<CreatorProfile>("/creator-profile/me");
     setUser(updated);
     queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     queryClient.invalidateQueries({ queryKey: ["pitch-matches"] });

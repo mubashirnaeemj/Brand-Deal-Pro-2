@@ -315,18 +315,18 @@ export default function ProfileSettings() {
               </div>
             </section>
 
-            <InstagramSection value={form.instagram} onChange={(instagram) => change({ ...form, instagram })}
+            {form.primaryPlatforms.includes("instagram") && <InstagramSection value={form.instagram} onChange={(instagram) => change({ ...form, instagram })}
               onSaveUsername={(username) => saveUsernameForGeneration("instagram", username)}
               onStartGeneration={(username, niche) => startGeneration("instagram", username, niche)}
               generationBusy={generatingCount > 0 || saving} status={instagramStatus}
               statusError={profile.instagram_description_error}
-              onGeneratingChange={(active) => setGeneratingCount((count) => count + (active ? 1 : -1))} />
-            <YoutubeSection value={form.youtube} onChange={(youtube) => change({ ...form, youtube })}
+              onGeneratingChange={(active) => setGeneratingCount((count) => count + (active ? 1 : -1))} />}
+            {form.primaryPlatforms.includes("youtube") && <YoutubeSection value={form.youtube} onChange={(youtube) => change({ ...form, youtube })}
               onSaveUsername={(username) => saveUsernameForGeneration("youtube", username)}
               onStartGeneration={(username, niche) => startGeneration("youtube", username, niche)}
               generationBusy={generatingCount > 0 || saving} status={youtubeStatus}
               statusError={profile.youtube_description_error}
-              onGeneratingChange={(active) => setGeneratingCount((count) => count + (active ? 1 : -1))} />
+              onGeneratingChange={(active) => setGeneratingCount((count) => count + (active ? 1 : -1))} />}
 
             <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
               <h2 className="mb-2 text-lg font-bold text-white">

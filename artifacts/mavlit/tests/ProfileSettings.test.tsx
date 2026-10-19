@@ -24,6 +24,38 @@ async function save() {
 }
 
 describe("ProfileSettings fixture-backed saves", () => {
+  it.each(["instagram", "youtube"] as const)("shows only the saved %s platform section", async (platform) => {
+    await mountSettings(installProfileApi(creatorProfile({ primary_platform: platform })));
+    if (platform === "instagram") {
+      expect(screen.getByRole("heading", { name: "Instagram" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "YouTube" })).not.toBeInTheDocument();
+    } else {
+      expect(screen.getByRole("heading", { name: "YouTube" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Instagram" })).not.toBeInTheDocument();
+    }
+  });
+
+  it("updates visible sections immediately and keeps edits when a platform is hidden and shown again", async () => {
+    const { user } = await mountSettings();
+    const channel = screen.getByRole("textbox", { name: /Channel name/i });
+    await user.clear(channel);
+    await user.type(channel, "Unsaved channel edit");
+    await user.click(screen.getByRole("button", { name: "YouTube" }));
+    expect(screen.queryByRole("heading", { name: "YouTube" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Instagram" })).toBeInTheDocument();
+    await save();
+    await screen.findByText("Profile saved.");
+    expect(fixture.writes[0].body).toMatchObject({ primary_platform: "instagram", youtube_channel_name: "Unsaved channel edit" });
+    await user.click(screen.getByRole("button", { name: "YouTube" }));
+    expect(screen.getByRole("textbox", { name: /Channel name/i })).toHaveValue("Unsaved channel edit");
+    await user.click(screen.getByRole("button", { name: "Instagram" }));
+    expect(screen.queryByRole("heading", { name: "Instagram" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "YouTube" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "YouTube" }));
+    expect(screen.queryByRole("heading", { name: "YouTube" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Instagram" })).not.toBeInTheDocument();
+  });
+
   it("edits separate Instagram and YouTube audience fields and sends numeric ages", async () => {
     const { user } = await mountSettings();
     await user.selectOptions(screen.getByRole("combobox", { name: /instagram audience gender/i }), "female");

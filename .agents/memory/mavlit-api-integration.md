@@ -50,6 +50,13 @@ The profile's "Brand categories to avoid" values are exact brand tags, not brand
 **How to apply:** Preserve API-provided tag strings in selections and saves. Each platform's tag suggestions must depend on that platform's own primary niches; do not silently discard existing exclusions when niches change.
 
 ## Auth model
+
+Audience demographics are independent for Instagram and YouTube. Audience gender uses `male`, `female`, `both`, or empty, not the legacy percentage fields; each platform also has its own numeric minimum/maximum audience ages.
+
+**Why:** The user supplied the external profile API contract and requested platform-specific profile editing.
+
+**How to apply:** Do not infer categorical audience gender from male/female percentages or populate platform age ranges from shared legacy audience ages.
+
 - Cookie-based JWT only — `credentials: "include"` on every request
 - `POST /auth/login` → sets `access_token` httpOnly cookie; response body is full CreatorProfile
 - `POST /auth/logout` → clears cookie

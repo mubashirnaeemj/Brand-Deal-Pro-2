@@ -34,7 +34,11 @@ export default function ProfileSettings() {
         try {
           const draft = JSON.parse(sessionStorage.getItem(`mavlit_profile_draft:${response.id}`) ?? "null");
           setForm(draft && typeof draft.fullName === "string" && typeof draft.brandPreferences === "string" &&
-            Array.isArray(draft.primaryPlatforms) && draft.instagram && draft.youtube ? draft : initial);
+            Array.isArray(draft.primaryPlatforms) && draft.instagram && draft.youtube ? {
+              ...initial, ...draft,
+              instagram: { ...initial.instagram, ...draft.instagram },
+              youtube: { ...initial.youtube, ...draft.youtube },
+            } : initial);
         } catch { setForm(initial); }
       })
       .catch((cause) => {
@@ -211,7 +215,8 @@ export default function ProfileSettings() {
     try {
       // Retain failed submissions even if an expired session navigates to sign-in.
       try { sessionStorage.setItem(`mavlit_profile_draft:${profile.id}`, JSON.stringify(form)); } catch { /* Storage may be unavailable. */ }
-      const updated = await updateProfile(profilePatch(form, profile));
+      const patch = profilePatch(form, profile);
+      const updated = await updateProfile(patch);
       if (form.primaryPlatforms.some((platform) => !parsePlatforms(updated.primary_platform).includes(platform))) {
         setProfile(updated);
         setError("The profile API did not keep all selected platforms. Please try again.");
@@ -227,6 +232,19 @@ export default function ProfileSettings() {
         setProfile(updated);
         setError("The profile API did not keep your brand preferences. Please try again.");
         return;
+      }
+      for (const platform of ["instagram", "youtube"] as const) {
+        const audience = form[platform];
+        if ((`${platform}_audience_gender` in patch &&
+              (updated[`${platform}_audience_gender`] || "") !== audience.audienceGender) ||
+            (`${platform}_audience_age_min` in patch &&
+              (updated[`${platform}_audience_age_min`] ?? null) !== (audience.audienceAgeMin.trim() ? Number(audience.audienceAgeMin) : null)) ||
+            (`${platform}_audience_age_max` in patch &&
+              (updated[`${platform}_audience_age_max`] ?? null) !== (audience.audienceAgeMax.trim() ? Number(audience.audienceAgeMax) : null))) {
+          setProfile(updated);
+          setError(`The profile API did not keep your ${platform === "instagram" ? "Instagram" : "YouTube"} audience details. Please try again.`);
+          return;
+        }
       }
       if (!isProfileComplete(updated)) {
         setError("Your profile was saved, but it is still incomplete. Check the required creator details.");

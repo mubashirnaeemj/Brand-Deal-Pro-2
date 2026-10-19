@@ -24,6 +24,39 @@ async function save() {
 }
 
 describe("ProfileSettings fixture-backed saves", () => {
+  it("edits separate Instagram and YouTube audience fields and sends numeric ages", async () => {
+    const { user } = await mountSettings();
+    await user.selectOptions(screen.getByRole("combobox", { name: /instagram audience gender/i }), "female");
+    await user.selectOptions(screen.getByRole("combobox", { name: /youtube audience gender/i }), "both");
+    fireEvent.change(screen.getByRole("spinbutton", { name: /instagram audience minimum age/i }), { target: { value: "18" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: /instagram audience maximum age/i }), { target: { value: "34" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: /youtube audience minimum age/i }), { target: { value: "25" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: /youtube audience maximum age/i }), { target: { value: "65" } });
+    await save();
+    await screen.findByText("Profile saved.");
+    expect(fixture.writes[0].body).toEqual({
+      ...creatorProfile(),
+      instagram_audience_gender: "female", instagram_audience_age_min: 18, instagram_audience_age_max: 34,
+      youtube_audience_gender: "both", youtube_audience_age_min: 25, youtube_audience_age_max: 65,
+    });
+  });
+
+  it("restores older drafts with defaults for the new audience fields", async () => {
+    const draft = profileToForm(creatorProfile());
+    const legacyDraft = JSON.parse(JSON.stringify(draft));
+    for (const platform of ["instagram", "youtube"]) {
+      delete legacyDraft[platform].audienceGender;
+      delete legacyDraft[platform].audienceAgeMin;
+      delete legacyDraft[platform].audienceAgeMax;
+    }
+    sessionStorage.setItem(draftKey, JSON.stringify(legacyDraft));
+    await mountSettings();
+    expect(screen.getByRole("combobox", { name: /instagram audience gender/i })).toHaveValue("");
+    await save();
+    await screen.findByText("Profile saved.");
+    expect(fixture.writes[0].body).toEqual(creatorProfile());
+  });
+
   it("saves a preferences-only edit without changing any other fresh server value", async () => {
     const { preferences, user } = await mountSettings();
     const fresh = freshCreatorProfile();

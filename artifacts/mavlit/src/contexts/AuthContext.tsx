@@ -40,6 +40,9 @@ export interface CreatorProfile {
   instagram_description_error?: string | null;
   instagram_audience_gender_male_pct: number | null;
   instagram_audience_gender_female_pct: number | null;
+  instagram_audience_gender?: "male" | "female" | "both" | "" | null;
+  instagram_audience_age_min?: number | null;
+  instagram_audience_age_max?: number | null;
   youtube_description: string | null;
   youtube_sub_niches: string[] | null;
   youtube_excluded_categories: string[] | null;
@@ -49,6 +52,9 @@ export interface CreatorProfile {
   youtube_description_error?: string | null;
   youtube_audience_gender_male_pct: number | null;
   youtube_audience_gender_female_pct: number | null;
+  youtube_audience_gender?: "male" | "female" | "both" | "" | null;
+  youtube_audience_age_min?: number | null;
+  youtube_audience_age_max?: number | null;
   instagram_primary_niche: string | null;
   youtube_primary_niche: string | null;
   excluded_categories: string[] | null;

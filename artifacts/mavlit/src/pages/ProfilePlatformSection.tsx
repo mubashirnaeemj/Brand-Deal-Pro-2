@@ -108,8 +108,8 @@ function SharedDetails({
       <fieldset className="space-y-3">
         <legend className="text-sm font-semibold text-white">Audience demographics (optional)</legend>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label={`${platform} audience gender`}>
-            <select value={value.audienceGender} onChange={(event) => set("audienceGender", event.target.value)}
+          <Field label="Audience gender">
+            <select aria-label={`${platform} audience gender`} value={value.audienceGender} onChange={(event) => set("audienceGender", event.target.value)}
               className={INPUT_CLASS}>
               <option value="">Not specified</option>
               <option value="male">Male</option>
@@ -117,13 +117,13 @@ function SharedDetails({
               <option value="both">Both</option>
             </select>
           </Field>
-          <Field label={`${platform} audience minimum age`}>
-            <input type="number" min={0} step={1} value={value.audienceAgeMin}
+          <Field label="Audience minimum age">
+            <input aria-label={`${platform} audience minimum age`} type="number" min={0} step={1} value={value.audienceAgeMin}
               onChange={(event) => set("audienceAgeMin", event.target.value)}
               placeholder="Not specified" className={INPUT_CLASS} />
           </Field>
-          <Field label={`${platform} audience maximum age`}>
-            <input type="number" min={0} step={1} value={value.audienceAgeMax}
+          <Field label="Audience maximum age">
+            <input aria-label={`${platform} audience maximum age`} type="number" min={0} step={1} value={value.audienceAgeMax}
               onChange={(event) => set("audienceAgeMax", event.target.value)}
               placeholder="Not specified" className={INPUT_CLASS} />
           </Field>

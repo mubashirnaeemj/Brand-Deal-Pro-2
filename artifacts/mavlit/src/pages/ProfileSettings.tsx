@@ -6,6 +6,7 @@ import PlatformSelector from "@/components/onboarding/PlatformSelector";
 import { INPUT_CLASS, parsePlatforms, samePrimaryNiches } from "@/components/onboarding/types";
 import { isDescriptionPending, isProfileComplete, type CreatorProfile, type DescriptionJob, type DescriptionPlatform, useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { fillEmptyAudience, audienceError } from "@/lib/audience";
 import { InstagramSection, YoutubeSection } from "./ProfilePlatformSection";
 import { profilePatch, profileToForm, validateProfile, type ProfileForm } from "./profileForm";
 
@@ -33,12 +34,20 @@ export default function ProfileSettings() {
         const initial = profileToForm(response);
         try {
           const draft = JSON.parse(sessionStorage.getItem(`mavlit_profile_draft:${response.id}`) ?? "null");
-          setForm(draft && typeof draft.fullName === "string" && typeof draft.brandPreferences === "string" &&
+          const restored: ProfileForm = draft && typeof draft.fullName === "string" && typeof draft.brandPreferences === "string" &&
             Array.isArray(draft.primaryPlatforms) && draft.instagram && draft.youtube ? {
               ...initial, ...draft,
               instagram: { ...initial.instagram, ...draft.instagram },
               youtube: { ...initial.youtube, ...draft.youtube },
-            } : initial);
+            } : initial;
+          for (const platform of ["instagram", "youtube"] as const) {
+            if (response[`${platform}_description_status`] === "completed" && restored[platform].descriptionMode === "generate") {
+              Object.assign(restored[platform], fillEmptyAudience(restored[platform], response, platform), {
+                description: restored[platform].description || response[`${platform}_description`] || "",
+              });
+            }
+          }
+          setForm(restored);
         } catch { setForm(initial); }
       })
       .catch((cause) => {
@@ -63,6 +72,15 @@ export default function ProfileSettings() {
         const latest = await api.get<CreatorProfile>("/creator-profile/me");
         if (stopped) return;
         setPollError(null);
+        for (const platform of ["instagram", "youtube"] as const) {
+          const wasPending = platform === "instagram" ? isDescriptionPending(instagramStatus) : isDescriptionPending(youtubeStatus);
+          const jobId = platform === "instagram" ? instagramJobId : youtubeJobId;
+          if (wasPending && latest[`${platform}_description_job_id`] !== jobId) {
+            // Do not adopt a replacement job, even if it completed before this poll.
+            latest[`${platform}_description_status`] = "failed";
+            latest[`${platform}_description_error`] = "The generation job changed. Progress checks stopped. Generate again or reload to view the current job.";
+          }
+        }
         setForm((current) => {
           if (!current) return current;
           let next = current;
@@ -70,14 +88,16 @@ export default function ProfileSettings() {
             const wasPending = platform === "instagram" ? isDescriptionPending(instagramStatus) : isDescriptionPending(youtubeStatus);
             if (wasPending && latest[`${platform}_description_status`] === "completed") {
               const description = latest[`${platform}_description`]?.trim();
-              if (description) next = { ...next, [platform]: { ...next[platform], description } };
+              if (description) next = { ...next, [platform]: {
+                ...fillEmptyAudience(next[platform], latest, platform), description,
+              } };
             }
           }
           return next;
         });
         setProfile(latest);
         if (isDescriptionPending(latest.instagram_description_status) || isDescriptionPending(latest.youtube_description_status)) {
-          timer = setTimeout(poll, 1000);
+          timer = setTimeout(poll, 2500);
         }
       } catch {
         if (stopped) return;
@@ -85,7 +105,7 @@ export default function ProfileSettings() {
         timer = setTimeout(poll, 3000);
       }
     };
-    timer = setTimeout(poll, 1000);
+    timer = setTimeout(poll, 2500);
     return () => { stopped = true; clearTimeout(timer); };
   }, [jobPending, instagramStatus, youtubeStatus, instagramJobId, youtubeJobId]);
 
@@ -95,8 +115,11 @@ export default function ProfileSettings() {
     setError(null);
   };
 
-  const generated = (platform: "instagram" | "youtube", description: string) => {
-    setForm((current) => current ? { ...current, [platform]: { ...current[platform], description } } : current);
+  const generated = (platform: "instagram" | "youtube", completed: CreatorProfile) => {
+    setForm((current) => current ? { ...current, [platform]: {
+      ...fillEmptyAudience(current[platform], completed, platform),
+      description: completed[`${platform}_description`]?.trim() || current[platform].description,
+    } } : current);
     setSaved(false);
     setError(null);
   };
@@ -117,12 +140,13 @@ export default function ProfileSettings() {
           current[`${platform}_description_job_id`] !== profile?.[`${platform}_description_job_id`] &&
           current[`${platform}_description`]?.trim()) {
         setProfile(current);
-        generated(platform, current[`${platform}_description`]!.trim());
+        generated(platform, current);
         return;
       }
       throw cause;
     }
-    if (result.platform !== platform || !["queued", "running", "completed", "failed"].includes(result.status)) {
+    if ((result.platform && result.platform !== platform) || !result.job_id ||
+        !["queued", "running", "completed", "failed"].includes(result.status)) {
       throw new Error("MAVLIT returned an unexpected generation response. Please reload your profile.");
     }
     setProfile((current) => current ? {
@@ -134,8 +158,13 @@ export default function ProfileSettings() {
     } : current);
     if (result.status === "failed") throw new Error(result.error || "Description generation failed.");
     if (result.status === "completed") {
-      if (!result.description?.trim()) throw new Error("MAVLIT completed generation without a description. Please reload your profile.");
-      generated(platform, result.description.trim());
+      const completed = await api.get<CreatorProfile>("/creator-profile/me");
+      if (completed[`${platform}_description_job_id`] !== result.job_id ||
+          !completed[`${platform}_description`]?.trim()) {
+        throw new Error("MAVLIT completed generation without a matching description. Please reload your profile.");
+      }
+      setProfile(completed);
+      generated(platform, completed);
     }
   };
 
@@ -168,18 +197,14 @@ export default function ProfileSettings() {
       instagram_sub_niches: current.instagram_sub_niches,
       instagram_excluded_categories: current.instagram_excluded_categories,
       instagram_description: current.instagram_description,
-      instagram_description_mode: current.instagram_description_mode,
-      instagram_audience_gender_male_pct: current.instagram_audience_gender_male_pct,
-      instagram_audience_gender_female_pct: current.instagram_audience_gender_female_pct,
+      instagram_description_mode: platform === "instagram" ? "generate" : current.instagram_description_mode,
       youtube_channel_name: platform === "youtube" ? enteredUsername : current.youtube_channel_name,
       youtube_subscribers: current.youtube_subscribers,
       youtube_primary_niche: current.youtube_primary_niche,
       youtube_sub_niches: current.youtube_sub_niches,
       youtube_excluded_categories: current.youtube_excluded_categories,
       youtube_description: current.youtube_description,
-      youtube_description_mode: current.youtube_description_mode,
-      youtube_audience_gender_male_pct: current.youtube_audience_gender_male_pct,
-      youtube_audience_gender_female_pct: current.youtube_audience_gender_female_pct,
+      youtube_description_mode: platform === "youtube" ? "generate" : current.youtube_description_mode,
     });
     setProfile(updated);
     const savedUsername = platform === "instagram"
@@ -352,7 +377,8 @@ export default function ProfileSettings() {
             {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>}
             {saved && <p role="status" className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">Profile saved.</p>}
             <div className="flex justify-end">
-              <button type="submit" disabled={saving || generatingCount > 0 || jobPending || form.brandPreferences.length > 1000}
+              <button type="submit" disabled={saving || generatingCount > 0 || jobPending || form.brandPreferences.length > 1000 ||
+                !!audienceError(form.instagram) || !!audienceError(form.youtube)}
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50">
                 <Save size={16} /> {saving ? "Saving…" : generatingCount > 0 || jobPending ? "Generating…" : "Save Profile"}
               </button>

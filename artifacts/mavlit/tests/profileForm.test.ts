@@ -29,7 +29,7 @@ describe("profile form replacement patches", () => {
     Object.assign(cleared[platform], { audienceGender: "", audienceAgeMin: "", audienceAgeMax: "" });
     expect(profilePatch(cleared, saved)).toEqual({
       brand_preferences: saved.brand_preferences,
-      [`${platform}_audience_gender`]: "",
+      [`${platform}_audience_gender`]: null,
       [`${platform}_audience_age_min`]: null,
       [`${platform}_audience_age_max`]: null,
     });
@@ -38,17 +38,17 @@ describe("profile form replacement patches", () => {
   it.each(["instagram", "youtube"] as const)("validates optional %s audience details", (platform) => {
     const profile = creatorProfile();
     const form = profileToForm(profile);
-    for (const invalid of ["-1", "1.5", "not a number"]) {
+    for (const invalid of ["12", "101", "-1", "1.5", "not a number"]) {
       form[platform].audienceAgeMin = invalid;
-      expect(validateProfile(form, profile)).toContain("non-negative whole numbers");
+      expect(validateProfile(form, profile)).toContain("whole numbers between 13 and 100");
     }
     form[platform].audienceAgeMin = "45";
     form[platform].audienceAgeMax = "18";
-    expect(validateProfile(form, profile)).toContain("minimum age cannot");
+    expect(validateProfile(form, profile)).toContain("age from must be less");
     form[platform].audienceAgeMax = "";
     expect(validateProfile(form, profile)).toBeNull();
     form[platform].audienceGender = "unknown";
-    expect(validateProfile(form, profile)).toContain("audience gender");
+    expect(validateProfile(form, profile)).toContain("Select Male, Female, or Both");
   });
 
   it("loads persisted preferences, including legacy missing/null values", () => {

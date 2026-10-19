@@ -51,11 +51,17 @@ The profile's "Brand categories to avoid" values are exact brand tags, not brand
 
 ## Auth model
 
-Audience demographics are independent for Instagram and YouTube. Audience gender uses `male`, `female`, `both`, or empty, not the legacy percentage fields; each platform also has its own numeric minimum/maximum audience ages.
+Audience demographics are independent for Instagram and YouTube. Gender is `male`, `female`, `both`, or null when empty. Ages are optional integers 13–100, with minimum <= maximum when both exist. The old male/female percentage fields were removed and must never be included in profile PUTs, even if a legacy GET still returns them.
 
 **Why:** The user supplied the external profile API contract and requested platform-specific profile editing.
 
-**How to apply:** Do not infer categorical audience gender from male/female percentages or populate platform age ranges from shared legacy audience ages.
+**How to apply:** Do not infer gender from percentages or use shared legacy ages. Preserve all other fresh profile fields on replacement saves. Keep the creator's own required gender separate from optional audience gender.
+
+Description generation produces the platform description and audience estimates together. Poll at 2–3 seconds for the same job ID; stop if it changes. Fill only empty audience inputs and let creators review/edit estimates before the final save; null estimates remain empty.
+
+**Why:** The user supplied this revised backend contract and explicitly said that generated values must never overwrite typed audience data.
+
+**How to apply:** Apply this to both onboarding and profile editing. Persist the selected description mode using `generate`/`manual`. Keep auth and Matches behavior unchanged; do not add client-side gender filtering or reintroduce V1/V2 pages from generic API instructions.
 
 - Cookie-based JWT only — `credentials: "include"` on every request
 - `POST /auth/login` → sets `access_token` httpOnly cookie; response body is full CreatorProfile

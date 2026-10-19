@@ -1,6 +1,7 @@
 import { Youtube } from "lucide-react";
 import BrandCategoriesToAvoid from "./BrandCategoriesToAvoid";
 import DescriptionModeSelector from "./DescriptionModeSelector";
+import YourAudience from "./YourAudience";
 import MultiSelectDropdown from "./MultiSelectDropdown";
 import type { DescriptionMode, FieldErrors, YouTubeProfile } from "./types";
 import { INPUT_CLASS, NICHE_OPTIONS, subNicheOptions } from "./types";
@@ -11,12 +12,20 @@ export default function YouTubeStep({
   descriptionMode,
   onDescriptionModeChange,
   errors,
+  onGenerate,
+  generating = false,
+  generateError,
+  estimated = false,
 }: {
   value: YouTubeProfile;
   onChange: (value: YouTubeProfile) => void;
   descriptionMode: DescriptionMode;
   onDescriptionModeChange: (mode: DescriptionMode) => void;
   errors: FieldErrors;
+  onGenerate?: () => void;
+  generating?: boolean;
+  generateError?: string | null;
+  estimated?: boolean;
 }) {
   const set = <K extends keyof YouTubeProfile>(key: K, next: YouTubeProfile[K]) => onChange({ ...value, [key]: next });
   return (
@@ -47,11 +56,16 @@ export default function YouTubeStep({
       </div>
 
       <div className="mt-5">
-        <DescriptionModeSelector platform="youtube" mode={descriptionMode} onChange={onDescriptionModeChange}>
+        <DescriptionModeSelector platform="youtube" mode={descriptionMode} onChange={onDescriptionModeChange}
+          onGenerate={onGenerate} generating={generating} generateError={generateError}
+          showGenerated={estimated && !!value.contentDescription.trim()}>
           <Field label="Describe your YouTube content" error={errors.contentDescription}>
             <textarea rows={4} value={value.contentDescription} onChange={(event) => set("contentDescription", event.target.value)} placeholder="Describe the content you publish on YouTube." className={`${INPUT_CLASS} resize-none leading-6 ${errors.contentDescription ? "border-red-500/60" : ""}`} />
           </Field>
         </DescriptionModeSelector>
+      </div>
+      <div className="mt-5">
+        <YourAudience platform="youtube" value={value} onChange={(audience) => onChange({ ...value, ...audience })} estimated={estimated} />
       </div>
       <div className="mt-5">
         <BrandCategoriesToAvoid selected={value.excludedCategories} primaryNiches={value.niches}

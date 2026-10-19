@@ -12,7 +12,7 @@ export const samePrimaryNiches = (saved: string | null | undefined, selected: st
   JSON.stringify(parsePrimaryNiches(saved)) === JSON.stringify(selected);
 export type DescriptionMode = "manual" | "generate";
 
-export type InstagramProfile = {
+export type InstagramProfile = import("@/lib/audience").AudienceFields & {
   username: string;
   followers: string;
   niches: string[];
@@ -21,7 +21,7 @@ export type InstagramProfile = {
   excludedCategories: string[];
 };
 
-export type YouTubeProfile = {
+export type YouTubeProfile = import("@/lib/audience").AudienceFields & {
   channelName: string;
   subscribers: string;
   niches: string[];
@@ -70,6 +70,9 @@ export const EMPTY_ONBOARDING: OnboardingData = {
     contentDescription: "",
   },
   instagram: {
+    audienceGender: "",
+    audienceAgeMin: "",
+    audienceAgeMax: "",
     username: "",
     followers: "",
     niches: [],
@@ -78,6 +81,9 @@ export const EMPTY_ONBOARDING: OnboardingData = {
     excludedCategories: [],
   },
   youtube: {
+    audienceGender: "",
+    audienceAgeMin: "",
+    audienceAgeMax: "",
     channelName: "",
     subscribers: "",
     niches: [],

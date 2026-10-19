@@ -11,6 +11,7 @@ export default function DescriptionModeSelector({
   generating = false,
   generateDisabled = false,
   generateError,
+  showGenerated = false,
 }: {
   platform: PlatformKey;
   mode: DescriptionMode;
@@ -20,6 +21,7 @@ export default function DescriptionModeSelector({
   generating?: boolean;
   generateDisabled?: boolean;
   generateError?: string | null;
+  showGenerated?: boolean;
 }) {
   const source = platform === "instagram" ? "Instagram posts/captions" : "YouTube videos/titles/descriptions";
 
@@ -97,6 +99,7 @@ export default function DescriptionModeSelector({
           </div>
         </div>
       )}
+      {mode === "generate" && showGenerated && <div className="mt-4">{children}</div>}
     </fieldset>
   );
 }

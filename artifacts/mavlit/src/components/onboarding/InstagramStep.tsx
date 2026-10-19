@@ -1,6 +1,7 @@
 import { Instagram } from "lucide-react";
 import BrandCategoriesToAvoid from "./BrandCategoriesToAvoid";
 import DescriptionModeSelector from "./DescriptionModeSelector";
+import YourAudience from "./YourAudience";
 import MultiSelectDropdown from "./MultiSelectDropdown";
 import type { DescriptionMode, FieldErrors, InstagramProfile } from "./types";
 import { INPUT_CLASS, NICHE_OPTIONS, subNicheOptions } from "./types";
@@ -11,12 +12,20 @@ export default function InstagramStep({
   descriptionMode,
   onDescriptionModeChange,
   errors,
+  onGenerate,
+  generating = false,
+  generateError,
+  estimated = false,
 }: {
   value: InstagramProfile;
   onChange: (value: InstagramProfile) => void;
   descriptionMode: DescriptionMode;
   onDescriptionModeChange: (mode: DescriptionMode) => void;
   errors: FieldErrors;
+  onGenerate?: () => void;
+  generating?: boolean;
+  generateError?: string | null;
+  estimated?: boolean;
 }) {
   const set = <K extends keyof InstagramProfile>(key: K, next: InstagramProfile[K]) => onChange({ ...value, [key]: next });
   return (
@@ -47,11 +56,16 @@ export default function InstagramStep({
       </div>
 
       <div className="mt-5">
-        <DescriptionModeSelector platform="instagram" mode={descriptionMode} onChange={onDescriptionModeChange}>
+        <DescriptionModeSelector platform="instagram" mode={descriptionMode} onChange={onDescriptionModeChange}
+          onGenerate={onGenerate} generating={generating} generateError={generateError}
+          showGenerated={estimated && !!value.contentDescription.trim()}>
           <Field label="Describe your Instagram content" error={errors.contentDescription}>
             <textarea rows={4} value={value.contentDescription} onChange={(event) => set("contentDescription", event.target.value)} placeholder="Describe the content you publish on Instagram." className={`${INPUT_CLASS} resize-none leading-6 ${errors.contentDescription ? "border-red-500/60" : ""}`} />
           </Field>
         </DescriptionModeSelector>
+      </div>
+      <div className="mt-5">
+        <YourAudience platform="instagram" value={value} onChange={(audience) => onChange({ ...value, ...audience })} estimated={estimated} />
       </div>
       <div className="mt-5">
         <BrandCategoriesToAvoid selected={value.excludedCategories} primaryNiches={value.niches}

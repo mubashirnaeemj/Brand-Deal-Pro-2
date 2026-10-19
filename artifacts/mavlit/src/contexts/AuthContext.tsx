@@ -9,11 +9,11 @@ export const isDescriptionPending = (status: DescriptionStatus | null | undefine
   status === "queued" || status === "running";
 
 export interface DescriptionJob {
-  platform: DescriptionPlatform;
+  platform?: DescriptionPlatform;
   status: DescriptionStatus;
   job_id: string | null;
-  description: string | null;
-  error: string | null;
+  description?: string | null;
+  error?: string | null;
 }
 
 export interface CreatorProfile {
@@ -38,8 +38,6 @@ export interface CreatorProfile {
   instagram_description_status?: DescriptionStatus | null;
   instagram_description_job_id?: string | null;
   instagram_description_error?: string | null;
-  instagram_audience_gender_male_pct: number | null;
-  instagram_audience_gender_female_pct: number | null;
   instagram_audience_gender?: "male" | "female" | "both" | "" | null;
   instagram_audience_age_min?: number | null;
   instagram_audience_age_max?: number | null;
@@ -50,8 +48,6 @@ export interface CreatorProfile {
   youtube_description_status?: DescriptionStatus | null;
   youtube_description_job_id?: string | null;
   youtube_description_error?: string | null;
-  youtube_audience_gender_male_pct: number | null;
-  youtube_audience_gender_female_pct: number | null;
   youtube_audience_gender?: "male" | "female" | "both" | "" | null;
   youtube_audience_age_min?: number | null;
   youtube_audience_age_max?: number | null;
@@ -73,8 +69,6 @@ export interface CreatorProfile {
   primary_platform: string | null;
   follower_count: number | null;
   onboarding_completed?: boolean;
-  audience_gender_male_pct: number | null;
-  audience_gender_female_pct: number | null;
   audience_age_bracket: string | null;
   audience_age_min: number | null;
   audience_age_max: number | null;

@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Instagram, Youtube } from "lucide-react";
 import { isDescriptionPending, type DescriptionStatus } from "@/contexts/AuthContext";
 import BrandCategoriesToAvoid from "@/components/onboarding/BrandCategoriesToAvoid";
 import DescriptionModeSelector from "@/components/onboarding/DescriptionModeSelector";
+import YourAudience from "@/components/onboarding/YourAudience";
 import MultiSelectDropdown from "@/components/onboarding/MultiSelectDropdown";
-import { INPUT_CLASS, NICHE_OPTIONS, subNicheOptions, type DescriptionMode } from "@/components/onboarding/types";
+import { INPUT_CLASS, NICHE_OPTIONS, subNicheOptions } from "@/components/onboarding/types";
 import type { PlatformDetails, ProfileForm } from "./profileForm";
 
 type InstagramDetails = ProfileForm["instagram"];
@@ -44,13 +45,9 @@ function SharedDetails({
   status?: DescriptionStatus | null;
   statusError?: string | null;
 }) {
-  const [descriptionMode, setDescriptionMode] = useState<DescriptionMode>("manual");
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const pending = isDescriptionPending(status);
-  useEffect(() => {
-    if (status === "completed" && value.description.trim()) setDescriptionMode("manual");
-  }, [status, value.description]);
   const set = <K extends keyof PlatformDetails>(key: K, next: PlatformDetails[K]) =>
     onChange({ ...value, [key]: next });
   const generate = async () => {
@@ -105,37 +102,15 @@ function SharedDetails({
       </div>
       <BrandCategoriesToAvoid selected={value.excludedCategories} primaryNiches={value.primaryNiches}
         onChange={(excludedCategories) => set("excludedCategories", excludedCategories)} />
-      <fieldset className="space-y-3">
-        <legend className="text-sm font-semibold text-white">Audience demographics (optional)</legend>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Audience gender">
-            <select aria-label={`${platform} audience gender`} value={value.audienceGender} onChange={(event) => set("audienceGender", event.target.value)}
-              className={INPUT_CLASS}>
-              <option value="">Not specified</option>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="both">Both</option>
-            </select>
-          </Field>
-          <Field label="Audience minimum age">
-            <input aria-label={`${platform} audience minimum age`} type="number" min={0} step={1} value={value.audienceAgeMin}
-              onChange={(event) => set("audienceAgeMin", event.target.value)}
-              placeholder="Not specified" className={INPUT_CLASS} />
-          </Field>
-          <Field label="Audience maximum age">
-            <input aria-label={`${platform} audience maximum age`} type="number" min={0} step={1} value={value.audienceAgeMax}
-              onChange={(event) => set("audienceAgeMax", event.target.value)}
-              placeholder="Not specified" className={INPUT_CLASS} />
-          </Field>
-        </div>
-      </fieldset>
-      <DescriptionModeSelector platform={platform} mode={descriptionMode}
+      <YourAudience platform={platform} value={value} onChange={(audience) => onChange({ ...value, ...audience })}
+        estimated={status === "completed"} />
+      <DescriptionModeSelector platform={platform} mode={value.descriptionMode}
         onChange={(mode) => {
           setGenerateError(null);
-          setDescriptionMode(mode);
+          set("descriptionMode", mode);
         }}
         onGenerate={generate} generating={generating || pending} generateDisabled={generationBusy || pending}
-        generateError={generateError}>
+        generateError={generateError} showGenerated={status === "completed" && !!value.description.trim()}>
         <Field label={`${platform} description`}>
           <textarea disabled={pending} rows={4} value={value.description} onChange={(event) => set("description", event.target.value)}
             placeholder={`Describe your ${platform === "instagram" ? "Instagram" : "YouTube"} content.`}

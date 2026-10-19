@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { type CreatorProfile, type DescriptionJob, type DescriptionPlatform, isDescriptionPending, isProfileComplete, useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { audienceError, audienceFromProfile, audiencePayload, fillEmptyAudience } from "@/lib/audience";
 import OnboardingLayout from "@/components/onboarding/OnboardingLayout";
 import WelcomeStep from "@/components/onboarding/WelcomeStep";
 import CreatorInfoStep from "@/components/onboarding/CreatorInfoStep";
@@ -38,6 +39,13 @@ export default function OnboardingPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [generationProgress, setGenerationProgress] = useState<string | null>(null);
   const submitting = useRef(false);
+  const generationController = useRef<AbortController | null>(null);
+  const [generatingPlatform, setGeneratingPlatform] = useState<DescriptionPlatform | null>(null);
+  const [estimatedPlatforms, setEstimatedPlatforms] = useState<Partial<Record<DescriptionPlatform, boolean>>>({
+    instagram: user?.instagram_description_status === "completed" && user.instagram_description_mode === "generate",
+    youtube: user?.youtube_description_status === "completed" && user.youtube_description_mode === "generate",
+  });
+  useEffect(() => () => generationController.current?.abort(), []);
 
   const steps = useMemo<StepKey[]>(() => {
     const next: StepKey[] = ["creator", "instagram"];
@@ -85,8 +93,81 @@ export default function OnboardingPage() {
 
   const previous = () => goTo(currentIndex - 1, -1);
 
+  const generateDescription = async (platform: DescriptionPlatform) => {
+    if (generationController.current) return;
+    const creatorErrors = validateStep("creator", data);
+    const platformErrors = validateStep(platform, data);
+    if (Object.keys(creatorErrors).length) {
+      setErrors(creatorErrors);
+      setCurrentStep("creator");
+      return;
+    }
+    // Audience inputs can remain incomplete during generation.
+    delete platformErrors.audience;
+    if (Object.keys(platformErrors).length) {
+      setErrors(platformErrors);
+      return;
+    }
+    const controller = new AbortController();
+    generationController.current = controller;
+    setGeneratingPlatform(platform);
+    setSubmitError(null);
+    try {
+      const current = await api.get<CreatorProfile>("/creator-profile/me");
+      let completed: CreatorProfile;
+      if (isDescriptionPending(current[`${platform}_description_status`])) {
+        completed = await waitForDescription(platform, current[`${platform}_description_job_id`]!, setGenerationProgress, controller.signal);
+      } else {
+        // Save prerequisite identity details, but not unreviewed form descriptions.
+        await updateProfile({
+          ...onboardingPayload(data),
+          content_description: current.content_description,
+          instagram_description: current.instagram_description,
+          youtube_description: current.youtube_description,
+          [`${platform}_description_mode`]: "generate",
+        });
+        if (controller.signal.aborted) return;
+        const username = platform === "instagram" ? data.instagram.username.trim().replace(/^@/, "") : data.youtube.channelName.trim();
+        let result: DescriptionJob;
+        try {
+          result = await api.post<DescriptionJob>("/creator-profile/me/generate-description", {
+            platform, username, niche: data[platform].niches[0],
+          });
+        } catch (cause) {
+          const latest = await api.get<CreatorProfile>("/creator-profile/me");
+          const id = latest[`${platform}_description_job_id`];
+          if (!id || id === current[`${platform}_description_job_id`] ||
+              !(isDescriptionPending(latest[`${platform}_description_status`]) || latest[`${platform}_description_status`] === "completed")) throw cause;
+          result = { platform, job_id: id, status: latest[`${platform}_description_status`]!, description: null, error: null };
+        }
+        if ((result.platform && result.platform !== platform) || !result.job_id ||
+            !["queued", "running", "completed", "failed"].includes(result.status)) throw new Error("MAVLIT returned an unexpected generation response.");
+        if (result.status === "failed") throw new Error(result.error || "Description generation failed.");
+        completed = await waitForDescription(platform, result.job_id, setGenerationProgress, controller.signal);
+      }
+      if (controller.signal.aborted) return;
+      setData((previous) => ({
+        ...previous,
+        [platform]: {
+          ...fillEmptyAudience(previous[platform], completed, platform),
+          contentDescription: completed[`${platform}_description`]!.trim(),
+        },
+      }));
+      setEstimatedPlatforms((previous) => ({ ...previous, [platform]: true }));
+      setErrors({});
+    } catch (cause) {
+      if (!controller.signal.aborted) setSubmitError(cause instanceof Error ? cause.message : "Could not generate your description.");
+    } finally {
+      if (!controller.signal.aborted) {
+        generationController.current = null;
+        setGeneratingPlatform(null);
+        setGenerationProgress(null);
+      }
+    }
+  };
+
   const submit = async () => {
-    if (submitting.current) return;
+    if (submitting.current || generationController.current) return;
     const validationOrder = steps.filter((step) => step !== "review");
     for (const step of validationOrder) {
       const stepErrors = validateStep(step, data);
@@ -103,27 +184,7 @@ export default function OnboardingPage() {
     try {
       let instagramDescription = data.instagram.contentDescription.trim();
       let youtubeDescription = data.youtube.contentDescription.trim();
-      const basePayload = {
-        full_name: data.creator.fullName.trim(),
-        creator_handle: data.instagram.username.trim().replace(/^@/, ""),
-        age: Number(data.creator.age),
-        gender: data.creator.gender,
-        primary_platform: formatPlatforms(data.creator.platforms),
-        instagram_handle: data.instagram.username.trim().replace(/^@/, ""),
-        instagram_followers: Number(data.instagram.followers),
-        follower_count: data.creator.platforms[0] === "youtube" ? Number(data.youtube.subscribers) : Number(data.instagram.followers),
-        content_niche: formatPrimaryNiches(data.instagram.niches),
-        instagram_primary_niche: formatPrimaryNiches(data.instagram.niches),
-        instagram_sub_niches: data.instagram.subNiches,
-        instagram_excluded_categories: data.instagram.excludedCategories,
-        youtube_channel_name: data.youtube.channelName.trim() || null,
-        youtube_subscribers: data.youtube.subscribers ? Number(data.youtube.subscribers) : null,
-        youtube_primary_niche: formatPrimaryNiches(data.youtube.niches),
-        youtube_sub_niches: data.youtube.subNiches,
-        youtube_excluded_categories: data.youtube.excludedCategories,
-        instagram_description_mode: data.instagramDescriptionMode,
-        youtube_description_mode: data.youtubeDescriptionMode,
-      };
+      const basePayload = onboardingPayload(data);
       if (!data.creator.contentDescription.trim() && !instagramDescription && !youtubeDescription) {
         const platform: DescriptionPlatform | null = data.instagramDescriptionMode === "generate"
           ? "instagram"
@@ -131,67 +192,10 @@ export default function OnboardingPage() {
             ? "youtube"
             : null;
         if (platform) {
-          const current = await api.get<CreatorProfile>("/creator-profile/me");
-          const username = platform === "instagram" ? data.instagram.username.trim().replace(/^@/, "") : data.youtube.channelName.trim();
-          const savedUsername = platform === "instagram" ? current.instagram_handle?.trim().replace(/^@/, "") : current.youtube_channel_name?.trim();
-          const status = current[`${platform}_description_status`];
-          let description = "";
-          if (isDescriptionPending(status)) {
-            setGenerationProgress(`${platform === "instagram" ? "Instagram" : "YouTube"} description is ${status}. Waiting for the existing job…`);
-            description = await waitForDescription(platform, setGenerationProgress);
-          } else if (status === "completed" && savedUsername === username && current[`${platform}_description`]?.trim()) {
-            description = current[`${platform}_description`]!.trim();
-          } else {
-            // The generation endpoint needs the creator details saved first.
-            await updateProfile({
-              ...basePayload,
-              content_description: current.content_description,
-              instagram_description: current.instagram_description,
-              youtube_description: current.youtube_description,
-            });
-            let result: DescriptionJob | null = null;
-            try {
-              result = await api.post<DescriptionJob>("/creator-profile/me/generate-description", {
-                platform, username,
-                niche: platform === "instagram" ? data.instagram.niches[0] : data.youtube.niches[0],
-              });
-            } catch (cause) {
-              // The remote request may have started a job before the proxy timed out.
-              const latest = await api.get<CreatorProfile>("/creator-profile/me").catch(() => null);
-              if (latest && isDescriptionPending(latest[`${platform}_description_status`])) {
-                setGenerationProgress("Generation started; waiting for MAVLIT to finish…");
-                description = await waitForDescription(platform, setGenerationProgress);
-              } else if (latest && latest[`${platform}_description_status`] === "completed" &&
-                  latest[`${platform}_description_job_id`] &&
-                  latest[`${platform}_description_job_id`] !== current[`${platform}_description_job_id`] &&
-                  latest[`${platform}_description`]?.trim()) {
-                description = latest[`${platform}_description`]!.trim();
-              } else {
-                throw cause;
-              }
-            }
-            if (result) {
-              if (result.platform !== platform || !["queued", "running", "completed", "failed"].includes(result.status)) {
-                throw new Error("MAVLIT returned an unexpected generation response.");
-              }
-              if (result.status === "failed") throw new Error(result.error || "Description generation failed.");
-              if (result.status === "completed") {
-                description = result.description?.trim() ?? "";
-              } else {
-                setGenerationProgress(`${platform === "instagram" ? "Instagram" : "YouTube"} description is ${result.status}. Waiting for MAVLIT…`);
-                description = await waitForDescription(platform, setGenerationProgress);
-              }
-            }
-          }
-          if (platform === "instagram") instagramDescription = description;
-          else youtubeDescription = description;
-          if (instagramDescription || youtubeDescription) {
-            setData((current) => ({
-              ...current,
-              instagram: { ...current.instagram, contentDescription: instagramDescription },
-              youtube: { ...current.youtube, contentDescription: youtubeDescription },
-            }));
-          }
+          setCurrentStep(platform);
+          await generateDescription(platform);
+          // Allow the creator to review/edit estimates before the final save.
+          return;
         }
         if (!instagramDescription && !youtubeDescription) {
           setErrors({ contentDescription: "Add at least one overall, Instagram, or YouTube description." });
@@ -205,9 +209,9 @@ export default function OnboardingPage() {
       for (const platform of ["instagram", "youtube"] as const) {
         if (isDescriptionPending(latestBeforeSave[`${platform}_description_status`])) {
           setGenerationProgress(`Waiting for the ${platform === "instagram" ? "Instagram" : "YouTube"} description…`);
-          const description = await waitForDescription(platform, setGenerationProgress);
-          if (platform === "instagram") instagramDescription = description;
-          else youtubeDescription = description;
+          setCurrentStep(platform);
+          await generateDescription(platform);
+          return;
         }
       }
       const updated = await updateProfile({
@@ -237,10 +241,14 @@ export default function OnboardingPage() {
   };
 
   useEffect(() => {
-    if (currentStep === "review" && (isDescriptionPending(user?.instagram_description_status) ||
-        isDescriptionPending(user?.youtube_description_status))) void submit();
-    // A pending job loaded from the server after a refresh is resumed once on review.
-  }, [currentStep, user?.instagram_description_status, user?.youtube_description_status]);
+    for (const platform of ["instagram", "youtube"] as const) {
+      if (isDescriptionPending(user?.[`${platform}_description_status`])) {
+        void generateDescription(platform);
+        break;
+      }
+    }
+    // Resume an existing server job after a reload, without posting a new job.
+  }, []);
 
   const stepContent = {
     welcome: <WelcomeStep onStart={() => goTo(1, 1)} />,
@@ -258,6 +266,10 @@ export default function OnboardingPage() {
         descriptionMode={data.instagramDescriptionMode}
         onDescriptionModeChange={(instagramDescriptionMode) => setData((current) => ({ ...current, instagramDescriptionMode }))}
         errors={errors}
+        onGenerate={() => void generateDescription("instagram")}
+        generating={generatingPlatform !== null}
+        generateError={submitError}
+        estimated={!!estimatedPlatforms.instagram}
       />
     ),
     youtube: (
@@ -267,6 +279,10 @@ export default function OnboardingPage() {
         descriptionMode={data.youtubeDescriptionMode}
         onDescriptionModeChange={(youtubeDescriptionMode) => setData((current) => ({ ...current, youtubeDescriptionMode }))}
         errors={errors}
+        onGenerate={() => void generateDescription("youtube")}
+        generating={generatingPlatform !== null}
+        generateError={submitError}
+        estimated={!!estimatedPlatforms.youtube}
       />
     ),
     review: <ReviewStep data={data} />,
@@ -281,7 +297,7 @@ export default function OnboardingPage() {
       continueLabel={currentStep === "review" ? "Complete Profile" : "Continue"}
       showPrevious={currentStep !== "creator"}
       showContinue
-      saving={saving}
+      saving={saving || generatingPlatform !== null}
     >
       <AnimatePresence mode="wait" custom={direction}>
         <motion.div
@@ -305,20 +321,49 @@ export default function OnboardingPage() {
   );
 }
 
-async function waitForDescription(platform: DescriptionPlatform, onProgress: (message: string) => void): Promise<string> {
+async function waitForDescription(platform: DescriptionPlatform, jobId: string, onProgress: (message: string) => void, signal: AbortSignal): Promise<CreatorProfile> {
+  if (!jobId) throw new Error("MAVLIT did not return a generation job ID.");
   while (true) {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    const profile = await api.get<CreatorProfile>("/creator-profile/me");
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    if (signal.aborted) throw new Error("Generation progress checks stopped.");
+    const profile = await api.get<CreatorProfile>("/creator-profile/me", { signal });
+    if (profile[`${platform}_description_job_id`] !== jobId) throw new Error("The generation job changed. Progress checks stopped. Please try again.");
     const status = profile[`${platform}_description_status`];
     if (status === "completed") {
       const description = profile[`${platform}_description`]?.trim();
       if (!description) throw new Error("MAVLIT completed generation without a description.");
-      return description;
+      return profile;
     }
     if (status === "failed") throw new Error(profile[`${platform}_description_error`] || "Description generation failed. Write it yourself or retry.");
     if (!isDescriptionPending(status)) throw new Error("Description generation stopped unexpectedly. Please try again.");
     onProgress(`${platform === "instagram" ? "Instagram" : "YouTube"} description is ${status}. Waiting for MAVLIT…`);
   }
+}
+
+function onboardingPayload(data: OnboardingData): Partial<CreatorProfile> {
+  return {
+    full_name: data.creator.fullName.trim(),
+    creator_handle: data.instagram.username.trim().replace(/^@/, ""),
+    age: Number(data.creator.age),
+    gender: data.creator.gender,
+    primary_platform: formatPlatforms(data.creator.platforms),
+    instagram_handle: data.instagram.username.trim().replace(/^@/, ""),
+    instagram_followers: Number(data.instagram.followers),
+    follower_count: data.creator.platforms[0] === "youtube" ? Number(data.youtube.subscribers) : Number(data.instagram.followers),
+    content_niche: formatPrimaryNiches(data.instagram.niches),
+    instagram_primary_niche: formatPrimaryNiches(data.instagram.niches),
+    instagram_sub_niches: data.instagram.subNiches,
+    instagram_excluded_categories: data.instagram.excludedCategories,
+    youtube_channel_name: data.youtube.channelName.trim() || null,
+    youtube_subscribers: data.youtube.subscribers ? Number(data.youtube.subscribers) : null,
+    youtube_primary_niche: formatPrimaryNiches(data.youtube.niches),
+    youtube_sub_niches: data.youtube.subNiches,
+    youtube_excluded_categories: data.youtube.excludedCategories,
+    instagram_description_mode: data.instagramDescriptionMode,
+    youtube_description_mode: data.youtubeDescriptionMode,
+    ...audiencePayload(data.instagram, "instagram"),
+    ...audiencePayload(data.youtube, "youtube"),
+  };
 }
 
 function loadDraft(profile: CreatorProfile | null): SavedDraft {
@@ -338,6 +383,8 @@ function loadDraft(profile: CreatorProfile | null): SavedDraft {
     step: "creator",
     data: currentFields({
       ...EMPTY_ONBOARDING,
+      instagramDescriptionMode: profile.instagram_description_mode === "generate" ? "generate" : "manual",
+      youtubeDescriptionMode: profile.youtube_description_mode === "generate" ? "generate" : "manual",
       creator: {
         fullName: profile.full_name ?? "",
         age: profile.age != null ? String(profile.age) : "",
@@ -354,6 +401,7 @@ function loadDraft(profile: CreatorProfile | null): SavedDraft {
         subNiches: profile.instagram_sub_niches ?? profile.sub_niches ?? [],
         contentDescription: profile.instagram_description ?? "",
         excludedCategories: profile.instagram_excluded_categories ?? profile.excluded_categories ?? [],
+        ...audienceFromProfile(profile, "instagram"),
       },
       youtube: {
         ...EMPTY_ONBOARDING.youtube,
@@ -363,6 +411,7 @@ function loadDraft(profile: CreatorProfile | null): SavedDraft {
         subNiches: profile.youtube_sub_niches ?? [],
         contentDescription: profile.youtube_description ?? "",
         excludedCategories: profile.youtube_excluded_categories ?? [],
+        ...audienceFromProfile(profile, "youtube"),
       },
     }),
   };
@@ -386,6 +435,9 @@ function currentFields(data: OnboardingData): OnboardingData {
       subNiches: data.instagram.subNiches ?? [],
       contentDescription: data.instagram.contentDescription ?? "",
       excludedCategories: categoriesArray(data.instagram.excludedCategories),
+      audienceGender: data.instagram.audienceGender ?? "",
+      audienceAgeMin: data.instagram.audienceAgeMin ?? "",
+      audienceAgeMax: data.instagram.audienceAgeMax ?? "",
     },
     youtube: {
       channelName: data.youtube.channelName ?? "",
@@ -394,6 +446,9 @@ function currentFields(data: OnboardingData): OnboardingData {
       subNiches: data.youtube.subNiches ?? [],
       contentDescription: data.youtube.contentDescription ?? "",
       excludedCategories: categoriesArray(data.youtube.excludedCategories),
+      audienceGender: data.youtube.audienceGender ?? "",
+      audienceAgeMin: data.youtube.audienceAgeMin ?? "",
+      audienceAgeMax: data.youtube.audienceAgeMax ?? "",
     },
   };
 }
@@ -414,6 +469,8 @@ function validateStep(step: StepKey, data: OnboardingData): FieldErrors {
   }
   if (step === "instagram") {
     const errors: FieldErrors = {};
+    const audience = audienceError(data.instagram);
+    if (audience) errors.audience = audience;
     if (!data.instagram.username.trim()) errors.username = "Instagram username is required.";
     if (data.instagram.followers === "" || !Number.isInteger(Number(data.instagram.followers)) || Number(data.instagram.followers) < 0) errors.followers = "Enter a valid follower count.";
     if (!data.instagram.niches.length || data.instagram.niches.some((niche) => !NICHE_OPTIONS.includes(niche as typeof NICHE_OPTIONS[number]))) errors.niches = "Select a listed primary niche.";
@@ -421,6 +478,8 @@ function validateStep(step: StepKey, data: OnboardingData): FieldErrors {
   }
   if (step === "youtube") {
     const errors: FieldErrors = {};
+    const audience = audienceError(data.youtube);
+    if (audience) errors.audience = audience;
     if (!data.youtube.channelName.trim()) errors.channelName = "Channel name is required.";
     if (data.youtube.subscribers === "" || Number(data.youtube.subscribers) < 0) errors.subscribers = "Enter a valid subscriber count.";
     if (!data.youtube.niches.length || data.youtube.niches.some((niche) => !NICHE_OPTIONS.includes(niche as typeof NICHE_OPTIONS[number]))) errors.niches = "Select a listed primary niche.";

@@ -1,0 +1,30 @@
+Update the creator profile screen to use the creator's audience demographics, and make them fill in automatically when the user picks "Let MAVLIT generate my description". The backend already supports all of this; only the app needs to change.
+
+1) New fields on the creator profile. Per platform (instagram_ and youtube_ prefix), each one optional:
+   - instagram_audience_gender / youtube_audience_gender: "male" | "female" | "both"
+   - instagram_audience_age_min / instagram_audience_age_max, and youtube_audience_age_min / youtube_audience_age_max: whole numbers 13-100, with min <= max
+   They come back on GET /creator-profile/me. Send them in PUT /creator-profile/me (the same body as today, plus these keys).
+   Do not send the old audience male/female percentage fields. They were removed.
+
+2) UI, one block per selected platform (Instagram and/or YouTube), titled "Your audience":
+   - a dropdown for audience gender: Male / Female / Both, with an empty "Select" option. Send null or omit it when empty.
+   - two number inputs: "Audience age from" (min) and "to" (max), range 13-100.
+   - validation: if both ages are set, min must be <= max (show an inline error and block save). Send integers, never strings.
+   - these are separate from the existing "Gender" field (the creator's own gender, still required). Keep that unchanged.
+
+3) "Let MAVLIT generate my description" flow. The description choice is stored in <platform>_description_mode ("manual" or MAVLIT-generated; keep the value your app already uses).
+   When the user chooses MAVLIT-generated and clicks generate:
+   - POST /creator-profile/me/generate-description with {platform, username, niche}. It returns right away with {status: "queued"|"running", job_id}. The work runs in the background.
+   - Poll GET /creator-profile/me every 2-3 seconds until <platform>_description_status is "completed" or "failed", and stop polling if <platform>_description_job_id no longer matches your job_id. On "failed" show <platform>_description_error.
+   - On "completed" the profile already contains the generated <platform>_description AND <platform>_audience_gender, <platform>_audience_age_min and <platform>_audience_age_max, all from the same AI run. Copy them from the polled profile into the form.
+   - Only fill an audience input if it is currently empty. Never overwrite a value the user already typed or chose.
+   - Show a short note under the block: "Estimated by MAVLIT from your bio and recent content. You can edit it." The user can change the values before saving.
+   - If a generated value is null (the AI could not tell), leave that input empty and let the user fill it in.
+
+4) Save. Include the audience fields (current form values, whether generated or typed) in the PUT /creator-profile/me body. Saving re-runs the profile signals and matching in the background, so keep the existing "saving / matches updating" behavior.
+
+5) Matching. Nothing to send for matching. The backend now matches brands using the creator's audience gender (instagram, else youtube, else the creator's own gender); "both" or empty means no gender filtering. After saving, the Matches v1/v2/v3 pages refresh by themselves as before. Do not add any gender filter on the client.
+
+6) Also send brand_preferences if the app has that box (free text, max 1000 characters).
+
+Keep the existing look and styling. Don't change auth or the matches pages. Test: new user with an Instagram handle, generate description, confirm gender and age fill in, edit them, save, reload, confirm they persist.

@@ -60,10 +60,10 @@ describe("ProfileSettings fixture-backed saves", () => {
     const { user } = await mountSettings();
     await user.selectOptions(screen.getByRole("combobox", { name: /instagram audience gender/i }), "female");
     await user.selectOptions(screen.getByRole("combobox", { name: /youtube audience gender/i }), "both");
-    fireEvent.change(screen.getByRole("spinbutton", { name: /instagram audience minimum age/i }), { target: { value: "18" } });
-    fireEvent.change(screen.getByRole("spinbutton", { name: /instagram audience maximum age/i }), { target: { value: "34" } });
-    fireEvent.change(screen.getByRole("spinbutton", { name: /youtube audience minimum age/i }), { target: { value: "25" } });
-    fireEvent.change(screen.getByRole("spinbutton", { name: /youtube audience maximum age/i }), { target: { value: "65" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: /instagram audience age from/i }), { target: { value: "18" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: /instagram audience age to/i }), { target: { value: "34" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: /youtube audience age from/i }), { target: { value: "25" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: /youtube audience age to/i }), { target: { value: "65" } });
     await save();
     await screen.findByText("Profile saved.");
     expect(fixture.writes[0].body).toEqual({

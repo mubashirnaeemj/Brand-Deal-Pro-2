@@ -9,6 +9,7 @@ export function installProfileApi(initial: CreatorProfile) {
   let persisted: ProfileRecord = structuredClone(initial) as ProfileRecord;
   let getFailure: string | null = null;
   let putFailure: string | null = null;
+  let generationEnabled = false;
   const requests: RequestRecord[] = [];
   const unexpected: string[] = [];
   const reply = (body: unknown, status = 200) =>
@@ -19,6 +20,18 @@ export function installProfileApi(initial: CreatorProfile) {
     const method = init?.method ?? "GET";
     const body: unknown = init?.body ? JSON.parse(String(init.body)) : undefined;
     requests.push({ path: url.pathname, method, body, credentials: init?.credentials });
+    if (generationEnabled && url.origin === window.location.origin &&
+        url.pathname === "/api/mavlit/creator-profile/me/generate-description" && method === "POST") {
+      const { platform } = body as { platform: "instagram" | "youtube" };
+      persisted = {
+        ...persisted,
+        [`${platform}_description_status`]: "queued",
+        [`${platform}_description_job_id`]: `fixture-${platform}-audience-job`,
+        [`${platform}_description_error`]: null,
+      };
+      // The real endpoint need not echo platform or return a description yet.
+      return reply({ status: "queued", job_id: `fixture-${platform}-audience-job` });
+    }
     if (url.origin === window.location.origin && url.pathname === "/api/mavlit/creator-profile/me") {
       if (method === "GET") {
         return getFailure ? reply({ detail: getFailure }, 503) : reply(persisted);
@@ -47,6 +60,7 @@ export function installProfileApi(initial: CreatorProfile) {
     replaceOnServer(profile: CreatorProfile) { persisted = structuredClone(profile) as ProfileRecord; },
     failGet(message: string | null) { getFailure = message; },
     failPut(message: string | null) { putFailure = message; },
+    allowGeneration() { generationEnabled = true; },
     assertIsolated() {
       expect(unexpected, "Unlisted requests, including AI jobs, are forbidden").toEqual([]);
       expect(requests.every((request) => request.credentials === "include")).toBe(true);

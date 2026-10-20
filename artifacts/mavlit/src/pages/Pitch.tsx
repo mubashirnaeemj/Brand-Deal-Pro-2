@@ -108,17 +108,30 @@ function OutboundMode() {
   const [error, setError]           = useState<string | null>(null);
   const emailRef = useRef<HTMLDivElement>(null);
   const generationInFlight = useRef(false);
+  const productReferenceEdited = useRef(false);
 
   useEffect(() => {
     const prefilledMatch = matches?.find(b => b.brand_name === prefillBrand);
     if (prefilledMatch) {
       setFormState(previous => previous.brandSource === "found" && previous.customBrand === prefillBrand
-        ? { ...previous, brandSource: "matched", selectedBrand: String(prefilledMatch.brand_raw_id), customBrand: "" }
+        ? { ...previous, brandSource: "matched", selectedBrand: String(prefilledMatch.brand_raw_id), customBrand: "",
+            recentProductLaunch: productReferenceEdited.current ? previous.recentProductLaunch : prefilledMatch.latest_product?.trim() || "" }
         : previous);
     }
   }, [matches, prefillBrand]);
 
-  const set = <K extends keyof OutboundForm>(k: K, v: OutboundForm[K]) => setFormState(p => ({ ...p, [k]: v }));
+  const set = <K extends keyof OutboundForm>(k: K, v: OutboundForm[K]) => {
+    if (k === "recentProductLaunch") productReferenceEdited.current = true;
+    if (k === "brandSource") productReferenceEdited.current = false;
+    setFormState(p => ({
+      ...p, [k]: v,
+      ...(k === "brandSource" ? {
+        recentProductLaunch: v === "matched"
+          ? matches?.find(b => String(b.brand_raw_id) === p.selectedBrand)?.latest_product?.trim() || ""
+          : "",
+      } : {}),
+    }));
+  };
 
   const selectedMatch = matches?.find(b => String(b.brand_raw_id) === form.selectedBrand);
   const brandName = form.brandSource === "matched" ? selectedMatch?.brand_name ?? "" : form.customBrand;
@@ -209,7 +222,9 @@ function OutboundMode() {
                     const selected = form.selectedBrand === String(b.brand_raw_id);
                     return (
                       <button key={b.brand_raw_id} onClick={() => {
-                          setFormState(p => ({ ...p, selectedBrand: selected ? "" : String(b.brand_raw_id), recentProductLaunch: "" }));
+                          productReferenceEdited.current = false;
+                          setFormState(p => ({ ...p, selectedBrand: selected ? "" : String(b.brand_raw_id),
+                            recentProductLaunch: selected ? "" : b.latest_product?.trim() || "" }));
                         }}
                         className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${selected ? "border-primary bg-primary/10 text-white" : "border-border text-muted-foreground hover:border-primary/40 hover:text-white"}`}>
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-primary/15">
@@ -248,9 +263,9 @@ function OutboundMode() {
               <Input
                 value={form.recentProductLaunch}
                 onChange={v => set("recentProductLaunch", v)}
-                placeholder="Leave blank to skip, or pick one below"
+                placeholder="Enter a product launch, or leave blank to skip"
               />
-              <p className="mt-1.5 text-xs text-muted-foreground/60 leading-relaxed">If filled in, it'll be woven into your pitch as a natural reason for the timing — not added as a separate line.</p>
+              <p className="mt-1.5 text-xs text-muted-foreground/60 leading-relaxed">We prefill the brand’s latest product when available. Edit or clear it anytime. If filled in, it’ll be woven into your pitch as a natural reason for the timing.</p>
             </div>
           )}
           <div><Label>Past brand partnerships (optional)</Label><Input value={form.pastDeals} onChange={v => set("pastDeals", v)} placeholder="e.g. Focusrite, Splice, Roland — or leave blank if none yet" /></div>

@@ -102,6 +102,7 @@ export async function getAllPitches(): Promise<ApiPitch[]> {
 export interface ApiMatch {
   brand_raw_id: number;
   brand_name: string;
+  latest_product?: string | null;
   niche: string | null;
   website?: string | null;
   total_score: number;

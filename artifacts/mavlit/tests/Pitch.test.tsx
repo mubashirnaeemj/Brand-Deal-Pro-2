@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import Pitch from "@/pages/Pitch";
 import Pipeline from "@/pages/Pipeline";
-import { api, type ApiPitch } from "@/lib/api";
+import { api, type ApiMatch, type ApiPitch } from "@/lib/api";
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({ user: { id: 808, content_niche: "Music", follower_count: 12345 } }),
@@ -20,6 +20,71 @@ const pitch: ApiPitch = {
 };
 
 describe("Pitch page generation and review", () => {
+  const matches: ApiMatch[] = [
+    { brand_raw_id: 7, brand_name: "Launch Brand", latest_product: "  Latest Studio Mic  ", niche: "Music",
+      total_score: 0.9, dimensions: {}, reasons: [] },
+    { brand_raw_id: 8, brand_name: "Another Brand", latest_product: "New Audio Interface", niche: "Music",
+      total_score: 0.8, dimensions: {}, reasons: [] },
+    { brand_raw_id: 9, brand_name: "No Product Brand", latest_product: null, niche: "Music",
+      total_score: 0.7, dimensions: {}, reasons: [] },
+  ];
+  function mountMatches(search = "") {
+    vi.spyOn(api, "get").mockResolvedValue({ top_contact: null });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(["pitch-matches"], matches);
+    window.history.replaceState(null, "", `/pitch${search}`);
+    render(<QueryClientProvider client={queryClient}><Pitch /></QueryClientProvider>);
+    return queryClient;
+  }
+
+  it("prefills each selected brand's latest product and clears the previous brand's reference", () => {
+    const queryClient = mountMatches();
+    fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
+    const reference = screen.getByPlaceholderText("Enter a product launch, or leave blank to skip");
+    expect(reference).toHaveValue("Latest Studio Mic");
+    fireEvent.change(reference, { target: { value: "My custom product reference" } });
+    expect(reference).toHaveValue("My custom product reference");
+    fireEvent.click(screen.getByRole("button", { name: /Another Brand/ }));
+    expect(reference).toHaveValue("New Audio Interface");
+    fireEvent.click(screen.getByRole("button", { name: /No Product Brand/ }));
+    expect(reference).toHaveValue("");
+    fireEvent.click(screen.getByRole("button", { name: /No Product Brand/ }));
+    expect(screen.queryByPlaceholderText("Enter a product launch, or leave blank to skip")).not.toBeInTheDocument();
+    queryClient.clear();
+  });
+
+  it("prefills the latest product when arriving from a brand link", async () => {
+    const queryClient = mountMatches("?brand=Launch%20Brand");
+    await waitFor(() => expect(screen.getByPlaceholderText("Enter a product launch, or leave blank to skip")).toHaveValue("Latest Studio Mic"));
+    queryClient.clear();
+  });
+
+  it("sends the creator's edited product reference, not the automatic default", async () => {
+    const queryClient = mountMatches();
+    const post = vi.spyOn(api, "post").mockResolvedValue({ ...pitch, brand_id: 7, is_custom: false });
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+    fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
+    fireEvent.change(screen.getByPlaceholderText("Enter a product launch, or leave blank to skip"),
+      { target: { value: "Creator's preferred launch" } });
+    fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
+    fireEvent.click(screen.getByRole("button", { name: /Generate pitch email rough draft/ }));
+    await screen.findByRole("textbox", { name: "Pitch email draft" });
+    expect(post).toHaveBeenCalledWith("/pitches", expect.objectContaining({
+      brand_id: 7, is_custom: false, product_reference: "Creator's preferred launch",
+    }));
+    queryClient.clear();
+  });
+
+  it("does not carry a matched brand's product into a custom brand", async () => {
+    const queryClient = mountMatches();
+    fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
+    fireEvent.click(screen.getByRole("button", { name: "A brand I found myself" }));
+    fireEvent.change(await screen.findByPlaceholderText("e.g. Focusrite, Rode, Ableton"),
+      { target: { value: "Custom Brand" } });
+    expect(screen.getByPlaceholderText("Enter a product launch, or leave blank to skip")).toHaveValue("");
+    queryClient.clear();
+  });
+
   it("shows the saved final email on its Pipeline card", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const text = "Subject: Final saved draft\n\nMy edited email for this brand.";

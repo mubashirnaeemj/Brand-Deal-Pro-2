@@ -85,6 +85,12 @@ The pitch review flow uses the existing generated pitch, not a separate unsaved-
 
 **How to apply:** Keep draft review separate from sending, update the original pitch rather than creating a duplicate, and only leave the editor after the edited email is confirmed saved.
 
+Selecting a brand on the Pitch page should prefill its latest product in the optional product-launch reference. The creator can edit or clear it; never invent a product when the backend has none.
+
+**Why:** The user explicitly requested an automatic starting value with manual editing retained.
+
+**How to apply:** Use the selected brand's backend product information, including when arriving from a brand link. Switching brands must not carry over another brand's product reference.
+
 Generating an email is not evidence that the creator sent it. New generated pitches are drafts; the creator supplies an actual sent date when moving them to sent. Earlier `proposal_sent` records may have been generated but never sent, so do not silently interpret their creation date as a sent date.
 
 **Why:** The older external API assigned `proposal_sent` at generation time; the revised September 2026 contract separates `generated` from `sent` and persists manual outreach and deal updates.

@@ -1,17 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Save, User } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import PlatformSelector from "@/components/onboarding/PlatformSelector";
-import { INPUT_CLASS, parsePlatforms, samePrimaryNiches } from "@/components/onboarding/types";
+import { formatPrimaryNiches, NICHE_OPTIONS, parsePlatforms, samePrimaryNiches } from "@/components/onboarding/types";
 import { isDescriptionPending, isProfileComplete, type CreatorProfile, type DescriptionJob, type DescriptionPlatform, useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { fillEmptyAudience, audienceError } from "@/lib/audience";
-import { InstagramSection, YoutubeSection } from "./ProfilePlatformSection";
+import ProfileWizard from "@/components/profile/ProfileWizard";
 import { profilePatch, profileToForm, validateProfile, type ProfileForm } from "./profileForm";
+import { applyProfileGeneration, creatorInfoError, generationKey, profileGenerationKey, restoreWizardForm, type ProfileStep } from "./profileWizardModel";
 
 export default function ProfileSettings() {
-  const { updateProfile } = useAuth();
+  const { user, updateProfile, logout } = useAuth();
   const [, navigate] = useLocation();
   const [profile, setProfile] = useState<CreatorProfile | null>(null);
   const [form, setForm] = useState<ProfileForm | null>(null);
@@ -22,6 +21,9 @@ export default function ProfileSettings() {
   const [saved, setSaved] = useState(false);
   const [retry, setRetry] = useState(0);
   const [pollError, setPollError] = useState<string | null>(null);
+  const [step, setStep] = useState<ProfileStep>(1);
+  const [generatedFor, setGeneratedFor] = useState<string | null>(null);
+  const generationStarting = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -31,22 +33,21 @@ export default function ProfileSettings() {
       .then((response) => {
         if (!active) return;
         setProfile(response);
-        const initial = profileToForm(response);
+        const initial = restoreWizardForm(response, null);
         try {
-          const draft = JSON.parse(sessionStorage.getItem(`mavlit_profile_draft:${response.id}`) ?? "null");
-          const restored: ProfileForm = draft && typeof draft.fullName === "string" && typeof draft.brandPreferences === "string" &&
-            Array.isArray(draft.primaryPlatforms) && draft.instagram && draft.youtube ? {
-              ...initial, ...draft,
-              instagram: { ...initial.instagram, ...draft.instagram },
-              youtube: { ...initial.youtube, ...draft.youtube },
-            } : initial;
-          for (const platform of ["instagram", "youtube"] as const) {
-            if (response[`${platform}_description_status`] === "completed" && restored[platform].descriptionMode === "generate") {
-              Object.assign(restored[platform], fillEmptyAudience(restored[platform], response, platform), {
-                description: restored[platform].description || response[`${platform}_description`] || "",
-              });
-            }
+          const key = `mavlit_profile_draft:${response.id}`;
+          const draft = JSON.parse(sessionStorage.getItem(key) ?? localStorage.getItem(key) ??
+            localStorage.getItem(`mavlit_onboarding_draft_${response.id}`) ?? "null");
+          let restored = restoreWizardForm(response, draft);
+          const completed = response.instagram_description_status === "completed" && response.instagram_description_mode === "generate";
+          const matches = generationKey(restored.instagram.username, restored.instagram.primaryNiches) === profileGenerationKey(response);
+          const usable = !draft || !("generatedFor" in draft) || draft.generatedFor === profileGenerationKey(response) || draft.generationPending === true;
+          if (completed && matches && usable && restored.instagram.descriptionMode === "generate") {
+            restored = applyProfileGeneration(restored, response, "instagram");
           }
+          setGeneratedFor(completed && usable ? profileGenerationKey(response) : null);
+          if ([1, 2, 3].includes(draft?.wizardStep)) setStep(draft.wizardStep);
+          if (isDescriptionPending(response.instagram_description_status)) setStep(3);
           setForm(restored);
         } catch { setForm(initial); }
       })
@@ -56,6 +57,18 @@ export default function ProfileSettings() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [retry]);
+
+  useEffect(() => {
+    if (!form || !profile || saved) return;
+    try {
+      const key = `mavlit_profile_draft:${profile.id}`;
+      const draft = JSON.stringify({ ...form, wizardStep: step, generatedFor, generationPending: isDescriptionPending(profile.instagram_description_status) });
+      sessionStorage.setItem(key, draft);
+      if (!user || !isProfileComplete(user)) localStorage.setItem(key, draft);
+    } catch { /* The in-memory draft remains available. */ }
+  }, [form, profile, user, step, generatedFor, saved]);
+
+  useEffect(() => { document.title = "Your Profile | MAVLIT"; }, []);
 
   const instagramStatus = profile?.instagram_description_status;
   const youtubeStatus = profile?.youtube_description_status;
@@ -87,15 +100,14 @@ export default function ProfileSettings() {
           for (const platform of ["instagram", "youtube"] as const) {
             const wasPending = platform === "instagram" ? isDescriptionPending(instagramStatus) : isDescriptionPending(youtubeStatus);
             if (wasPending && latest[`${platform}_description_status`] === "completed") {
-              const description = latest[`${platform}_description`]?.trim();
-              if (description) next = { ...next, [platform]: {
-                ...fillEmptyAudience(next[platform], latest, platform),
-                description: next[platform].description.trim() ? next[platform].description : description,
-              } };
+              if (latest[`${platform}_description`]?.trim()) next = applyProfileGeneration(next, latest, platform);
             }
           }
           return next;
         });
+        if (isDescriptionPending(instagramStatus) && latest.instagram_description_status === "completed") {
+          setGeneratedFor(profileGenerationKey(latest));
+        }
         setProfile(latest);
         if (isDescriptionPending(latest.instagram_description_status) || isDescriptionPending(latest.youtube_description_status)) {
           timer = setTimeout(poll, 1500);
@@ -111,16 +123,23 @@ export default function ProfileSettings() {
   }, [jobPending, instagramStatus, youtubeStatus, instagramJobId, youtubeJobId]);
 
   const change = (next: ProfileForm) => {
-    setForm(next);
+    if (next.instagram.descriptionMode === "generate" && form?.instagram.descriptionMode !== "generate") {
+      if (profile?.instagram_description_status === "completed" && profile.instagram_description_mode === "generate" &&
+          generationKey(next.instagram.username, next.instagram.primaryNiches) === profileGenerationKey(profile)) {
+        setForm(applyProfileGeneration(next, profile, "instagram"));
+        setGeneratedFor(profileGenerationKey(profile));
+      } else {
+        setForm(next);
+        setGeneratedFor(null);
+      }
+    } else setForm(next);
     setSaved(false);
     setError(null);
   };
 
   const generated = (platform: "instagram" | "youtube", completed: CreatorProfile) => {
-    setForm((current) => current ? { ...current, [platform]: {
-      ...fillEmptyAudience(current[platform], completed, platform),
-      description: current[platform].description.trim() ? current[platform].description : completed[`${platform}_description`]?.trim() || "",
-    } } : current);
+    setForm((current) => current ? applyProfileGeneration(current, completed, platform) : current);
+    if (platform === "instagram") setGeneratedFor(profileGenerationKey(completed));
     setSaved(false);
     setError(null);
   };
@@ -175,7 +194,7 @@ export default function ProfileSettings() {
       setProfile(current);
       throw new Error(`${platform === "instagram" ? "Instagram" : "YouTube"} description generation is already in progress.`);
     }
-    if (!current.full_name?.trim()) throw new Error("Save your full name before generating a description.");
+    if (!form || creatorInfoError(form)) throw new Error("Complete your creator information before generating a description.");
     const creatorHandle = platform === "instagram"
       ? enteredUsername
       : current.creator_handle?.trim() || current.instagram_handle?.trim().replace(/^@/, "");
@@ -183,10 +202,16 @@ export default function ProfileSettings() {
 
     // Use persisted values, not the other unsaved fields in the editor, when saving a name before generation.
     const updated = await updateProfile({
+      full_name: form.fullName.trim(),
+      age: Number(form.age),
+      gender: form.gender,
+      primary_platform: "instagram",
+      instagram_primary_niche: formatPrimaryNiches(form.instagram.primaryNiches),
+      content_niche: formatPrimaryNiches(form.instagram.primaryNiches),
       creator_handle: creatorHandle,
       [platform === "instagram" ? "instagram_handle" : "youtube_channel_name"]: enteredUsername,
       [`${platform}_description_mode`]: "generate",
-    });
+    }, { commit: false });
     setProfile(updated);
     const savedUsername = platform === "instagram"
       ? updated.instagram_handle?.trim().replace(/^@/, "")
@@ -208,10 +233,55 @@ export default function ProfileSettings() {
     return savedUsername;
   };
 
-  const save = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const generationComplete = !!form && profile?.instagram_description_status === "completed" &&
+    !!form.instagram.description.trim() &&
+    generatedFor === generationKey(form.instagram.username, form.instagram.primaryNiches);
+
+  const generateInstagram = async () => {
+    if (!form || generationStarting.current || generatingCount > 0 || saving || jobPending) return;
+    const infoError = creatorInfoError(form);
+    if (infoError) { setError(infoError); setStep(1); return; }
+    const username = form.instagram.username.trim().replace(/^@/, "");
+    const niche = form.instagram.primaryNiches[0];
+    if (!username || !NICHE_OPTIONS.includes(niche as typeof NICHE_OPTIONS[number])) {
+      setError("Enter your Instagram username and select a primary niche before generating.");
+      return;
+    }
+    generationStarting.current = true;
+    setGeneratingCount(1);
+    setGeneratedFor(null);
+    setError(null);
+    try {
+      const savedUsername = await saveUsernameForGeneration("instagram", username);
+      await startGeneration("instagram", savedUsername, niche);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not generate your profile.");
+    } finally { generationStarting.current = false; setGeneratingCount(0); }
+  };
+
+  const continueStep = () => {
+    if (!form || saving) return;
+    const infoError = creatorInfoError(form);
+    if (step === 1 && infoError) { setError(infoError); return; }
+    setError(null);
+    setStep(step === 1 ? 2 : 3);
+    window.scrollTo({ top: 0 });
+  };
+
+  const exit = () => {
+    if (!profile || saving) return;
+    if (!user || !isProfileComplete(user)) {
+      if (window.confirm("Exit setup and sign out? Your draft will be kept on this device.")) logout();
+    } else navigate("/dashboard");
+  };
+
+  const save = async () => {
     if (!form || !profile || saving || generatingCount > 0 || jobPending) return;
     setError(null);
+    if (form.instagram.descriptionMode === "generate" && !generationComplete) {
+      setError("Generate your Instagram profile and wait for it to finish before saving.");
+      return;
+    }
     const validationError = validateProfile(form, profile);
     if (validationError) {
       setError(validationError);
@@ -243,10 +313,7 @@ export default function ProfileSettings() {
             (profile[`${platform}_description_status`] !== "completed" ||
              latest[`${platform}_description_job_id`] !== profile[`${platform}_description_job_id`]) &&
             form[platform].descriptionMode === "generate") {
-          saveForm = { ...saveForm, [platform]: {
-            ...fillEmptyAudience(saveForm[platform], latest, platform),
-            description: saveForm[platform].description.trim() ? saveForm[platform].description : latest[`${platform}_description`] || "",
-          } };
+          saveForm = applyProfileGeneration(saveForm, latest, platform);
         }
       }
       setForm(saveForm);
@@ -257,15 +324,14 @@ export default function ProfileSettings() {
       }
       // Retain failed submissions even if an expired session navigates to sign-in.
       try { sessionStorage.setItem(`mavlit_profile_draft:${profile.id}`, JSON.stringify(saveForm)); } catch { /* Storage may be unavailable. */ }
-      const patch = profilePatch(saveForm, profile);
+      const patch = { ...profilePatch(saveForm, profile), primary_platform: "instagram" };
       const updated = await updateProfile(patch);
-      if (form.primaryPlatforms.some((platform) => !parsePlatforms(updated.primary_platform).includes(platform))) {
+      if (parsePlatforms(updated.primary_platform).length !== 1 || !parsePlatforms(updated.primary_platform).includes("instagram")) {
         setProfile(updated);
         setError("The profile API did not keep all selected platforms. Please try again.");
         return;
       }
-      if (!samePrimaryNiches(updated.instagram_primary_niche, form.instagram.primaryNiches) ||
-          !samePrimaryNiches(updated.youtube_primary_niche, form.youtube.primaryNiches)) {
+      if (!samePrimaryNiches(updated.instagram_primary_niche, form.instagram.primaryNiches)) {
         setProfile(updated);
         setError("The profile API did not keep all selected primary niches. Please try again.");
         return;
@@ -293,8 +359,12 @@ export default function ProfileSettings() {
         return;
       }
       setProfile(updated);
-      setForm(profileToForm(updated));
-      try { sessionStorage.removeItem(`mavlit_profile_draft:${profile.id}`); } catch { /* Storage may be unavailable. */ }
+      setForm(restoreWizardForm(updated, null));
+      try {
+        sessionStorage.removeItem(`mavlit_profile_draft:${profile.id}`);
+        localStorage.removeItem(`mavlit_profile_draft:${profile.id}`);
+        localStorage.removeItem(`mavlit_onboarding_draft_${profile.id}`);
+      } catch { /* Storage may be unavailable. */ }
       setSaved(true);
       navigate("/brand-matches?version=v3");
     } catch (cause) {
@@ -307,102 +377,26 @@ export default function ProfileSettings() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
-      <main className="mx-auto max-w-3xl px-4 pb-20 pt-28">
-        <div className="mb-8">
-          <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
-            <User size={15} /> Creator Profile
-          </p>
-          <h1 className="text-3xl font-extrabold text-white">Your Profile</h1>
-        </div>
-
+      <div className="pb-20 pt-20">
         {loading ? (
-          <p className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground" role="status">Loading your profile…</p>
+          <p className="mx-auto max-w-2xl rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground" role="status">Loading your profile…</p>
         ) : !form || !profile ? (
-          <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-card p-6">
             <p role="alert" className="text-sm text-red-400">{error ?? "Could not load your profile."}</p>
             <button type="button" onClick={() => setRetry((value) => value + 1)}
               className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">Retry</button>
           </div>
         ) : (
-          <form onSubmit={save} noValidate className="space-y-5">
-            <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-              <h2 className="mb-5 text-lg font-bold text-white">Creator information</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Full name <span className="text-primary">*</span>
-                  <input value={form.fullName} onChange={(event) => change({ ...form, fullName: event.target.value })}
-                    autoComplete="name" className={`${INPUT_CLASS} mt-1.5`} />
-                </label>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Age
-                  <input type="number" min="13" max="120" step="1" value={form.age}
-                    onChange={(event) => change({ ...form, age: event.target.value })}
-                    className={`${INPUT_CLASS} mt-1.5`} />
-                </label>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:col-span-2">
-                  Gender
-                  <select value={form.gender} onChange={(event) => change({ ...form, gender: event.target.value })}
-                    className={`${INPUT_CLASS} mt-1.5`}>
-                    <option value="">Select an option</option>
-                    {!["Male", "Female", "Non-binary", "Prefer not to say", "Other"].includes(form.gender) && form.gender &&
-                      <option value={form.gender}>{form.gender}</option>}
-                    <option>Male</option><option>Female</option><option>Non-binary</option>
-                    <option>Prefer not to say</option><option>Other</option>
-                  </select>
-                </label>
-              </div>
-              <div className="mt-5">
-                <PlatformSelector value={form.primaryPlatforms}
-                  onChange={(primaryPlatforms) => change({ ...form, primaryPlatforms })} />
-              </div>
-            </section>
-
-            {form.primaryPlatforms.includes("instagram") && <InstagramSection value={form.instagram} onChange={(instagram) => change({ ...form, instagram })}
-              onSaveUsername={(username) => saveUsernameForGeneration("instagram", username)}
-              onStartGeneration={(username, niche) => startGeneration("instagram", username, niche)}
-              generationBusy={generatingCount > 0 || saving} status={instagramStatus}
-              statusError={profile.instagram_description_error}
-              onGeneratingChange={(active) => setGeneratingCount((count) => count + (active ? 1 : -1))} />}
-            {form.primaryPlatforms.includes("youtube") && <YoutubeSection value={form.youtube} onChange={(youtube) => change({ ...form, youtube })}
-              onSaveUsername={(username) => saveUsernameForGeneration("youtube", username)}
-              onStartGeneration={(username, niche) => startGeneration("youtube", username, niche)}
-              generationBusy={generatingCount > 0 || saving} status={youtubeStatus}
-              statusError={profile.youtube_description_error}
-              onGeneratingChange={(active) => setGeneratingCount((count) => count + (active ? 1 : -1))} />}
-
-            <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-              <h2 className="mb-2 text-lg font-bold text-white">
-                <label htmlFor="brand-preferences">Brand preferences</label>
-              </h2>
-              <p id="brand-preferences-help" className="mb-4 text-sm leading-relaxed text-muted-foreground">
-                Optional. Tell us which brands you'd like to see more of, and which you don't want.
-                {" "}Brands you don't want are shown last.
-              </p>
-              <textarea id="brand-preferences" data-testid="input-brand-preferences" rows={4} maxLength={1000}
-                value={form.brandPreferences} aria-describedby="brand-preferences-help brand-preferences-count"
-                aria-invalid={form.brandPreferences.length > 1000}
-                placeholder={"e.g. I want more guitar and amp brands. I'd love sunscreen brands.\nI don't want lipstick or makeup brands."}
-                onChange={(event) => change({ ...form, brandPreferences: event.target.value })}
-                className={`${INPUT_CLASS} resize-y normal-case`} />
-              <p id="brand-preferences-count" aria-live="polite"
-                className={`mt-2 text-right text-xs ${form.brandPreferences.length > 1000 ? "text-red-400" : "text-muted-foreground"}`}>
-                {form.brandPreferences.length} / 1000
-              </p>
-            </section>
-
-            {pollError && <p role="alert" className="text-sm text-amber-400">{pollError}</p>}
-            {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>}
-            {saved && <p role="status" className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">Profile saved.</p>}
-            <div className="flex justify-end">
-              <button type="submit" disabled={saving || generatingCount > 0 || jobPending || form.brandPreferences.length > 1000 ||
-                !!audienceError(form.instagram) || !!audienceError(form.youtube)}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50">
-                <Save size={16} /> {saving ? "Saving…" : generatingCount > 0 || jobPending ? "Generating…" : "Save Profile"}
-              </button>
-            </div>
-          </form>
+          <ProfileWizard step={step} form={form} onChange={change}
+            onContinue={continueStep} onBack={() => { setError(null); setStep(step === 3 ? 2 : 1); }}
+            onExit={exit} onGenerate={() => void generateInstagram()} onSave={() => void save()}
+            saving={saving} generating={generatingCount > 0 || jobPending}
+            canSave={!audienceError(form.instagram) && form.brandPreferences.length <= 1000 &&
+              (form.instagram.descriptionMode === "manual" || generationComplete)}
+            generationComplete={generationComplete} status={instagramStatus}
+            error={error} pollError={pollError || profile.instagram_description_error || null} saved={saved} />
         )}
-      </main>
+      </div>
     </div>
   );
 }

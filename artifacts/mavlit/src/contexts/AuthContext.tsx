@@ -100,7 +100,7 @@ interface AuthContextValue {
   authError: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-  updateProfile: (patch: Partial<CreatorProfile>) => Promise<CreatorProfile>;
+  updateProfile: (patch: Partial<CreatorProfile>, options?: { commit?: boolean }) => Promise<CreatorProfile>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -178,7 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     navigate("/signin");
   }, [navigate, queryClient]);
 
-  const updateProfile = useCallback(async (patch: Partial<CreatorProfile>) => {
+  const updateProfile = useCallback(async (patch: Partial<CreatorProfile>, options?: { commit?: boolean }) => {
     // PUT replaces the whole profile, including fields outside the current editor.
     const current = await api.get<CreatorProfile>("/creator-profile/me");
     if (isDescriptionPending(current.instagram_description_status) || isDescriptionPending(current.youtube_description_status)) {
@@ -188,6 +188,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // PUT is a replacement write; display and validate the persisted profile,
     // not an acknowledgement or an echo of the submitted body.
     const updated = await api.get<CreatorProfile>("/creator-profile/me");
+    // Generation prerequisites are not the creator's final submission.
+    if (options?.commit === false) return updated;
     setUser(updated);
     queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     queryClient.invalidateQueries({ queryKey: ["pitch-matches"] });

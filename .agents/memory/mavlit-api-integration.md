@@ -57,11 +57,11 @@ Audience demographics are independent for Instagram and YouTube. Gender is `male
 
 **How to apply:** Do not infer gender from percentages or use shared legacy ages. Preserve all other fresh profile fields on replacement saves. Keep the creator's own required gender separate from optional audience gender.
 
-Description generation produces the platform description and audience estimates together. The POST response contains only job status/ID, not audience values; poll GET at 1–2 seconds for the same job ID and read all generated values from the completed profile. Stop on failure or job replacement. Fill only empty description/audience inputs; null estimates remain empty.
+Description generation produces the platform description and audience estimates together. The user also confirmed the backend now generates follower counts and sub-niches. The POST response contains only job status/ID, not generated values; poll GET at 1–2 seconds for the same job ID and read all generated values from the completed profile. Stop on failure or job replacement; null estimates remain empty.
 
 **Why:** The user supplied this revised backend contract and explicitly said that generated values must never overwrite typed audience data.
 
-**How to apply:** Apply this to both onboarding and profile editing. Persist the selected description mode using `generate`/`manual`. No replacement PUT may run while either platform's generation is queued/running. Include all selected-platform audience fields from the current form in final saves, and reload with GET afterward rather than trusting the PUT response. Recover completed estimates into empty stale drafts before saving, without preventing deliberate clears. Keep auth and Matches behavior unchanged; do not add client-side gender filtering or reintroduce V1/V2 pages from generic API instructions.
+**How to apply:** Apply this to both onboarding and profile editing. Persist the selected description mode using `generate`/`manual`. In generate mode, outputs are server-owned and read-only; populate all of them from the completed profile. In manual mode, preserve user-entered values when a previously started job finishes. No replacement PUT may run while either platform's generation is queued/running. Include all selected-platform audience fields from the current form in final saves, and reload with GET afterward rather than trusting the PUT response. Keep sign-in and Matches behavior unchanged; do not add client-side gender filtering or reintroduce V1/V2 pages from generic API instructions.
 
 - Cookie-based JWT only — `credentials: "include"` on every request
 - `POST /auth/login` → sets `access_token` httpOnly cookie; response body is full CreatorProfile

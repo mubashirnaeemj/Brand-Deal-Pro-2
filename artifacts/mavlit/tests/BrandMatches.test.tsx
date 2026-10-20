@@ -192,7 +192,9 @@ describe("Matches page V3 integration", () => {
       </Switch>,
     );
     await settle();
-    fireEvent.change(screen.getByRole("textbox", { name: "Brand preferences" }), {
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.change(screen.getByTestId("input-brand-preferences"), {
       target: { value: "Avoid Unwanted Amplifiers" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));

@@ -66,10 +66,11 @@ export function validateProfile(form: ProfileForm, profile: CreatorProfile): str
   if (form.age.trim() && (!Number.isInteger(Number(form.age)) || Number(form.age) < 13 || Number(form.age) > 120)) {
     return "Age must be a whole number between 13 and 120.";
   }
-  for (const [value, label] of [[form.instagram.followers, "Follower count"], [form.youtube.subscribers, "Subscriber count"]]) {
+  for (const [value, label] of [[form.instagram.followers, "Follower count"], ...(form.primaryPlatforms.includes("youtube") ? [[form.youtube.subscribers, "Subscriber count"]] : [])]) {
     if (value.trim() && (!Number.isInteger(Number(value)) || Number(value) < 0)) return `${label} must be a non-negative whole number.`;
   }
   for (const platform of ["instagram", "youtube"] as const) {
+    if (!form.primaryPlatforms.includes(platform)) continue;
     const label = platform === "instagram" ? "Instagram" : "YouTube";
     const error = audienceError(form[platform]);
     if (error) return `${label}: ${error}`;
@@ -80,7 +81,7 @@ export function validateProfile(form: ProfileForm, profile: CreatorProfile): str
     return "To keep your profile active, complete age, gender, Instagram username, follower count, and Instagram primary niche.";
   }
   if (form.instagram.primaryNiches.some((niche) => !NICHE_OPTIONS.includes(niche as typeof NICHE_OPTIONS[number])) ||
-      form.youtube.primaryNiches.some((niche) => !NICHE_OPTIONS.includes(niche as typeof NICHE_OPTIONS[number]))) {
+      (form.primaryPlatforms.includes("youtube") && form.youtube.primaryNiches.some((niche) => !NICHE_OPTIONS.includes(niche as typeof NICHE_OPTIONS[number])))) {
     return "Choose a listed primary niche (Music, Health, Beauty, or Fitness).";
   }
   if (!form.instagram.description.trim() && !form.youtube.description.trim() && !profile.content_description?.trim()) {

@@ -1,8 +1,7 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import ProfileSettings from "@/pages/ProfileSettings";
-import { profileToForm } from "@/pages/profileForm";
 import { creatorProfile, freshCreatorProfile } from "./fixtures/creatorProfile";
 import { installProfileApi } from "./fixtures/profileApi";
 import { renderProfile } from "./renderProfile";
@@ -11,187 +10,154 @@ let fixture: ReturnType<typeof installProfileApi>;
 afterEach(() => fixture?.assertIsolated());
 const draftKey = `mavlit_profile_draft:${creatorProfile().id}`;
 
-async function mountSettings(apiFixture = installProfileApi(creatorProfile())) {
-  fixture = apiFixture;
+async function mount(initial = creatorProfile()) {
+  fixture = installProfileApi(initial);
   const rendered = renderProfile(<ProfileSettings />);
-  const preferences = await screen.findByRole("textbox", { name: "Brand preferences" });
-  await waitFor(() => expect(screen.getByRole("button", { name: /Sign Out/i })).toBeInTheDocument());
-  return { ...rendered, preferences, user: userEvent.setup() };
+  await screen.findByTestId("profile-wizard");
+  return { ...rendered, user: userEvent.setup() };
 }
-
+async function details() {
+  while (screen.queryByRole("button", { name: "Continue" })) {
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  }
+  await screen.findByTestId("input-brand-preferences");
+}
 async function save() {
-  await userEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+  fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+  await screen.findByText("Profile saved.");
 }
+const instagramSaved = (extra = {}) => ({ ...creatorProfile(), primary_platform: "instagram", ...extra });
 
-describe("ProfileSettings fixture-backed saves", () => {
-  it.each(["instagram", "youtube"] as const)("shows only the saved %s platform section", async (platform) => {
-    await mountSettings(installProfileApi(creatorProfile({ primary_platform: platform })));
-    if (platform === "instagram") {
-      expect(screen.getByRole("heading", { name: "Instagram" })).toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "YouTube" })).not.toBeInTheDocument();
-    } else {
-      expect(screen.getByRole("heading", { name: "YouTube" })).toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "Instagram" })).not.toBeInTheDocument();
-    }
+describe("three-page Instagram profile", () => {
+  it("shows only creator information first and keeps the creator gender contract", async () => {
+    await mount();
+    expect(screen.getByRole("heading", { name: "Creator information" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Gender" })).toHaveValue("Other");
+    expect(screen.queryByTestId("input-username")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Instagram" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "YouTube" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Exit" })).toBeEnabled();
   });
 
-  it("updates visible sections immediately and keeps edits when a platform is hidden and shown again", async () => {
-    const { user } = await mountSettings();
-    const channel = screen.getByRole("textbox", { name: /Channel name/i });
-    await user.clear(channel);
-    await user.type(channel, "Unsaved channel edit");
-    await user.click(screen.getByRole("button", { name: "YouTube" }));
-    expect(screen.queryByRole("heading", { name: "YouTube" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Instagram" })).toBeInTheDocument();
-    await save();
-    await screen.findByText("Profile saved.");
-    expect(fixture.writes[0].body).toMatchObject({ primary_platform: "instagram", youtube_channel_name: "Unsaved channel edit" });
-    await user.click(screen.getByRole("button", { name: "YouTube" }));
-    expect(screen.getByRole("textbox", { name: /Channel name/i })).toHaveValue("Unsaved channel edit");
-    await user.click(screen.getByRole("button", { name: "Instagram" }));
-    expect(screen.queryByRole("heading", { name: "Instagram" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "YouTube" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "YouTube" }));
-    expect(screen.queryByRole("heading", { name: "YouTube" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Instagram" })).not.toBeInTheDocument();
+  it("validates creator information before Continue and shows errors on page one", async () => {
+    await mount();
+    fireEvent.change(screen.getByTestId("input-full-name"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Full name is required");
+    expect(screen.getByText("Step 1 of 3")).toBeInTheDocument();
+    expect(fixture.writes).toHaveLength(0);
   });
 
-  it("edits separate Instagram and YouTube audience fields and sends numeric ages", async () => {
-    const { user } = await mountSettings();
-    await user.selectOptions(screen.getByRole("combobox", { name: /instagram audience gender/i }), "female");
-    await user.selectOptions(screen.getByRole("combobox", { name: /youtube audience gender/i }), "both");
-    fireEvent.change(screen.getByRole("spinbutton", { name: /instagram audience age from/i }), { target: { value: "18" } });
-    fireEvent.change(screen.getByRole("spinbutton", { name: /instagram audience age to/i }), { target: { value: "34" } });
-    fireEvent.change(screen.getByRole("spinbutton", { name: /youtube audience age from/i }), { target: { value: "25" } });
-    fireEvent.change(screen.getByRole("spinbutton", { name: /youtube audience age to/i }), { target: { value: "65" } });
-    await save();
-    await screen.findByText("Profile saved.");
-    expect(fixture.writes[0].body).toEqual({
-      ...creatorProfile(),
-      instagram_audience_gender: "female", instagram_audience_age_min: 18, instagram_audience_age_max: 34,
-      youtube_audience_gender: "both", youtube_audience_age_min: 25, youtube_audience_age_max: 65,
-    });
+  it("shows just the two method tabs on page two and retains fields while moving back", async () => {
+    await mount();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
+    expect(screen.queryByTestId("input-username")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "retained_draft" } });
+    fireEvent.change(screen.getByTestId("input-brand-preferences"), { target: { value: "More guitar brands" } });
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByText("Step 1 of 3")).toBeInTheDocument();
+    await details();
+    expect(screen.getByTestId("input-username")).toHaveValue("retained_draft");
+    expect(screen.getByTestId("input-brand-preferences")).toHaveValue("More guitar brands");
   });
 
-  it("restores older drafts with defaults for the new audience fields", async () => {
-    const draft = profileToForm(creatorProfile());
-    const legacyDraft = JSON.parse(JSON.stringify(draft));
-    for (const platform of ["instagram", "youtube"]) {
-      delete legacyDraft[platform].audienceGender;
-      delete legacyDraft[platform].audienceAgeMin;
-      delete legacyDraft[platform].audienceAgeMax;
-    }
-    sessionStorage.setItem(draftKey, JSON.stringify(legacyDraft));
-    await mountSettings();
-    expect(screen.getByRole("combobox", { name: /instagram audience gender/i })).toHaveValue("");
+  it("manual mode exposes editable fields and saves numeric audience ages for Instagram only", async () => {
+    await mount();
+    await details();
+    expect(screen.getByTestId("input-followers")).not.toHaveAttribute("readonly");
+    expect(screen.getByLabelText("instagram audience gender")).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("instagram audience gender"), { target: { value: "both" } });
+    fireEvent.change(screen.getByLabelText("instagram audience age from"), { target: { value: "25" } });
+    fireEvent.change(screen.getByLabelText("instagram audience age to"), { target: { value: "40" } });
     await save();
-    await screen.findByText("Profile saved.");
-    expect(fixture.writes[0].body).toEqual(creatorProfile());
-  });
-
-  it("saves a preferences-only edit without changing any other fresh server value", async () => {
-    const { preferences, user } = await mountSettings();
-    const fresh = freshCreatorProfile();
-    fixture.replaceOnServer(fresh);
-    await user.clear(preferences);
-    await user.type(preferences, "  More guitar brands.  ");
-    await save();
-    await screen.findByText("Profile saved.");
-    expect(fixture.writes).toHaveLength(1);
-    expect(fixture.writes[0].body).toEqual({ ...fresh, brand_preferences: "More guitar brands." });
-    expect(sessionStorage.getItem(draftKey)).toBeNull();
+    expect(fixture.writes[0].body).toEqual(instagramSaved({
+      instagram_audience_gender: "both", instagram_audience_age_min: 25, instagram_audience_age_max: 40,
+    }));
     expect(window.location.pathname + window.location.search).toBe("/brand-matches?version=v3");
   });
 
-  it("keeps unknown fresh fields and existing preferences during an unrelated name edit", async () => {
-    const { user } = await mountSettings();
+  it("preserves all hidden YouTube fields, unknown fresh fields, and fresh untouched audience data", async () => {
+    await mount();
+    await details();
     const fresh = freshCreatorProfile();
-    // Preferences unchanged on the server; other fields changed since editor load.
-    fresh.brand_preferences = creatorProfile().brand_preferences!;
     fixture.replaceOnServer(fresh);
-    const name = screen.getByRole("textbox", { name: /Full name/ });
-    await user.clear(name);
-    await user.type(name, "Updated Fixture Creator");
+    fireEvent.change(screen.getByTestId("input-brand-preferences"), { target: { value: "More guitar brands." } });
     await save();
-    await screen.findByText("Profile saved.");
-    expect(fixture.writes[0].body).toEqual({ ...fresh, full_name: "Updated Fixture Creator" });
+    expect(fixture.writes[0].body).toEqual({ ...fresh, primary_platform: "instagram", brand_preferences: "More guitar brands." });
+    expect(sessionStorage.getItem(draftKey)).toBeNull();
+    expect(fixture.requests.at(-1)?.method).toBe("GET");
   });
 
-  it.each(["", " \n\t "])("clears preferences %j by submitting null, not omission or empty text", async (value) => {
-    const { preferences } = await mountSettings();
-    fireEvent.change(preferences, { target: { value } });
+  it.each(["", " \n\t "])("clears blank preferences %j with null", async (value) => {
+    await mount();
+    await details();
+    fireEvent.change(screen.getByTestId("input-brand-preferences"), { target: { value } });
     await save();
-    await screen.findByText("Profile saved.");
-    expect(fixture.writes[0].body).toEqual({ ...creatorProfile(), brand_preferences: null });
+    expect(fixture.persisted.brand_preferences).toBeNull();
   });
 
-  it("accepts exactly 1000 characters", async () => {
-    const { preferences } = await mountSettings();
-    fireEvent.change(preferences, { target: { value: "x".repeat(1000) } });
-    expect(screen.getByText("1000 / 1000")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
-    await save();
-    await screen.findByText("Profile saved.");
-    expect(fixture.writes[0].body).toEqual({ ...creatorProfile(), brand_preferences: "x".repeat(1000) });
+  it.each([1000, 1001])("enforces the %i character preferences boundary", async (length) => {
+    await mount();
+    await details();
+    fireEvent.change(screen.getByTestId("input-brand-preferences"), { target: { value: "x".repeat(length) } });
+    const button = screen.getByRole("button", { name: "Save Profile" });
+    if (length > 1000) expect(button).toBeDisabled();
+    else { await save(); expect(fixture.persisted.brand_preferences).toBe("x".repeat(1000)); }
   });
 
-  it("rejects a 1001-character restored draft even if submit bypasses the disabled button", async () => {
-    const draft = { ...profileToForm(creatorProfile()), brandPreferences: "x".repeat(1001) };
-    sessionStorage.setItem(draftKey, JSON.stringify(draft));
-    const { preferences } = await mountSettings();
-    expect(preferences).toHaveAttribute("maxlength", "1000");
-    expect(preferences).toHaveValue(draft.brandPreferences);
-    expect(preferences).toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByText("1001 / 1000")).toBeInTheDocument();
+  it("shows inline age-range errors and blocks invalid saves", async () => {
+    await mount();
+    await details();
+    fireEvent.change(screen.getByLabelText("instagram audience age from"), { target: { value: "45" } });
+    fireEvent.change(screen.getByLabelText("instagram audience age to"), { target: { value: "18" } });
+    expect(screen.getByText(/Audience age from must be less/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
-    const requestCount = fixture.requests.length;
-    fireEvent.submit(preferences.closest("form")!);
-    await screen.findByRole("alert");
-    expect(screen.getByRole("alert")).toHaveTextContent("Brand preferences must be 1000 characters or fewer.");
     expect(fixture.writes).toHaveLength(0);
-    expect(fixture.requests).toHaveLength(requestCount);
-    expect(sessionStorage.getItem(draftKey)).toBe(JSON.stringify(draft));
   });
 
-  it.each(["GET", "PUT"] as const)("retains the complete draft after a failed %s, restores it on remount, and permits retry", async (method) => {
-    const { preferences, user, unmount } = await mountSettings();
-    await user.clear(preferences);
-    await user.type(preferences, "Unsaved guitar preferences");
-    const name = screen.getByRole("textbox", { name: /Full name/ });
-    await user.clear(name);
-    await user.type(name, "Unsaved Creator");
-    const message = "Fixture service unavailable";
-    if (method === "GET") fixture.failGet(message);
-    else fixture.failPut(message);
-    await save();
-    expect(await screen.findByRole("alert")).toHaveTextContent(message);
-    expect(preferences).toHaveValue("Unsaved guitar preferences");
-    expect(name).toHaveValue("Unsaved Creator");
-    expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
-    expect(window.location.pathname).toBe("/profile");
+  it.each(["GET", "PUT"] as const)("keeps the draft and page after a failed %s, then retries safely", async (method) => {
+    const rendered = await mount();
+    await details();
+    fireEvent.change(screen.getByTestId("input-brand-preferences"), { target: { value: "Keep this draft" } });
+    if (method === "GET") fixture.failGet("Fixture read failed");
+    else fixture.failPut("Fixture save failed");
+    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    await screen.findByText(method === "GET" ? "Fixture read failed" : "Fixture save failed");
     expect(fixture.persisted).toEqual(creatorProfile());
-    const draft = JSON.parse(sessionStorage.getItem(draftKey)!);
-    expect(draft).toEqual({
-      ...profileToForm(creatorProfile()),
-      fullName: "Unsaved Creator",
-      brandPreferences: "Unsaved guitar preferences",
-    });
-    expect(fixture.writes).toHaveLength(method === "GET" ? 0 : 1);
-    fixture.assertIsolated();
-    unmount();
+    expect(JSON.parse(sessionStorage.getItem(draftKey)!)).toMatchObject({ brandPreferences: "Keep this draft" });
     fixture.failGet(null);
     fixture.failPut(null);
-    const restored = await mountSettings(fixture);
-    expect(restored.preferences).toHaveValue(draft.brandPreferences);
-    expect(screen.getByRole("textbox", { name: /Full name/ })).toHaveValue(draft.fullName);
+    // Saving again uses the same current form and does not discard its edits.
     await save();
-    await screen.findByText("Profile saved.");
-    const expected = {
-      ...creatorProfile(), full_name: draft.fullName, brand_preferences: draft.brandPreferences,
-    };
-    expect(fixture.writes).toHaveLength(method === "GET" ? 1 : 2);
-    expect(fixture.writes.at(-1)!.body).toEqual(expected);
-    expect(fixture.persisted).toEqual(expected);
-    expect(sessionStorage.getItem(draftKey)).toBeNull();
+    expect(fixture.persisted).toMatchObject({ brand_preferences: "Keep this draft", primary_platform: "instagram" });
+    rendered.unmount();
+  });
+
+  it("Exit keeps a draft and a remount restores the step and edits", async () => {
+    const rendered = await mount();
+    await details();
+    fireEvent.change(screen.getByTestId("input-brand-preferences"), { target: { value: "Retain on exit" } });
+    fireEvent.click(screen.getByRole("button", { name: "Exit" }));
+    expect(window.location.pathname).toBe("/dashboard");
+    rendered.unmount();
+    renderProfile(<ProfileSettings />);
+    await screen.findByTestId("input-brand-preferences");
+    expect(screen.getByText("Step 3 of 3")).toBeInTheDocument();
+    expect(screen.getByTestId("input-brand-preferences")).toHaveValue("Retain on exit");
+  });
+
+  it("loads and retries a failed initial profile request", async () => {
+    fixture = installProfileApi(creatorProfile());
+    fixture.failGet("Fixture read failed");
+    renderProfile(<ProfileSettings />);
+    await screen.findByRole("button", { name: "Retry" });
+    fixture.failGet(null);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await screen.findByTestId("profile-wizard");
+    expect(screen.getByText("Step 1 of 3")).toBeInTheDocument();
   });
 });

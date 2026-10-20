@@ -1,5 +1,5 @@
 import type { CreatorProfile, DescriptionPlatform } from "@/contexts/AuthContext";
-import { fillEmptyAudience } from "@/lib/audience";
+import { fillEmptyAudience, formatAudienceAgeRange } from "@/lib/audience";
 import { parsePrimaryNiches, type OnboardingData } from "@/components/onboarding/types";
 import { profileToForm, type ProfileForm } from "./profileForm";
 
@@ -23,11 +23,16 @@ export function applyProfileGeneration(form: ProfileForm, profile: CreatorProfil
       ...fillEmptyAudience({ ...current, audienceGender: "", audienceAgeMin: "", audienceAgeMax: "" }, profile, platform),
       description: generated.description,
       subNiches: generated.subNiches,
+      audienceAgeRange: generated.audienceAgeRange,
+      audienceDescription: generated.audienceDescription,
       ...(platform === "instagram" ? { followers: profileToForm(profile).instagram.followers } : {}),
     } };
   }
+  const audience = fillEmptyAudience(current, profile, platform);
   return { ...form, [platform]: {
-    ...fillEmptyAudience(current, profile, platform),
+    ...audience,
+    audienceAgeRange: current.audienceAgeRange || formatAudienceAgeRange(audience),
+    audienceDescription: current.audienceDescription.trim() ? current.audienceDescription : generated.audienceDescription,
     description: current.description.trim() ? current.description : generated.description,
   } };
 }
@@ -49,20 +54,28 @@ export function restoreWizardForm(profile: CreatorProfile, draft: unknown): Prof
       instagram: {
         ...initial.instagram, ...legacy.instagram,
         description: legacy.instagram.contentDescription,
+        audienceAgeRange: formatAudienceAgeRange({ ...initial.instagram, ...legacy.instagram }),
         descriptionMode: legacy.instagramDescriptionMode === "generate" ? "generate" : "manual", primaryNiches: legacy.instagram.niches,
       },
       youtube: {
         ...initial.youtube, ...legacy.youtube,
         description: legacy.youtube.contentDescription,
+        audienceAgeRange: formatAudienceAgeRange({ ...initial.youtube, ...legacy.youtube }),
         descriptionMode: legacy.youtubeDescriptionMode === "generate" ? "generate" : "manual", primaryNiches: legacy.youtube.niches,
       },
     });
   }
   const value = draft as Partial<ProfileForm>;
   if (typeof value.fullName !== "string" || !value.instagram || !value.youtube) return instagramForm(initial);
-  return instagramForm({
+  const restored = instagramForm({
     ...initial, ...value,
     instagram: { ...initial.instagram, ...value.instagram },
     youtube: { ...initial.youtube, ...value.youtube },
   });
+  for (const platform of ["instagram", "youtube"] as const) {
+    if (typeof value[platform]?.audienceAgeRange !== "string") {
+      restored[platform].audienceAgeRange = formatAudienceAgeRange(restored[platform]);
+    }
+  }
+  return restored;
 }

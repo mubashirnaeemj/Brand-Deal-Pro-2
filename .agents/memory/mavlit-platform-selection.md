@@ -14,3 +14,9 @@ The profile has three pages: (1) creator information only, (2) description-metho
 **Why:** The user chose this layout rather than putting fields on page two and review on page three.
 
 **How to apply:** Manual mode makes all Instagram fields editable. Generate mode permits editing only username, primary niches, brand categories to avoid, and brand preferences. All generated outputs stay read-only, including after completion.
+
+Page three includes a separate Instagram audience description and one age-range input displayed as `25-44`, not separate visible minimum/maximum inputs. Do not show the line “MAVLIT builds your profile around Instagram.”
+
+**Why:** The user explicitly requested this profile presentation.
+
+**How to apply:** Treat the audience description as distinct from the creator's content description. The single range is a frontend presentation; retain the backend's numeric age bounds when saving and reconstruct the range after loading.

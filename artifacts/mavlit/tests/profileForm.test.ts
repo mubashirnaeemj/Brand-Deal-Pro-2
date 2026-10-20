@@ -4,7 +4,9 @@ import { creatorProfile } from "./fixtures/creatorProfile";
 
 const emptyAudienceWrites = {
   instagram_audience_gender: null, instagram_audience_age_min: null, instagram_audience_age_max: null,
+  instagram_audience_description: null,
   youtube_audience_gender: null, youtube_audience_age_min: null, youtube_audience_age_max: null,
+  youtube_audience_description: null,
 };
 
 describe("profile form replacement patches", () => {

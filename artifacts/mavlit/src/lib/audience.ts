@@ -6,6 +6,24 @@ export type AudienceFields = {
   audienceAgeMax: string;
 };
 
+export function formatAudienceAgeRange(value: Pick<AudienceFields, "audienceAgeMin" | "audienceAgeMax">): string {
+  return value.audienceAgeMin || value.audienceAgeMax ? `${value.audienceAgeMin}-${value.audienceAgeMax}` : "";
+}
+
+export function parseAudienceAgeRange(value: string) {
+  const [minimum = "", maximum = ""] = value.trim().replace(/[–—]/g, "-").split("-");
+  return { audienceAgeMin: minimum.trim(), audienceAgeMax: maximum.trim() };
+}
+
+export function audienceAgeRangeError(value: string | undefined): string | null {
+  if (!value?.trim()) return null;
+  const normalized = value.trim().replace(/[–—]/g, "-");
+  if (!/^(?:\d{1,3})?\s*-\s*(?:\d{1,3})?$/.test(normalized) || normalized.trim() === "-") {
+    return "Enter an audience age range like 25-44.";
+  }
+  return audienceError({ audienceGender: "", ...parseAudienceAgeRange(normalized) });
+}
+
 export function audienceFromProfile(profile: CreatorProfile, platform: DescriptionPlatform): AudienceFields {
   return {
     audienceGender: profile[`${platform}_audience_gender`] || "",

@@ -1,9 +1,9 @@
-import { Instagram, Loader2, Sparkles, PenLine, Check } from "lucide-react";
+import { Loader2, Sparkles, PenLine, Check } from "lucide-react";
 import { isDescriptionPending, type DescriptionStatus } from "@/contexts/AuthContext";
 import type { ProfileForm } from "@/pages/profileForm";
 import BrandCategoriesToAvoid from "@/components/onboarding/BrandCategoriesToAvoid";
 import MultiSelectDropdown from "@/components/onboarding/MultiSelectDropdown";
-import YourAudience from "@/components/onboarding/YourAudience";
+import ProfileAudience from "./ProfileAudience";
 import { INPUT_CLASS, NICHE_OPTIONS, subNicheOptions, type DescriptionMode } from "@/components/onboarding/types";
 
 export interface ProfileWizardProps {
@@ -90,9 +90,6 @@ export default function ProfileWizard(p: ProfileWizardProps) {
                 </select>
               </label>
             </div>
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Instagram size={16} className="text-pink-400" aria-hidden />MAVLIT builds your profile around Instagram.
-            </p>
           </>
         )}
 
@@ -169,10 +166,7 @@ export default function ProfileWizard(p: ProfileWizardProps) {
             <BrandCategoriesToAvoid selected={ig.excludedCategories} primaryNiches={ig.primaryNiches}
               onChange={(excludedCategories) => setIg({ excludedCategories })} />
 
-            <fieldset disabled={locked} className={locked ? "opacity-70" : ""}>
-              <YourAudience platform="instagram" value={ig} onChange={(a) => setIg(a)} />
-              {locked && <p className="mt-2 text-xs text-muted-foreground">Audience details are estimated by MAVLIT and cannot be edited in this mode.</p>}
-            </fieldset>
+            <ProfileAudience value={ig} onChange={setIg} readOnly={locked} />
 
             <label className={labelCls}>Instagram description
               <textarea data-testid="input-description" rows={4} className={`${INPUT_CLASS} mt-1.5 resize-none`} value={ig.description}

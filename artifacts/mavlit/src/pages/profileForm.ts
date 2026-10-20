@@ -1,5 +1,5 @@
 import type { CreatorProfile } from "@/contexts/AuthContext";
-import { audienceError, audienceFromProfile, audiencePayload } from "@/lib/audience";
+import { audienceAgeRangeError, audienceError, audienceFromProfile, audiencePayload, formatAudienceAgeRange } from "@/lib/audience";
 import type { DescriptionMode } from "@/components/onboarding/types";
 import { formatPlatforms, formatPrimaryNiches, NICHE_OPTIONS, parsePlatforms, parsePrimaryNiches, type PlatformKey } from "@/components/onboarding/types";
 
@@ -12,6 +12,8 @@ export type PlatformDetails = {
   audienceGender: string;
   audienceAgeMin: string;
   audienceAgeMax: string;
+  audienceAgeRange: string;
+  audienceDescription: string;
 };
 
 export type ProfileForm = {
@@ -45,6 +47,8 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
       description: text(profile.instagram_description),
       descriptionMode: profile.instagram_description_mode === "generate" ? "generate" : "manual",
       ...audienceFromProfile(profile, "instagram"),
+      audienceAgeRange: formatAudienceAgeRange(audienceFromProfile(profile, "instagram")),
+      audienceDescription: text(profile.instagram_audience_description),
     },
     youtube: {
       channelName: text(profile.youtube_channel_name),
@@ -55,6 +59,8 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
       description: text(profile.youtube_description),
       descriptionMode: profile.youtube_description_mode === "generate" ? "generate" : "manual",
       ...audienceFromProfile(profile, "youtube"),
+      audienceAgeRange: formatAudienceAgeRange(audienceFromProfile(profile, "youtube")),
+      audienceDescription: text(profile.youtube_audience_description),
     },
   };
 }
@@ -72,8 +78,9 @@ export function validateProfile(form: ProfileForm, profile: CreatorProfile): str
   for (const platform of ["instagram", "youtube"] as const) {
     if (!form.primaryPlatforms.includes(platform)) continue;
     const label = platform === "instagram" ? "Instagram" : "YouTube";
-    const error = audienceError(form[platform]);
+    const error = audienceAgeRangeError(form[platform].audienceAgeRange) || audienceError(form[platform]);
     if (error) return `${label}: ${error}`;
+    if (form[platform].audienceDescription.length > 1500) return `${label}: Audience description must be 1500 characters or fewer.`;
   }
   // The app still gates access on the required onboarding fields.
   if (!form.age.trim() || !form.gender.trim() || !form.instagram.username.trim() ||
@@ -113,6 +120,7 @@ function profileValues(form: ProfileForm, profile: CreatorProfile): Partial<Crea
     instagram_description: form.instagram.description.trim() || null,
     instagram_description_mode: form.instagram.descriptionMode,
     ...audiencePayload(form.instagram, "instagram"),
+    instagram_audience_description: form.instagram.audienceDescription.trim() || null,
     content_description: profile.content_description?.trim() || form.instagram.description.trim() || form.youtube.description.trim() || null,
     youtube_channel_name: form.youtube.channelName.trim() || null,
     youtube_subscribers: optionalNumber(form.youtube.subscribers),
@@ -122,6 +130,7 @@ function profileValues(form: ProfileForm, profile: CreatorProfile): Partial<Crea
     youtube_description: form.youtube.description.trim() || null,
     youtube_description_mode: form.youtube.descriptionMode,
     ...audiencePayload(form.youtube, "youtube"),
+    youtube_audience_description: form.youtube.audienceDescription.trim() || null,
   };
 }
 

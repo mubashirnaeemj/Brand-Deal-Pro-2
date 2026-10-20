@@ -33,6 +33,7 @@ function finish(extra: Record<string, unknown> = {}) {
     ...fixture.persisted, instagram_description_status: "completed",
     instagram_description: "Generated creator description", instagram_audience_gender: "female",
     instagram_audience_age_min: 18, instagram_audience_age_max: 34,
+    instagram_audience_description: "Young musicians learning guitar.",
     instagram_followers: 9876, follower_count: 9876, instagram_sub_niches: ["Guitar"],
     ...extra,
   });
@@ -52,7 +53,9 @@ describe("Instagram wizard generation", () => {
     await tick(1);
     expect(screen.getByLabelText("instagram audience gender")).toHaveValue("female");
     expect(screen.getByLabelText("instagram audience gender")).toBeDisabled();
-    expect(screen.getByLabelText("instagram audience age from")).toHaveValue(18);
+    expect(screen.getByLabelText("instagram audience age range")).toHaveValue("18-34");
+    expect(screen.getByLabelText("Instagram audience description")).toHaveValue("Young musicians learning guitar.");
+    expect(screen.getByLabelText("Instagram audience description")).toBeDisabled();
     expect(screen.getByTestId("input-followers")).toHaveValue(9876);
     expect(screen.getByTestId("input-followers")).toHaveAttribute("readonly");
     expect(screen.getByTestId("input-description")).toHaveValue("Generated creator description");
@@ -63,6 +66,7 @@ describe("Instagram wizard generation", () => {
     expect(fixture.persisted).toMatchObject({
       primary_platform: "instagram", instagram_followers: 9876, instagram_sub_niches: ["Guitar"],
       instagram_audience_gender: "female", instagram_audience_age_min: 18, instagram_audience_age_max: 34,
+      instagram_audience_description: "Young musicians learning guitar.",
       instagram_description_mode: "generate",
     });
     const sent = fixture.writes.at(-1)!.body as Record<string, unknown>;
@@ -75,7 +79,7 @@ describe("Instagram wizard generation", () => {
     await settle();
     details();
     expect(screen.getByTestId("input-followers")).toHaveValue(9876);
-    expect(screen.getByLabelText("instagram audience age to")).toHaveValue(34);
+    expect(screen.getByLabelText("instagram audience age range")).toHaveValue("18-34");
   });
 
   it("exposes only the allowed editable fields in generate mode and blocks Save before generation", async () => {
@@ -83,7 +87,7 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByTestId("input-username")).toBeEnabled();
     expect(screen.getByTestId("input-brand-preferences")).toBeEnabled();
     expect(screen.getByTestId("input-followers")).toHaveAttribute("readonly");
-    expect(screen.getByLabelText("instagram audience age from")).toBeDisabled();
+    expect(screen.getByLabelText("instagram audience age range")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
     expect(fixture.writes).toHaveLength(0);
   });
@@ -135,8 +139,7 @@ describe("Instagram wizard generation", () => {
     finish({ instagram_audience_gender: null, instagram_audience_age_min: null, instagram_audience_age_max: null });
     await tick(1500);
     expect(screen.getByLabelText("instagram audience gender")).toHaveValue("");
-    expect(screen.getByLabelText("instagram audience age from")).toHaveValue(null);
-    expect(screen.getByLabelText("instagram audience age to")).toHaveValue(null);
+    expect(screen.getByLabelText("instagram audience age range")).toHaveValue("");
   });
 
   it("switching to manual unlocks fields and protects manual edits while a job finishes", async () => {
@@ -164,7 +167,7 @@ describe("Instagram wizard generation", () => {
     await settle();
     expect(screen.getByText("Step 3 of 3")).toBeInTheDocument();
     expect(screen.getByTestId("input-followers")).toHaveValue(9876);
-    expect(screen.getByLabelText("instagram audience age from")).toHaveValue(18);
+    expect(screen.getByLabelText("instagram audience age range")).toHaveValue("18-34");
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
   });
 

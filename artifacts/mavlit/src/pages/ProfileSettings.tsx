@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar";
 import { formatPrimaryNiches, NICHE_OPTIONS, parsePlatforms, samePrimaryNiches } from "@/components/onboarding/types";
 import { isDescriptionPending, isProfileComplete, type CreatorProfile, type DescriptionJob, type DescriptionPlatform, useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
-import { fillEmptyAudience, audienceError } from "@/lib/audience";
+import { fillEmptyAudience, audienceAgeRangeError, audienceError, formatAudienceAgeRange } from "@/lib/audience";
 import ProfileWizard from "@/components/profile/ProfileWizard";
 import { profilePatch, profileToForm, validateProfile, type ProfileForm } from "./profileForm";
 import { applyProfileGeneration, creatorInfoError, generationKey, profileGenerationKey, restoreWizardForm, type ProfileStep } from "./profileWizardModel";
@@ -308,6 +308,10 @@ export default function ProfileSettings() {
         for (const key of ["audienceGender", "audienceAgeMin", "audienceAgeMax"] as const) {
           if (!fields[key].trim() && fields[key] === baseline[platform][key]) fields[key] = fresh[platform][key];
         }
+        fields.audienceAgeRange = form[platform].audienceAgeRange || formatAudienceAgeRange(fields);
+        if (!fields.audienceDescription.trim() && fields.audienceDescription === baseline[platform].audienceDescription) {
+          fields.audienceDescription = fresh[platform].audienceDescription;
+        }
         saveForm = { ...saveForm, [platform]: fields };
         if (latest[`${platform}_description_status`] === "completed" &&
             (profile[`${platform}_description_status`] !== "completed" ||
@@ -345,6 +349,8 @@ export default function ProfileSettings() {
         const audience = saveForm[platform];
         if ((`${platform}_audience_gender` in patch &&
               (updated[`${platform}_audience_gender`] || "") !== audience.audienceGender) ||
+            (`${platform}_audience_description` in patch &&
+              (updated[`${platform}_audience_description`]?.trim() || "") !== audience.audienceDescription.trim()) ||
             (`${platform}_audience_age_min` in patch &&
               (updated[`${platform}_audience_age_min`] ?? null) !== (audience.audienceAgeMin.trim() ? Number(audience.audienceAgeMin) : null)) ||
             (`${platform}_audience_age_max` in patch &&
@@ -391,7 +397,8 @@ export default function ProfileSettings() {
             onContinue={continueStep} onBack={() => { setError(null); setStep(step === 3 ? 2 : 1); }}
             onExit={exit} onGenerate={() => void generateInstagram()} onSave={() => void save()}
             saving={saving} generating={generatingCount > 0 || jobPending}
-            canSave={!audienceError(form.instagram) && form.brandPreferences.length <= 1000 &&
+            canSave={!audienceError(form.instagram) && !audienceAgeRangeError(form.instagram.audienceAgeRange) &&
+              form.instagram.audienceDescription.length <= 1500 && form.brandPreferences.length <= 1000 &&
               (form.instagram.descriptionMode === "manual" || generationComplete)}
             generationComplete={generationComplete} status={instagramStatus}
             error={error} pollError={pollError || profile.instagram_description_error || null} saved={saved} />

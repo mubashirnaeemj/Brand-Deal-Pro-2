@@ -33,6 +33,7 @@ describe("three-page Instagram profile", () => {
     await mount();
     expect(screen.getByRole("heading", { name: "Creator information" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Gender" })).toHaveValue("Other");
+    expect(screen.queryByText("MAVLIT builds your profile around Instagram.")).not.toBeInTheDocument();
     expect(screen.queryByTestId("input-username")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Instagram" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "YouTube" })).not.toBeInTheDocument();
@@ -71,11 +72,12 @@ describe("three-page Instagram profile", () => {
     expect(screen.getByTestId("input-followers")).not.toHaveAttribute("readonly");
     expect(screen.getByLabelText("instagram audience gender")).toBeEnabled();
     fireEvent.change(screen.getByLabelText("instagram audience gender"), { target: { value: "both" } });
-    fireEvent.change(screen.getByLabelText("instagram audience age from"), { target: { value: "25" } });
-    fireEvent.change(screen.getByLabelText("instagram audience age to"), { target: { value: "40" } });
+    fireEvent.change(screen.getByLabelText("instagram audience age range"), { target: { value: "25-44" } });
+    fireEvent.change(screen.getByLabelText("Instagram audience description"), { target: { value: "  Guitar enthusiasts and aspiring musicians.  " } });
     await save();
     expect(fixture.writes[0].body).toEqual(instagramSaved({
-      instagram_audience_gender: "both", instagram_audience_age_min: 25, instagram_audience_age_max: 40,
+      instagram_audience_gender: "both", instagram_audience_age_min: 25, instagram_audience_age_max: 44,
+      instagram_audience_description: "Guitar enthusiasts and aspiring musicians.",
     }));
     expect(window.location.pathname + window.location.search).toBe("/brand-matches?version=v3");
   });
@@ -112,8 +114,7 @@ describe("three-page Instagram profile", () => {
   it("shows inline age-range errors and blocks invalid saves", async () => {
     await mount();
     await details();
-    fireEvent.change(screen.getByLabelText("instagram audience age from"), { target: { value: "45" } });
-    fireEvent.change(screen.getByLabelText("instagram audience age to"), { target: { value: "18" } });
+    fireEvent.change(screen.getByLabelText("instagram audience age range"), { target: { value: "45-18" } });
     expect(screen.getByText(/Audience age from must be less/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
     expect(fixture.writes).toHaveLength(0);

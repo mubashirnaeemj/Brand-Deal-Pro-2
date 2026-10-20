@@ -14,7 +14,7 @@ export default function ProfileGenerationProgress({ progress, error }: { progres
       <p role="status" className="mt-5 max-w-sm text-sm text-muted-foreground">
         {complete ? "Review and edit any details before saving."
           : progress >= 95 ? "This is taking a little longer. We’re still waiting for your generated profile."
-          : "Usually takes about 2 minutes. We’ll show your details as soon as they’re ready."}
+          : "Usually takes about 1 minute. We’ll show your details as soon as they’re ready."}
       </p>
       {!complete && <p className="mt-3 text-xs text-muted-foreground">Progress is estimated. You can leave and return while MAVLIT works.</p>}
       {error && <p role="alert" className="mt-4 text-sm text-red-400">{error}</p>}

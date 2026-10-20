@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-/** An estimated two-minute animation, never evidence that the API job finished. */
+/** An estimated one-minute animation, never evidence that the API job finished. */
 export function useProfileGenerationProgress(active: boolean, complete: boolean) {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now);
@@ -27,7 +27,7 @@ export function useProfileGenerationProgress(active: boolean, complete: boolean)
   return {
     startedAt,
     setStartedAt,
-    progress: complete ? 100 : Math.min(95, Math.floor(elapsed / 120000 * 95)),
+    progress: complete ? 100 : Math.min(95, Math.floor(elapsed / 60000 * 95)),
     showProgress: active || (complete && startedAt !== null),
   };
 }

@@ -21,7 +21,7 @@ After generation, reveal all fields and let the creator edit any of them, includ
 
 **Why:** The user explicitly replaced the former read-only generated-output rule with a generate-then-edit flow.
 
-**How to apply:** Keep generation progress separate from profile completion. Show estimated percentage progress over about two minutes, jump to 100% if the API finishes early, and do not report success before the API actually finishes. Reveal the editable review after success. Preserve corrections across reloads and final Save rather than overwriting them with the original generated outputs or requiring regeneration after a correction.
+**How to apply:** Keep generation progress separate from profile completion. Show estimated percentage progress over about one minute (the user shortened it from two minutes), jump to 100% if the API finishes early, and do not report success before the API actually finishes. Reveal the editable review after success. Preserve corrections across reloads and final Save rather than overwriting them with the original generated outputs or requiring regeneration after a correction.
 
 Page three includes a separate Instagram audience description and one age-range input displayed as `25-44`, not separate visible minimum/maximum inputs. Do not show the line “MAVLIT builds your profile around Instagram.”
 

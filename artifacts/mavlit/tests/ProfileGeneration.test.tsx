@@ -192,11 +192,11 @@ describe("Instagram wizard generation", () => {
     expect(fixture.requests.filter((request) => request.method === "POST")).toHaveLength(2);
   });
 
-  it("animates over two minutes but never reveals fields or claims 100% before the backend finishes", async () => {
+  it("animates over one minute but never reveals fields or claims 100% before the backend finishes", async () => {
     await mount();
-    await tick(60000);
+    await tick(30000);
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "47");
-    await tick(60000);
+    await tick(30000);
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "95");
     expect(screen.getByText(/taking a little longer/)).toBeInTheDocument();
     expect(screen.queryByTestId("input-followers")).not.toBeInTheDocument();
@@ -212,7 +212,7 @@ describe("Instagram wizard generation", () => {
 
   it("restores the estimated percentage after leaving and returning to a pending job", async () => {
     const rendered = await mount();
-    await tick(60000);
+    await tick(30000);
     rendered.unmount();
     renderProfile(<ProfileSettings />);
     await settle();

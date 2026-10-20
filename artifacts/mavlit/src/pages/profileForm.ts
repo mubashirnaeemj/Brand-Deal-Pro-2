@@ -1,5 +1,6 @@
 import type { CreatorProfile } from "@/contexts/AuthContext";
 import { audienceAgeRangeError, audienceError, audienceFromProfile, audiencePayload, formatAudienceAgeRange } from "@/lib/audience";
+import { normalizeSubNiches } from "@/lib/subNiches";
 import type { DescriptionMode } from "@/components/onboarding/types";
 import { formatPlatforms, formatPrimaryNiches, NICHE_OPTIONS, parsePlatforms, parsePrimaryNiches, type PlatformKey } from "@/components/onboarding/types";
 
@@ -42,7 +43,7 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
       username: text(profile.instagram_handle),
       followers: numberText(profile.instagram_followers ?? (firstPlatform === "instagram" ? profile.follower_count : null)),
       primaryNiches: parsePrimaryNiches(profile.instagram_primary_niche ?? profile.content_niche),
-      subNiches: profile.instagram_sub_niches ?? profile.sub_niches ?? [],
+      subNiches: normalizeSubNiches(profile.instagram_sub_niches ?? profile.sub_niches ?? []),
       excludedCategories: profile.instagram_excluded_categories ?? profile.excluded_categories ?? [],
       description: text(profile.instagram_description),
       descriptionMode: profile.instagram_description_mode === "generate" ? "generate" : "manual",
@@ -54,7 +55,7 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
       channelName: text(profile.youtube_channel_name),
       subscribers: numberText(profile.youtube_subscribers ?? (firstPlatform === "youtube" ? profile.follower_count : null)),
       primaryNiches: parsePrimaryNiches(profile.youtube_primary_niche),
-      subNiches: profile.youtube_sub_niches ?? [],
+      subNiches: normalizeSubNiches(profile.youtube_sub_niches ?? []),
       excludedCategories: profile.youtube_excluded_categories ?? [],
       description: text(profile.youtube_description),
       descriptionMode: profile.youtube_description_mode === "generate" ? "generate" : "manual",
@@ -115,7 +116,7 @@ function profileValues(form: ProfileForm, profile: CreatorProfile): Partial<Crea
     follower_count: optionalNumber(form.primaryPlatforms[0] === "youtube" ? form.youtube.subscribers : form.instagram.followers),
     instagram_primary_niche: formatPrimaryNiches(form.instagram.primaryNiches),
     content_niche: formatPrimaryNiches(form.instagram.primaryNiches),
-    instagram_sub_niches: form.instagram.subNiches,
+    instagram_sub_niches: normalizeSubNiches(form.instagram.subNiches),
     instagram_excluded_categories: form.instagram.excludedCategories,
     instagram_description: form.instagram.description.trim() || null,
     instagram_description_mode: form.instagram.descriptionMode,
@@ -125,7 +126,7 @@ function profileValues(form: ProfileForm, profile: CreatorProfile): Partial<Crea
     youtube_channel_name: form.youtube.channelName.trim() || null,
     youtube_subscribers: optionalNumber(form.youtube.subscribers),
     youtube_primary_niche: formatPrimaryNiches(form.youtube.primaryNiches),
-    youtube_sub_niches: form.youtube.subNiches,
+    youtube_sub_niches: normalizeSubNiches(form.youtube.subNiches),
     youtube_excluded_categories: form.youtube.excludedCategories,
     youtube_description: form.youtube.description.trim() || null,
     youtube_description_mode: form.youtube.descriptionMode,
@@ -140,6 +141,8 @@ export function profilePatch(form: ProfileForm, profile: CreatorProfile): Partia
   // Do not normalize or overwrite unrelated fields during a preferences-only edit.
   return Object.fromEntries(Object.entries(values).filter(([key, value]) =>
     key === "brand_preferences" ||
+    (form.primaryPlatforms.some((platform) => key === `${platform}_sub_niches`) &&
+      JSON.stringify(value) !== JSON.stringify(profile[key as keyof CreatorProfile])) ||
     form.primaryPlatforms.some((platform) => key.startsWith(`${platform}_audience_`)) ||
     JSON.stringify(value) !== JSON.stringify(original[key as keyof CreatorProfile])));
 }

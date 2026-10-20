@@ -2,6 +2,7 @@ import type { CreatorProfile, DescriptionPlatform } from "@/contexts/AuthContext
 import { fillEmptyAudience, formatAudienceAgeRange } from "@/lib/audience";
 import { parsePrimaryNiches, type OnboardingData } from "@/components/onboarding/types";
 import { profileToForm, type ProfileForm } from "./profileForm";
+import { normalizeSubNiches } from "@/lib/subNiches";
 
 export type ProfileStep = 1 | 2 | 3;
 export function serializeWizardDraft(
@@ -16,7 +17,9 @@ export const profileGenerationKey = (profile: CreatorProfile) =>
   generationKey(profile.instagram_handle || "", parsePrimaryNiches(profile.instagram_primary_niche ?? profile.content_niche));
 
 export function instagramForm(form: ProfileForm): ProfileForm {
-  return { ...form, primaryPlatforms: ["instagram"] };
+  return { ...form, primaryPlatforms: ["instagram"], instagram: {
+    ...form.instagram, subNiches: normalizeSubNiches(form.instagram.subNiches),
+  } };
 }
 
 /** Seed a completed job's outputs; later user corrections are retained in drafts. */

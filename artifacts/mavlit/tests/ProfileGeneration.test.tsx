@@ -252,6 +252,18 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByLabelText("instagram audience age range")).toHaveValue("");
   });
 
+  it("displays and saves generated sub-niches with spaces rather than underscores", async () => {
+    await mount();
+    finish({ instagram_sub_niches: ["country_music", "bedroom__pop"] });
+    await tick(1500);
+    await tick(450);
+    expect(screen.getByRole("button", { name: "Remove country music" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Remove bedroom pop" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    await settle();
+    expect(fixture.persisted.instagram_sub_niches).toEqual(["country music", "bedroom pop"]);
+  });
+
   it("shows a missing audience description notice and saves a manual correction instead of null", async () => {
     const rendered = await mount();
     finish({ instagram_audience_description: null });

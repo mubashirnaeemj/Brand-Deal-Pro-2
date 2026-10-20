@@ -22,6 +22,8 @@ export default function MultiSelectDropdown({
   hint,
   tagSearch = false,
   searchPlaceholder = "Search options",
+  allowCustom = false,
+  normalizeCustomValue = (value: string) => value.trim(),
 }: {
   label: string;
   options: string[];
@@ -35,12 +37,24 @@ export default function MultiSelectDropdown({
   hint?: string;
   tagSearch?: boolean;
   searchPlaceholder?: string;
+  allowCustom?: boolean;
+  normalizeCustomValue?: (value: string) => string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const customValue = normalizeCustomValue(query);
+  const sameValue = (value: string) => normalizeCustomValue(value).toLowerCase() === customValue.toLowerCase();
+  const existingOption = options.find(sameValue);
+  const alreadySelected = selected.some(sameValue);
+  const addCustom = () => {
+    if (disabled || !customValue || alreadySelected) return;
+    onChange([...selected, existingOption ?? customValue]);
+    setQuery("");
+    if (closeOnSelect) setOpen(false);
+  };
   const filtered = useMemo(
-    () => filterMultiSelectOptions(options, query, selected, tagSearch),
-    [options, query, selected, tagSearch],
+    () => filterMultiSelectOptions(options, allowCustom ? customValue : query, selected, tagSearch),
+    [options, query, selected, tagSearch, allowCustom, customValue],
   );
 
   const toggle = (option: string) => {
@@ -86,17 +100,32 @@ export default function MultiSelectDropdown({
         <>
           <button type="button" className="fixed inset-0 z-30 cursor-default" onClick={() => setOpen(false)} aria-label="Close options" />
           <div className="absolute z-40 mt-2 w-full overflow-hidden rounded-xl border border-border bg-card p-2 shadow-2xl">
-            {searchable && (
+            {(searchable || allowCustom) && (
               <div className="relative mb-2">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input
                   autoFocus
                   value={query}
+                  disabled={disabled}
+                  aria-label={allowCustom ? `${label} search or add` : undefined}
                   onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (allowCustom && event.key === "Enter") {
+                      event.preventDefault();
+                      addCustom();
+                    }
+                  }}
                   placeholder={searchPlaceholder}
                   className="w-full rounded-lg border border-border bg-secondary py-2 pl-9 pr-3 text-sm text-white outline-none focus:border-primary/60"
                 />
               </div>
+            )}
+            {allowCustom && <p className="mb-2 px-3 text-xs text-muted-foreground">Select an option or type your own and press Enter or Add.</p>}
+            {allowCustom && customValue && !alreadySelected && !existingOption && (
+              <button type="button" disabled={disabled} onClick={addCustom}
+                className="mb-2 w-full rounded-lg bg-primary/15 px-3 py-2 text-left text-sm font-semibold text-primary">
+                Add "{customValue}"
+              </button>
             )}
             <div className="max-h-56 overflow-y-auto">
               {hint && <p role="status" className="px-3 py-2 text-sm text-[#94a3b8] cursor-default">{hint}</p>}

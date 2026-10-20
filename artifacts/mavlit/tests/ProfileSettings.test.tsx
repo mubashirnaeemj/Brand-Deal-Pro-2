@@ -94,6 +94,44 @@ describe("three-page Instagram profile", () => {
     expect(fixture.requests.at(-1)?.method).toBe("GET");
   });
 
+  it("adds custom sub-niches with Enter or Add, prevents duplicates, retains them across niche changes, and saves spaces", async () => {
+    const rendered = await mount(creatorProfile({ instagram_sub_niches: ["country_music"] }));
+    await details();
+    expect(screen.getByRole("button", { name: "Remove country music" })).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Sub-niches").parentElement!.querySelector("button")!);
+    const input = screen.getByRole("textbox", { name: "Sub-niches search or add" });
+    fireEvent.change(input, { target: { value: "bedroom__pop" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByRole("button", { name: "Remove bedroom pop" })).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: " Country_Music " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getAllByRole("button", { name: /Remove country music/i })).toHaveLength(1);
+    fireEvent.change(input, { target: { value: "indie_rock" } });
+    fireEvent.click(screen.getByRole("button", { name: 'Add "indie rock"' }));
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove indie rock" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Music" }));
+    expect(screen.getByRole("button", { name: "Remove bedroom pop" })).toBeInTheDocument();
+    await save();
+    expect(fixture.persisted.instagram_sub_niches).toEqual(["country music", "bedroom pop"]);
+    rendered.unmount();
+    renderProfile(<ProfileSettings />);
+    await screen.findByTestId("profile-wizard");
+    await details();
+    expect(screen.getByRole("button", { name: "Remove country music" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove bedroom pop" })).toBeInTheDocument();
+  });
+
+  it("orders brand preferences, content description, then audience details", async () => {
+    await mount();
+    await details();
+    const preferences = screen.getByTestId("input-brand-preferences");
+    const description = screen.getByTestId("input-description");
+    const audience = screen.getByText("Your audience");
+    expect(preferences.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(description.compareDocumentPosition(audience) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it.each(["", " \n\t "])("clears blank preferences %j with null", async (value) => {
     await mount();
     await details();

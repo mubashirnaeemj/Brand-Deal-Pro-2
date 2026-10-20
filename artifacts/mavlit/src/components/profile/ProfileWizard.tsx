@@ -5,6 +5,7 @@ import BrandCategoriesToAvoid from "@/components/onboarding/BrandCategoriesToAvo
 import MultiSelectDropdown from "@/components/onboarding/MultiSelectDropdown";
 import ProfileAudience from "./ProfileAudience";
 import ProfileGenerationProgress from "./ProfileGenerationProgress";
+import { normalizeSubNiche, normalizeSubNiches } from "@/lib/subNiches";
 import { INPUT_CLASS, NICHE_OPTIONS, subNicheOptions, type DescriptionMode } from "@/components/onboarding/types";
 
 export interface ProfileWizardProps {
@@ -162,25 +163,16 @@ export default function ProfileWizard(p: ProfileWizardProps) {
             <div className="grid gap-4 sm:grid-cols-2">
               <MultiSelectDropdown label="Primary niches" options={NICHE_OPTIONS} selected={ig.primaryNiches}
                 disabled={pending || p.generating || p.saving} placeholder="Select one or more"
-                onChange={(items) => setIg({ primaryNiches: items, subNiches: ig.subNiches.filter((s) => subNicheOptions(items).includes(s)) })} />
-              {showAllFields && <MultiSelectDropdown label="Sub-niches" options={subNicheOptions(ig.primaryNiches)} selected={ig.subNiches}
-                searchable disabled={p.saving} placeholder="Select sub-niches"
-                onChange={(subNiches) => setIg({ subNiches })} />}
+                onChange={(items) => setIg({ primaryNiches: items })} />
+              {showAllFields && <MultiSelectDropdown label="Sub-niches" options={normalizeSubNiches(subNicheOptions(ig.primaryNiches))} selected={ig.subNiches}
+                searchable allowCustom normalizeCustomValue={normalizeSubNiche} searchPlaceholder="Search or add your own sub-niche"
+                disabled={p.saving} placeholder="Select or add sub-niches"
+                onChange={(subNiches) => setIg({ subNiches: normalizeSubNiches(subNiches) })} />}
             </div>
 
             {showAllFields && <>
             <BrandCategoriesToAvoid selected={ig.excludedCategories} primaryNiches={ig.primaryNiches}
               onChange={(excludedCategories) => setIg({ excludedCategories })} />
-
-            <ProfileAudience value={ig} onChange={setIg} readOnly={false}
-              showMissingDescriptionWarning={gen && p.generationComplete} />
-
-            <label className={labelCls}>Instagram content description
-              <textarea data-testid="input-description" rows={4} className={`${INPUT_CLASS} mt-1.5 resize-none`} value={ig.description}
-                disabled={p.saving}
-                placeholder={gen ? "MAVLIT will write this from your content." : "Describe your Instagram content."}
-                onChange={(e) => setIg({ description: e.target.value })} />
-            </label>
 
             <label className={labelCls}>Brand preferences
               <textarea data-testid="input-brand-preferences" rows={3} maxLength={1000} className={`${INPUT_CLASS} mt-1.5 resize-none`}
@@ -188,6 +180,15 @@ export default function ProfileWizard(p: ProfileWizardProps) {
                 placeholder="Brands or partnership styles you want." />
               <span aria-live="polite" className="mt-1 block text-right text-[11px] normal-case tracking-normal">{form.brandPreferences.length}/1000</span>
             </label>
+            <label className={labelCls}>Instagram content description
+              <textarea data-testid="input-description" rows={4} className={`${INPUT_CLASS} mt-1.5 resize-none`} value={ig.description}
+                disabled={p.saving}
+                placeholder={gen ? "MAVLIT will write this from your content." : "Describe your Instagram content."}
+                onChange={(e) => setIg({ description: e.target.value })} />
+            </label>
+
+            <ProfileAudience value={ig} onChange={setIg} readOnly={false}
+              showMissingDescriptionWarning={gen && p.generationComplete} />
             </>}
             </>}
           </>

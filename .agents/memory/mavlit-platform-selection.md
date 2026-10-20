@@ -28,3 +28,9 @@ Page three includes a separate Instagram audience description and one age-range 
 **Why:** The user explicitly requested this profile presentation.
 
 **How to apply:** Treat the audience description as distinct from the creator's content description. The single range is a frontend presentation; retain the backend's numeric age bounds when saving and reconstruct the range after loading.
+
+Sub-niches can be selected or entered freely by the creator. Use spaces rather than underscores, e.g. `country music`, including when saving generated tags. Page-three sections are ordered Brand preferences → Instagram content description → Your audience.
+
+**Why:** The user explicitly requested freeform sub-niches, space-separated wording, and this section order.
+
+**How to apply:** Normalize generated, restored, and newly entered sub-niches consistently. Do not silently discard custom sub-niches when primary niches change, and preserve hidden YouTube data.

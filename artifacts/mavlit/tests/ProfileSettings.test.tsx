@@ -130,6 +130,46 @@ describe("three-page Instagram profile", () => {
     const audience = screen.getByText("Your audience");
     expect(preferences.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(description.compareDocumentPosition(audience) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(audience.compareDocumentPosition(screen.getByTestId("input-pitch-style-preferences")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("loads, drafts, saves, reloads, and clears optional pitch style preferences", async () => {
+    const rendered = await mount(creatorProfile({ pitch_style_preferences: "Friendly and brief." }));
+    await details();
+    const input = screen.getByTestId("input-pitch-style-preferences");
+    expect(input).toHaveValue("Friendly and brief.");
+    expect(input).not.toBeRequired();
+    expect(screen.getByText("Leave empty to use MAVLIT’s default.")).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "  Confident, concise, and no emojis.  " } });
+    await waitFor(() => expect(JSON.parse(sessionStorage.getItem(draftKey)!)).toMatchObject({
+      pitchStylePreferences: "  Confident, concise, and no emojis.  ",
+    }));
+    rendered.unmount();
+    const restored = renderProfile(<ProfileSettings />);
+    await screen.findByTestId("profile-wizard");
+    expect(screen.getByText("Step 3 of 3")).toBeInTheDocument();
+    expect(screen.getByTestId("input-pitch-style-preferences")).toHaveValue("  Confident, concise, and no emojis.  ");
+    await save();
+    expect(fixture.persisted.pitch_style_preferences).toBe("Confident, concise, and no emojis.");
+    restored.unmount();
+    renderProfile(<ProfileSettings />);
+    await screen.findByTestId("profile-wizard");
+    await details();
+    expect(screen.getByTestId("input-pitch-style-preferences")).toHaveValue("Confident, concise, and no emojis.");
+    fireEvent.change(screen.getByTestId("input-pitch-style-preferences"), { target: { value: "" } });
+    await save();
+    expect(fixture.persisted.pitch_style_preferences).toBeNull();
+  });
+
+  it.each([1000, 1001])("enforces the %i character pitch-style preferences boundary", async (length) => {
+    await mount();
+    await details();
+    fireEvent.change(screen.getByTestId("input-pitch-style-preferences"), { target: { value: "x".repeat(length) } });
+    if (length > 1000) expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
+    else {
+      await save();
+      expect(fixture.persisted.pitch_style_preferences).toBe("x".repeat(length));
+    }
   });
 
   it.each(["", " \n\t "])("clears blank preferences %j with null", async (value) => {

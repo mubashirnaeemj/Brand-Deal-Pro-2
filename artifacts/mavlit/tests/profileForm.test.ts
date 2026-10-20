@@ -10,6 +10,18 @@ const emptyAudienceWrites = {
 };
 
 describe("profile form replacement patches", () => {
+  it("handles missing pitch preferences and sends null when a saved preference is cleared", () => {
+    expect(profileToForm(creatorProfile()).pitchStylePreferences).toBe("");
+    const profile = creatorProfile({ pitch_style_preferences: "Keep it short." });
+    const form = profileToForm(profile);
+    expect(form.pitchStylePreferences).toBe("Keep it short.");
+    form.pitchStylePreferences = " ";
+    expect(profilePatch(form, profile).pitch_style_preferences).toBeNull();
+    expect(validateProfile(form, profile)).toBeNull();
+    form.pitchStylePreferences = " ".repeat(1000) + "x";
+    expect(validateProfile(form, profile)).toBe("Pitch style preferences must be 1000 characters or fewer.");
+  });
+
   it("loads separate audience demographics without falling back to legacy shared fields", () => {
     const form = profileToForm(creatorProfile({
       instagram_audience_gender: "female", instagram_audience_age_min: 18, instagram_audience_age_max: 34,

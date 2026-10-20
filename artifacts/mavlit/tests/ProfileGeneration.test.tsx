@@ -360,6 +360,7 @@ describe("Instagram wizard generation", () => {
     await tick(450);
     expect(screen.getByTestId("auth-name")).toHaveTextContent("");
     fireEvent.change(screen.getByTestId("input-brand-preferences"), { target: { value: "Keep this after generation" } });
+    fireEvent.change(screen.getByTestId("input-pitch-style-preferences"), { target: { value: "Conversational and direct." } });
     await settle();
     expect(JSON.parse(localStorage.getItem(`mavlit_profile_draft:${fixture.persisted.id}`)!))
       .toMatchObject({ brandPreferences: "Keep this after generation", wizardStep: 3 });
@@ -370,6 +371,9 @@ describe("Instagram wizard generation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
     await settle();
     expect(screen.getByTestId("auth-name")).toHaveTextContent("New Creator");
-    expect(fixture.persisted).toMatchObject({ primary_platform: "instagram", instagram_followers: 9876, gender: "Female" });
+    expect(fixture.persisted).toMatchObject({
+      primary_platform: "instagram", instagram_followers: 9876, gender: "Female",
+      pitch_style_preferences: "Conversational and direct.",
+    });
   });
 });

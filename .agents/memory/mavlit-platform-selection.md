@@ -34,3 +34,9 @@ Sub-niches can be selected or entered freely by the creator. Use spaces rather t
 **Why:** The user explicitly requested freeform sub-niches, space-separated wording, and this section order.
 
 **How to apply:** Normalize generated, restored, and newly entered sub-niches consistently. Do not silently discard custom sub-niches when primary niches change, and preserve hidden YouTube data.
+
+The final field on page three is “Pitch style preferences (optional)” with the helper “Leave empty to use MAVLIT’s default.”
+
+**Why:** The user explicitly requested optional pitch-writing guidance at the end of the profile.
+
+**How to apply:** Preserve saved preferences and drafts. Clearing the field restores the backend default; do not store invented default wording as the creator’s preference.

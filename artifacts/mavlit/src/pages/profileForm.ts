@@ -22,6 +22,7 @@ export type ProfileForm = {
   age: string;
   gender: string;
   brandPreferences: string;
+  pitchStylePreferences: string;
   primaryPlatforms: PlatformKey[];
   instagram: PlatformDetails & { username: string; followers: string };
   youtube: PlatformDetails & { channelName: string; subscribers: string };
@@ -38,6 +39,7 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
     age: numberText(profile.age),
     gender: text(profile.gender),
     brandPreferences: text(profile.brand_preferences),
+    pitchStylePreferences: text(profile.pitch_style_preferences),
     primaryPlatforms: parsePlatforms(profile.primary_platform),
     instagram: {
       username: text(profile.instagram_handle),
@@ -68,6 +70,7 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
 
 export function validateProfile(form: ProfileForm, profile: CreatorProfile): string | null {
   if (form.brandPreferences.length > 1000) return "Brand preferences must be 1000 characters or fewer.";
+  if (form.pitchStylePreferences.length > 1000) return "Pitch style preferences must be 1000 characters or fewer.";
   if (!form.fullName.trim()) return "Full name is required.";
   if (!form.primaryPlatforms.length) return "Choose at least one primary platform.";
   if (form.age.trim() && (!Number.isInteger(Number(form.age)) || Number(form.age) < 13 || Number(form.age) > 120)) {
@@ -107,6 +110,7 @@ function profileValues(form: ProfileForm, profile: CreatorProfile): Partial<Crea
   return {
     full_name: form.fullName.trim(),
     brand_preferences: form.brandPreferences.trim() || null,
+    pitch_style_preferences: form.pitchStylePreferences.trim() || null,
     creator_handle: instagramHandle || profile.creator_handle || "",
     age: optionalNumber(form.age),
     gender: form.gender.trim() || null,

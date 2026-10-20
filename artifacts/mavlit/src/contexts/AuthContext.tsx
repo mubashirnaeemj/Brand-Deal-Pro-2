@@ -31,6 +31,7 @@ export interface CreatorProfile {
   sub_niches: string[] | null;
   content_description: string | null;
   brand_preferences?: string | null;
+  pitch_style_preferences?: string | null;
   instagram_description: string | null;
   instagram_sub_niches: string[] | null;
   instagram_excluded_categories: string[] | null;

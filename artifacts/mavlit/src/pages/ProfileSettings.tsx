@@ -368,6 +368,12 @@ export default function ProfileSettings() {
         setError("The profile API did not keep your brand preferences. Please try again.");
         return;
       }
+      if ("pitch_style_preferences" in patch &&
+          (updated.pitch_style_preferences?.trim() || "") !== saveForm.pitchStylePreferences.trim()) {
+        setProfile(updated);
+        setError("The profile API did not keep your pitch style preferences. Please try again.");
+        return;
+      }
       for (const platform of ["instagram", "youtube"] as const) {
         const audience = saveForm[platform];
         if ((`${platform}_audience_gender` in patch &&
@@ -422,6 +428,7 @@ export default function ProfileSettings() {
             saving={saving} generating={generatingCount > 0 || jobPending}
             canSave={!audienceError(form.instagram) && !audienceAgeRangeError(form.instagram.audienceAgeRange) &&
               form.instagram.audienceDescription.length <= 1500 && form.brandPreferences.length <= 1000 &&
+              form.pitchStylePreferences.length <= 1000 &&
               (form.instagram.descriptionMode === "manual" || generationComplete)}
             generationComplete={generationComplete} status={instagramStatus}
             generationProgress={generationProgress.progress} showGenerationProgress={generationProgress.showProgress}

@@ -189,6 +189,19 @@ export default function ProfileWizard(p: ProfileWizardProps) {
 
             <ProfileAudience value={ig} onChange={setIg} readOnly={false}
               showMissingDescriptionWarning={gen && p.generationComplete} />
+
+            <label className={labelCls}>Pitch style preferences (optional)
+              <textarea data-testid="input-pitch-style-preferences" rows={3} maxLength={1000}
+                className={`${INPUT_CLASS} mt-1.5 resize-none`} disabled={p.saving}
+                aria-describedby="pitch-style-preferences-help"
+                value={form.pitchStylePreferences}
+                onChange={(event) => onChange({ ...form, pitchStylePreferences: event.target.value })}
+                placeholder="For example: friendly, concise, and confident." />
+              <span id="pitch-style-preferences-help" className="mt-1 block text-xs font-normal normal-case tracking-normal">
+                Leave empty to use MAVLIT’s default.
+              </span>
+              <span aria-live="polite" className="mt-1 block text-right text-[11px] normal-case tracking-normal">{form.pitchStylePreferences.length}/1000</span>
+            </label>
             </>}
             </>}
           </>

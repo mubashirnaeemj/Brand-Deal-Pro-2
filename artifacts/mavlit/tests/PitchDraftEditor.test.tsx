@@ -21,17 +21,18 @@ function mount(disabled = false) {
   return { onSaved, onSavingChange, onDirtyChange };
 }
 const editor = () => screen.getByRole("textbox", { name: "Pitch email draft" });
-const save = () => screen.getByRole("button", { name: "Save to Pipeline" });
+const save = () => screen.getByRole("button", { name: "Save changes" });
 
 describe("pitch review and save", () => {
-  it("shows the generated draft and only saves when explicitly clicked", async () => {
-    const patch = vi.spyOn(api, "patch").mockResolvedValue(pitch);
+  it("shows the generated draft and disables saving until something changes", () => {
+    const patch = vi.spyOn(api, "patch");
     const { onSaved } = mount();
     expect(editor()).toHaveValue(pitch.pitch_text);
     expect(patch).not.toHaveBeenCalled();
+    expect(save()).toBeDisabled();
     fireEvent.click(save());
-    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(pitch));
-    expect(patch).toHaveBeenCalledExactlyOnceWith("/pitches/43", { pitch_text: pitch.pitch_text });
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(patch).not.toHaveBeenCalled();
   });
 
   it("saves exact edited text to the same row without modifying status or sent date", async () => {
@@ -45,6 +46,11 @@ describe("pitch review and save", () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(updated));
     expect(patch).toHaveBeenCalledExactlyOnceWith("/pitches/43", { pitch_text: text });
     expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+    expect(screen.getByRole("status")).toHaveTextContent("Your changes were saved.");
+    expect(save()).toBeDisabled();
+    fireEvent.change(editor(), { target: { value: text + " More edits." } });
+    expect(save()).toBeEnabled();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("keeps edited text after a failed save and retries the same pitch", async () => {
@@ -87,6 +93,7 @@ describe("pitch review and save", () => {
     let finish!: (value: ApiPitch) => void;
     const patch = vi.spyOn(api, "patch").mockReturnValue(new Promise<ApiPitch>((resolve) => { finish = resolve; }));
     const { onSaved, onSavingChange } = mount();
+    fireEvent.change(editor(), { target: { value: "Edited email" } });
     fireEvent.click(save());
     const pending = screen.getByRole("button", { name: "Saving…" });
     expect(pending).toBeDisabled();
@@ -94,7 +101,7 @@ describe("pitch review and save", () => {
     fireEvent.click(pending);
     expect(patch).toHaveBeenCalledOnce();
     expect(onSavingChange).toHaveBeenLastCalledWith(true);
-    finish(pitch);
+    finish({ ...pitch, pitch_text: "Edited email" });
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
     expect(onSavingChange).toHaveBeenLastCalledWith(false);
   });

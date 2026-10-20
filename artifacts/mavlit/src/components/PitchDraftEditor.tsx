@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Loader2 } from "lucide-react";
 import { api, type ApiPitch } from "@/lib/api";
+import { Link } from "wouter";
 
 interface Props {
   pitch: ApiPitch;
@@ -15,8 +16,10 @@ export default function PitchDraftEditor({ pitch, disabled = false, onSaved, onS
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [lastSaved, setLastSaved] = useState(pitch.pitch_text ?? "");
+  const [saved, setSaved] = useState(false);
   const savingRef = useRef(false);
-  const dirty = text !== (pitch.pitch_text ?? "");
+  const dirty = text !== lastSaved;
 
   useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
   useEffect(() => {
@@ -30,11 +33,12 @@ export default function PitchDraftEditor({ pitch, disabled = false, onSaved, onS
   }, [dirty]);
 
   const save = async () => {
-    if (disabled || savingRef.current || !text.trim() || text.length > 20000) return;
+    if (disabled || savingRef.current || !dirty || !text.trim() || text.length > 20000) return;
     savingRef.current = true;
     setSaving(true);
     onSavingChange(true);
     setError(null);
+    setSaved(false);
     try {
       // Only update the generated row's email, never its status or sent date.
       const updated = await api.patch<ApiPitch>(`/pitches/${pitch.id}`, { pitch_text: text });
@@ -42,6 +46,8 @@ export default function PitchDraftEditor({ pitch, disabled = false, onSaved, onS
         throw new Error("The API did not confirm your edited email. Your edits are still here; please try saving again.");
       }
       onDirtyChange(false);
+      setLastSaved(text);
+      setSaved(true);
       onSaved(updated);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save your email. Your edits are still here. Please try again.");
@@ -66,11 +72,11 @@ export default function PitchDraftEditor({ pitch, disabled = false, onSaved, onS
       <div>
         <h3 className="text-lg font-bold text-white">Review your pitch to {pitch.brand_name}</h3>
         <p id="pitch-draft-help" className="mt-1 text-sm text-muted-foreground">
-          Edit your email below, then save your changes to Pipeline. The original generated draft is already there. Saving does not send an email.
+          Your generated draft is saved in Pipeline. Edit your email below, then save your changes. Nothing is sent by email.
         </p>
       </div>
-      {pitch.contact_email && (
-        <p className="break-words text-sm text-muted-foreground">To: {pitch.contact_name ? `${pitch.contact_name} — ` : ""}{pitch.contact_email}</p>
+      {(pitch.contact_name || pitch.contact_email) && (
+        <p className="break-words text-sm text-muted-foreground">Suggested contact: {[pitch.contact_name, pitch.contact_email].filter(Boolean).join(" — ")}</p>
       )}
       <div className="flex items-center justify-between gap-3">
         <label htmlFor="pitch-draft-text" className="text-sm font-semibold text-white">Pitch email draft</label>
@@ -81,15 +87,17 @@ export default function PitchDraftEditor({ pitch, disabled = false, onSaved, onS
       </div>
       <textarea id="pitch-draft-text" value={text} rows={16} maxLength={20000} disabled={saving || disabled}
         aria-describedby="pitch-draft-help pitch-draft-count"
-        onChange={(event) => { setText(event.target.value); setCopied(false); }}
+        onChange={(event) => { setText(event.target.value); setCopied(false); setSaved(false); }}
         className="w-full resize-y rounded-xl border border-border bg-black/40 p-4 font-mono text-sm leading-relaxed text-white/90 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60" />
       <p id="pitch-draft-count" className="text-right text-xs text-muted-foreground">{text.length}/20000</p>
       {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">{error}</p>}
-      <button type="button" onClick={() => void save()} disabled={disabled || saving || !text.trim() || text.length > 20000}
+      <button type="button" onClick={() => void save()} disabled={disabled || saving || !dirty || !text.trim() || text.length > 20000}
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40">
         {saving && <Loader2 size={16} className="animate-spin" />}
-        {saving ? "Saving…" : "Save to Pipeline"}
+        {saving ? "Saving…" : "Save changes"}
       </button>
+      {saved && <p role="status" className="text-sm text-emerald-400">Your changes were saved.</p>}
+      {!dirty && <Link href="/deals" className="inline-block text-sm font-semibold text-primary hover:underline">View in Pipeline</Link>}
       <p className="text-xs text-muted-foreground">After sending the email yourself, mark it sent in Pipeline.</p>
     </section>
   );

@@ -11,7 +11,7 @@ export class ApiRequestError extends Error {
   }
 }
 
-async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function apiResponse(path: string, options: RequestInit = {}): Promise<Response> {
   const headers = new Headers(options.headers);
   if (options.body !== undefined && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -34,7 +34,11 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     const detail = typeof err.detail === "string" ? err.detail : validationDetail || (typeof err.message === "string" ? err.message : null);
     throw new ApiRequestError(detail ?? `Request failed (${res.status})`, res.status);
   }
-  return res.json() as Promise<T>;
+  return res;
+}
+
+async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return (await apiResponse(path, options)).json() as Promise<T>;
 }
 
 export const api = {

@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import Pitch from "@/pages/Pitch";
 import Pipeline from "@/pages/Pipeline";
 import { api, type ApiMatch, type ApiPitch } from "@/lib/api";
+import * as pitchStreaming from "@/lib/pitchStream";
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({ user: { id: 808, content_niche: "Music", follower_count: 12345 } }),
@@ -61,17 +62,17 @@ describe("Pitch page generation and review", () => {
 
   it("sends the creator's edited product reference, not the automatic default", async () => {
     const queryClient = mountMatches();
-    const post = vi.spyOn(api, "post").mockResolvedValue({ ...pitch, brand_id: 7, is_custom: false });
+    const post = vi.spyOn(pitchStreaming, "generatePitch").mockResolvedValue({ ...pitch, brand_id: 7, is_custom: false });
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
     fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
     fireEvent.change(screen.getByPlaceholderText("Enter a product launch, or leave blank to skip"),
       { target: { value: "Creator's preferred launch" } });
     fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
-    fireEvent.click(screen.getByRole("button", { name: /Generate pitch email rough draft/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
     await screen.findByRole("textbox", { name: "Pitch email draft" });
-    expect(post).toHaveBeenCalledWith("/pitches", expect.objectContaining({
+    expect(post).toHaveBeenCalledWith(expect.objectContaining({
       brand_id: 7, is_custom: false, product_reference: "Creator's preferred launch",
-    }));
+    }), expect.any(Function), expect.any(AbortSignal));
     queryClient.clear();
   });
 
@@ -97,9 +98,9 @@ describe("Pitch page generation and review", () => {
     queryClient.clear();
   });
 
-  it("generates with visible brand/story inputs, edits, and saves the same row before opening Pipeline", async () => {
+  it("generates with visible brand/story inputs, edits, and confirms same-row saving without leaving the page", async () => {
     vi.spyOn(api, "get").mockResolvedValue({ matches: [], total: 0 });
-    const post = vi.spyOn(api, "post").mockResolvedValue(pitch);
+    const post = vi.spyOn(pitchStreaming, "generatePitch").mockResolvedValue(pitch);
     const edited = "Subject: My edits\n\nFinal email";
     const patch = vi.spyOn(api, "patch").mockResolvedValue({ ...pitch, pitch_text: edited });
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
@@ -108,7 +109,7 @@ describe("Pitch page generation and review", () => {
     const invalidate = vi.spyOn(queryClient, "invalidateQueries");
     render(<QueryClientProvider client={queryClient}><Pitch /></QueryClientProvider>);
 
-    const generate = screen.getByRole("button", { name: /Generate pitch email rough draft/ });
+    const generate = screen.getByRole("button", { name: "Generate pitch email draft" });
     expect(generate).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "A brand I found myself" }));
     fireEvent.change(await screen.findByPlaceholderText("e.g. Focusrite, Rode, Ableton"),
@@ -116,20 +117,86 @@ describe("Pitch page generation and review", () => {
     fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
     expect(generate).toBeEnabled();
     fireEvent.click(generate);
-    const editor = await screen.findByRole("textbox", { name: "Pitch email draft" });
+    await screen.findByRole("button", { name: "Save changes" });
+    const editor = screen.getByRole("textbox", { name: "Pitch email draft" });
     expect(editor).toHaveValue(pitch.pitch_text);
     expect(window.location.pathname).toBe("/pitch");
     expect(patch).not.toHaveBeenCalled();
     fireEvent.change(editor, { target: { value: edited } });
-    fireEvent.click(screen.getByRole("button", { name: "Save to Pipeline" }));
-    await waitFor(() => expect(window.location.pathname).toBe("/deals"));
-    expect(post).toHaveBeenCalledExactlyOnceWith("/pitches", {
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("Your changes were saved.")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/pitch");
+    expect(screen.getByRole("link", { name: "View in Pipeline" })).toHaveAttribute("href", "/deals");
+    expect(post).toHaveBeenCalledExactlyOnceWith({
       is_custom: true, custom_brand_name: pitch.brand_name, story: pitch.story,
       product_reference: undefined, past_brand_partnership: undefined, content_link: undefined,
-    });
+    }, expect.any(Function), expect.any(AbortSignal));
     expect(patch).toHaveBeenCalledExactlyOnceWith("/pitches/43", { pitch_text: edited });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["pitches"] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["dashboard"] });
     queryClient.clear();
   });
+
+  it("immediately shows a read-only draft, displays live deltas, then enables editing with the final saved text", async () => {
+    const queryClient = mountMatches();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+    let publish!: (text: string) => void;
+    let finish!: (value: ApiPitch) => void;
+    const pending = new Promise<ApiPitch>((resolve) => { finish = resolve; });
+    const generate = vi.spyOn(pitchStreaming, "generatePitch").mockImplementation((_body, delta) => {
+      publish = delta;
+      return pending;
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
+    fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
+    const live = screen.getByPlaceholderText("MAVLIT is writing your pitch…");
+    expect(live).toHaveValue("");
+    expect(live).toHaveAttribute("readonly");
+    expect(screen.getByRole("status")).toHaveTextContent("Writing your pitch…");
+    expect(screen.getByRole("button", { name: "Writing your pitch…" })).toBeDisabled();
+    act(() => publish("Hi "));
+    expect(live).toHaveValue("Hi ");
+    act(() => publish("Lauren"));
+    expect(live).toHaveValue("Hi Lauren");
+    await act(async () => finish({ ...pitch, contact_name: "Lauren", pitch_text: "Hi Lauren,\n\nFinal trimmed email." }));
+    const editor = screen.getByRole("textbox", { name: "Pitch email draft" });
+    expect(editor).toHaveValue("Hi Lauren,\n\nFinal trimmed email.");
+    expect(editor).not.toHaveAttribute("readonly");
+    expect(screen.getByText("Suggested contact: Lauren")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(screen.queryByText("Writing your pitch…")).not.toBeInTheDocument();
+    fireEvent.change(editor, { target: { value: "Unsaved corrections" } });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    fireEvent.click(screen.getByRole("button", { name: "Generate again" }));
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(editor).toHaveValue("Unsaved corrections");
+    expect(generate).toHaveBeenCalledOnce();
+    queryClient.clear();
+  });
+
+  it.each(["Brand not found", pitchStreaming.INCOMPLETE_PITCH, "Generation failed upstream"])(
+    "clears the partial draft and restores generation controls on failure: %s", async (message) => {
+      const queryClient = mountMatches();
+      Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+      let publish!: (text: string) => void;
+      let fail!: (cause: Error) => void;
+      const pending = new Promise<ApiPitch>((_resolve, reject) => { fail = reject; });
+      vi.spyOn(pitchStreaming, "generatePitch").mockImplementation((_body, delta) => {
+        publish = delta;
+        return pending;
+      });
+      fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
+      fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
+      fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
+      act(() => publish("Never leave this partial email behind"));
+      expect(screen.getByRole("textbox", { name: "Pitch email draft" })).toHaveValue("Never leave this partial email behind");
+      await act(async () => fail(new Error(message)));
+      expect(screen.getByRole("alert")).toHaveTextContent(message);
+      expect(screen.queryByRole("textbox", { name: "Pitch email draft" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Generate pitch email draft" })).toBeEnabled();
+      expect(screen.queryByText("Your changes were saved.")).not.toBeInTheDocument();
+      queryClient.clear();
+    },
+  );
 });

@@ -9,6 +9,8 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PitchDraftEditor from "@/components/PitchDraftEditor";
+import LivePitchDraft from "@/components/LivePitchDraft";
+import { generatePitch } from "@/lib/pitchStream";
 import { api, getAllMatches, type ApiBrand, type ApiPitch } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -102,6 +104,7 @@ function OutboundMode() {
     ? { ...EMPTY_OUTBOUND, brandSource: "found", customBrand: prefillBrand }
     : EMPTY_OUTBOUND);
   const [generating, setGenerating] = useState(false);
+  const [streamText, setStreamText] = useState("");
   const [draft, setDraft] = useState<ApiPitch | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -109,6 +112,11 @@ function OutboundMode() {
   const emailRef = useRef<HTMLDivElement>(null);
   const generationInFlight = useRef(false);
   const productReferenceEdited = useRef(false);
+  const streamController = useRef<AbortController | null>(null);
+  useEffect(() => () => { streamController.current?.abort(); }, []);
+  useEffect(() => {
+    if (generating) emailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [generating]);
 
   useEffect(() => {
     const prefilledMatch = matches?.find(b => b.brand_name === prefillBrand);
@@ -149,7 +157,9 @@ function OutboundMode() {
     if (!canGenerate || saving || generationInFlight.current) return;
     if (dirty && !window.confirm("Generate a new pitch and discard your unsaved email edits? The previous generated draft remains in Pipeline.")) return;
     generationInFlight.current = true;
-    setGenerating(true); setError(null);
+    const controller = new AbortController();
+    streamController.current = controller;
+    setGenerating(true); setError(null); setDraft(null); setStreamText(""); setDirty(false);
     try {
       const body = form.brandSource === "matched" && selectedMatch
         ? {
@@ -168,24 +178,26 @@ function OutboundMode() {
             past_brand_partnership: form.pastDeals || undefined,
             content_link: form.contentLink || undefined,
           };
-      const data = await api.post<ApiPitch>("/pitches", body);
+      const data = await generatePitch(body, (delta) => setStreamText(previous => previous + delta), controller.signal);
+      if (controller.signal.aborted) return;
       setDraft(data);
       setDirty(false);
-      if (!data.pitch_text) setError("The API returned no email text. You can write your email in the draft editor below and save it to the same pitch.");
       // Invalidate cached pitches and dashboard stats so Pipeline + Dashboard reflect the new pitch immediately
       queryClient.invalidateQueries({ queryKey: ["pitches"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      setTimeout(() => emailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     } catch (err) {
+      if (controller.signal.aborted) return;
+      setDraft(null);
+      setStreamText("");
       setError(err instanceof Error ? err.message : "Something went wrong generating your email. Please try again.");
     }
     finally { generationInFlight.current = false; setGenerating(false); }
   };
 
-  const saved = () => {
+  const saved = (updated: ApiPitch) => {
+    setDraft(updated);
     queryClient.invalidateQueries({ queryKey: ["pitches"] });
     queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-    setLocation("/deals");
   };
 
 
@@ -294,21 +306,20 @@ function OutboundMode() {
         <button onClick={generate} disabled={!canGenerate || generating || saving}
           className="w-full py-4 rounded-2xl text-base font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-lg shadow-primary/30 transition-all flex items-center justify-center gap-2">
           {generating
-            ? (<><motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />Generating your pitch email…</>)
-            : (<><Sparkles size={16} />✦ Generate pitch email rough draft</>)}
+            ? (<><motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />Writing your pitch…</>)
+            : (<><Sparkles size={16} />{draft ? "Generate again" : "Generate pitch email draft"}</>)}
         </button>
 
         {error && <div role="alert" className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}
         </div>}
 
         {/* Email output */}
-        <AnimatePresence>
-          {draft && (
-            <motion.div ref={emailRef} key={draft.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className={generating ? "pointer-events-none opacity-50" : ""}>
-              <PitchDraftEditor pitch={draft} disabled={generating} onSaved={saved} onSavingChange={setSaving} onDirtyChange={setDirty} />
+          {(generating || draft) && (
+            <motion.div ref={emailRef} key="pitch-output" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
+              {generating ? <LivePitchDraft text={streamText} /> : draft &&
+                <PitchDraftEditor key={draft.id} pitch={draft} onSaved={saved} onSavingChange={setSaving} onDirtyChange={setDirty} />}
             </motion.div>
           )}
-        </AnimatePresence>
       </motion.div>
 
       {/* Right sidebar */}

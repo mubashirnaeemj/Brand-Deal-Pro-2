@@ -79,11 +79,17 @@ Profile PUT is a full replacement, not a patch. Preserve the entire latest GET o
 
 ## Pitch lifecycle
 
-The pitch review flow uses the existing generated pitch, not a separate unsaved-draft API. Review and edit on the Pitch page, then explicitly save edits before opening Pipeline. Do not promise that generation waits until Save to create the Pipeline entry.
+The pitch review flow uses the existing generated pitch, not a separate unsaved-draft API. Review and edit on the Pitch page, then explicitly save edits. Do not promise that generation waits until Save to create the Pipeline entry.
 
 **Why:** The user clarified that generation already creates the row and chose to extend same-row email editing rather than introduce separate generate/save endpoints. Saving email text must not mark outreach sent or change its sent date.
 
-**How to apply:** Keep draft review separate from sending, update the original pitch rather than creating a duplicate, and only leave the editor after the edited email is confirmed saved.
+**How to apply:** Keep draft review separate from sending and update the original pitch rather than creating a duplicate. The user's streaming instructions supersede the earlier automatic Pipeline navigation: “Save changes” stays on the Pitch page, is disabled until edited, and confirms “Your changes were saved.” Pipeline navigation is separate.
+
+Pitch generation must display real incoming server text live, not a simulated typewriter animation after completion. An empty read-only draft and writing status should appear immediately, including during the initial model-thinking delay. Only a completed server pitch becomes editable; failed or incomplete streams must not leave partial emails on screen.
+
+**Why:** The user explicitly replaced wait-for-completion generation with live streaming, and authorized a local proxy transport change only because buffering prevented the frontend from receiving live chunks.
+
+**How to apply:** Keep the external backend's generation and persistence logic unchanged. Preserve same-origin cookie authentication and streaming through the local proxy. Do not automatically retry interrupted generation with another creation request, since a completion may have been saved before the connection was lost.
 
 Selecting a brand on the Pitch page should prefill its latest product in the optional product-launch reference. The creator can edit or clear it; never invent a product when the backend has none.
 

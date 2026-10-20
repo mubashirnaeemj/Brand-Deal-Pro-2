@@ -4,6 +4,12 @@ import { parsePrimaryNiches, type OnboardingData } from "@/components/onboarding
 import { profileToForm, type ProfileForm } from "./profileForm";
 
 export type ProfileStep = 1 | 2 | 3;
+export function serializeWizardDraft(
+  form: ProfileForm, wizardStep: ProfileStep, generatedFor: string | null,
+  generationStartedAt: number | null, generationPending: boolean,
+): string {
+  return JSON.stringify({ ...form, wizardStep, generatedFor, generationStartedAt, generationPending });
+}
 export const generationKey = (username: string, niches: string[]) =>
   JSON.stringify([username.trim().replace(/^@/, "").toLowerCase(), niches]);
 export const profileGenerationKey = (profile: CreatorProfile) =>
@@ -13,7 +19,7 @@ export function instagramForm(form: ProfileForm): ProfileForm {
   return { ...form, primaryPlatforms: ["instagram"] };
 }
 
-/** Generated-mode outputs are server-owned; switching to manual preserves edits. */
+/** Seed a completed job's outputs; later user corrections are retained in drafts. */
 export function applyProfileGeneration(form: ProfileForm, profile: CreatorProfile, platform: DescriptionPlatform): ProfileForm {
   const current = form[platform];
   const generated = profileToForm(profile)[platform];

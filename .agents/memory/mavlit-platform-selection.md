@@ -13,13 +13,13 @@ The profile has three pages: (1) creator information only, (2) description-metho
 
 **Why:** The user chose this layout rather than putting fields on page two and review on page three.
 
-**How to apply:** Manual mode makes all Instagram fields editable. Generate mode permits editing only username, primary niches, brand categories to avoid, and brand preferences. All generated outputs stay read-only, including after completion.
+**How to apply:** Manual mode shows all Instagram fields immediately. Generate mode initially shows only username and primary niches. The bottom primary action is Generate until generation finishes, then Save Profile.
 
-In generate mode, follower count and the field labeled “Instagram content description” must be visibly disabled, not merely read-only-looking editable controls.
+After generation, reveal all fields and let the creator edit any of them, including followers, username, primary niches, audience, and “Instagram content description.”
 
-**Why:** The user repeated that these fields must not be writable and explicitly renamed the content-description label.
+**Why:** The user explicitly replaced the former read-only generated-output rule with a generate-then-edit flow.
 
-**How to apply:** Disable both fields throughout generate mode, before and after generation; re-enable them when the creator switches to manual mode.
+**How to apply:** Keep generation progress separate from profile completion. Show estimated percentage progress over about two minutes, jump to 100% if the API finishes early, and do not report success before the API actually finishes. Reveal the editable review after success. Preserve corrections across reloads and final Save rather than overwriting them with the original generated outputs or requiring regeneration after a correction.
 
 Page three includes a separate Instagram audience description and one age-range input displayed as `25-44`, not separate visible minimum/maximum inputs. Do not show the line “MAVLIT builds your profile around Instagram.”
 

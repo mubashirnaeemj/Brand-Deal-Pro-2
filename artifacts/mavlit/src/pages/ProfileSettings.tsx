@@ -7,7 +7,8 @@ import { api } from "@/lib/api";
 import { fillEmptyAudience, audienceAgeRangeError, audienceError, formatAudienceAgeRange } from "@/lib/audience";
 import ProfileWizard from "@/components/profile/ProfileWizard";
 import { profilePatch, profileToForm, validateProfile, type ProfileForm } from "./profileForm";
-import { applyProfileGeneration, creatorInfoError, generationKey, profileGenerationKey, restoreWizardForm, type ProfileStep } from "./profileWizardModel";
+import { applyProfileGeneration, creatorInfoError, generationKey, profileGenerationKey, restoreWizardForm, serializeWizardDraft, type ProfileStep } from "./profileWizardModel";
+import { useProfileGenerationProgress } from "./useProfileGenerationProgress";
 
 export default function ProfileSettings() {
   const { user, updateProfile, logout } = useAuth();
@@ -24,6 +25,13 @@ export default function ProfileSettings() {
   const [step, setStep] = useState<ProfileStep>(1);
   const [generatedFor, setGeneratedFor] = useState<string | null>(null);
   const generationStarting = useRef(false);
+  // After a successful generation, creators may correct any field, including
+  // username and niche, without having those edits hidden or forcing a new job.
+  const generationComplete = !!form && profile?.instagram_description_status === "completed" && generatedFor !== null;
+  const generationProgress = useProfileGenerationProgress(
+    generatingCount > 0 || isDescriptionPending(profile?.instagram_description_status), generationComplete,
+  );
+  const { setStartedAt } = generationProgress;
 
   useEffect(() => {
     let active = true;
@@ -39,11 +47,18 @@ export default function ProfileSettings() {
           const draft = JSON.parse(sessionStorage.getItem(key) ?? localStorage.getItem(key) ??
             localStorage.getItem(`mavlit_onboarding_draft_${response.id}`) ?? "null");
           let restored = restoreWizardForm(response, draft);
-          const completed = response.instagram_description_status === "completed" && response.instagram_description_mode === "generate";
+          const completed = response.instagram_description_status === "completed" && response.instagram_description_mode === "generate" &&
+            !!response.instagram_description?.trim();
           const matches = generationKey(restored.instagram.username, restored.instagram.primaryNiches) === profileGenerationKey(response);
           const usable = !draft || !("generatedFor" in draft) || draft.generatedFor === profileGenerationKey(response) || draft.generationPending === true;
-          if (completed && matches && usable && restored.instagram.descriptionMode === "generate") {
+          if (completed && matches && usable && restored.instagram.descriptionMode === "generate" &&
+              (!draft || !draft.generatedFor || draft.generationPending === true)) {
             restored = applyProfileGeneration(restored, response, "instagram");
+          }
+          if (isDescriptionPending(response.instagram_description_status) || (completed && usable)) {
+            const timestamp = draft?.generationStartedAt;
+            setStartedAt(typeof timestamp === "number" && Number.isFinite(timestamp) && timestamp > 0 && timestamp <= Date.now()
+              ? timestamp : isDescriptionPending(response.instagram_description_status) ? Date.now() : null);
           }
           setGeneratedFor(completed && usable ? profileGenerationKey(response) : null);
           if ([1, 2, 3].includes(draft?.wizardStep)) setStep(draft.wizardStep);
@@ -62,11 +77,12 @@ export default function ProfileSettings() {
     if (!form || !profile || saved) return;
     try {
       const key = `mavlit_profile_draft:${profile.id}`;
-      const draft = JSON.stringify({ ...form, wizardStep: step, generatedFor, generationPending: isDescriptionPending(profile.instagram_description_status) });
+      const draft = serializeWizardDraft(form, step, generatedFor, generationProgress.startedAt,
+        isDescriptionPending(profile.instagram_description_status));
       sessionStorage.setItem(key, draft);
       if (!user || !isProfileComplete(user)) localStorage.setItem(key, draft);
     } catch { /* The in-memory draft remains available. */ }
-  }, [form, profile, user, step, generatedFor, saved]);
+  }, [form, profile, user, step, generatedFor, generationProgress.startedAt, saved]);
 
   useEffect(() => { document.title = "Your Profile | MAVLIT"; }, []);
 
@@ -93,6 +109,10 @@ export default function ProfileSettings() {
             latest[`${platform}_description_status`] = "failed";
             latest[`${platform}_description_error`] = "The generation job changed. Progress checks stopped. Generate again or reload to view the current job.";
           }
+        }
+        if (latest.instagram_description_status === "completed" && !latest.instagram_description?.trim()) {
+          latest.instagram_description_status = "failed";
+          latest.instagram_description_error = "Generation finished without a content description. Please try again.";
         }
         setForm((current) => {
           if (!current) return current;
@@ -126,7 +146,7 @@ export default function ProfileSettings() {
     if (next.instagram.descriptionMode === "generate" && form?.instagram.descriptionMode !== "generate") {
       if (profile?.instagram_description_status === "completed" && profile.instagram_description_mode === "generate" &&
           generationKey(next.instagram.username, next.instagram.primaryNiches) === profileGenerationKey(profile)) {
-        setForm(applyProfileGeneration(next, profile, "instagram"));
+        setForm(generatedFor ? next : applyProfileGeneration(next, profile, "instagram"));
         setGeneratedFor(profileGenerationKey(profile));
       } else {
         setForm(next);
@@ -233,10 +253,6 @@ export default function ProfileSettings() {
     return savedUsername;
   };
 
-  const generationComplete = !!form && profile?.instagram_description_status === "completed" &&
-    !!form.instagram.description.trim() &&
-    generatedFor === generationKey(form.instagram.username, form.instagram.primaryNiches);
-
   const generateInstagram = async () => {
     if (!form || generationStarting.current || generatingCount > 0 || saving || jobPending) return;
     const infoError = creatorInfoError(form);
@@ -249,6 +265,7 @@ export default function ProfileSettings() {
     }
     generationStarting.current = true;
     setGeneratingCount(1);
+    setStartedAt(Date.now());
     setGeneratedFor(null);
     setError(null);
     try {
@@ -278,7 +295,7 @@ export default function ProfileSettings() {
   const save = async () => {
     if (!form || !profile || saving || generatingCount > 0 || jobPending) return;
     setError(null);
-    if (form.instagram.descriptionMode === "generate" && !generationComplete) {
+    if (form.instagram.descriptionMode === "generate" && (!generationComplete || generationProgress.showProgress)) {
       setError("Generate your Instagram profile and wait for it to finish before saving.");
       return;
     }
@@ -289,7 +306,10 @@ export default function ProfileSettings() {
     }
     setSaving(true);
     try {
-      try { sessionStorage.setItem(`mavlit_profile_draft:${profile.id}`, JSON.stringify(form)); } catch { /* Storage may be unavailable. */ }
+      try {
+        sessionStorage.setItem(`mavlit_profile_draft:${profile.id}`,
+          serializeWizardDraft(form, step, generatedFor, generationProgress.startedAt, jobPending));
+      } catch { /* Storage may be unavailable. */ }
       const latest = await api.get<CreatorProfile>("/creator-profile/me");
       if (isDescriptionPending(latest.instagram_description_status) || isDescriptionPending(latest.youtube_description_status)) {
         setProfile(latest);
@@ -327,7 +347,10 @@ export default function ProfileSettings() {
         return;
       }
       // Retain failed submissions even if an expired session navigates to sign-in.
-      try { sessionStorage.setItem(`mavlit_profile_draft:${profile.id}`, JSON.stringify(saveForm)); } catch { /* Storage may be unavailable. */ }
+      try {
+        sessionStorage.setItem(`mavlit_profile_draft:${profile.id}`,
+          serializeWizardDraft(saveForm, step, generatedFor, generationProgress.startedAt, jobPending));
+      } catch { /* Storage may be unavailable. */ }
       const patch = { ...profilePatch(saveForm, profile), primary_platform: "instagram" };
       const updated = await updateProfile(patch);
       if (parsePlatforms(updated.primary_platform).length !== 1 || !parsePlatforms(updated.primary_platform).includes("instagram")) {
@@ -401,6 +424,7 @@ export default function ProfileSettings() {
               form.instagram.audienceDescription.length <= 1500 && form.brandPreferences.length <= 1000 &&
               (form.instagram.descriptionMode === "manual" || generationComplete)}
             generationComplete={generationComplete} status={instagramStatus}
+            generationProgress={generationProgress.progress} showGenerationProgress={generationProgress.showProgress}
             error={error} pollError={pollError || profile.instagram_description_error || null} saved={saved} />
         )}
       </div>

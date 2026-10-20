@@ -4,6 +4,7 @@ import type { ProfileForm } from "@/pages/profileForm";
 import BrandCategoriesToAvoid from "@/components/onboarding/BrandCategoriesToAvoid";
 import MultiSelectDropdown from "@/components/onboarding/MultiSelectDropdown";
 import ProfileAudience from "./ProfileAudience";
+import ProfileGenerationProgress from "./ProfileGenerationProgress";
 import { INPUT_CLASS, NICHE_OPTIONS, subNicheOptions, type DescriptionMode } from "@/components/onboarding/types";
 
 export interface ProfileWizardProps {
@@ -19,6 +20,8 @@ export interface ProfileWizardProps {
   generating: boolean;
   canSave: boolean;
   generationComplete: boolean;
+  generationProgress: number;
+  showGenerationProgress: boolean;
   status?: DescriptionStatus | null;
   error: string | null;
   pollError: string | null;
@@ -40,7 +43,9 @@ export default function ProfileWizard(p: ProfileWizardProps) {
   const busy = p.saving || p.generating || pending;
   const setIg = (next: Partial<ProfileForm["instagram"]>) => onChange({ ...form, instagram: { ...ig, ...next } });
   const setMode = (m: DescriptionMode) => setIg({ descriptionMode: m });
-  const locked = gen; // read-only fields in generate mode
+  const showAllFields = !gen || p.generationComplete;
+  const showProgress = gen && p.showGenerationProgress;
+  const generateAction = gen && (!p.generationComplete || showProgress);
   const headings = ["Creator information", "How would you like to create your description?", "Your Instagram profile"];
 
   return (
@@ -99,7 +104,7 @@ export default function ProfileWizard(p: ProfileWizardProps) {
             <div className="grid gap-3 sm:grid-cols-2" role="tablist" aria-label="Description method">
               {([
                 ["manual", "Write it myself", "Describe your content in your own words and fill in every detail.", PenLine],
-                ["generate", "Let MAVLIT generate it from my content", "We read your Instagram and fill in the rest. You only confirm a few things.", Sparkles],
+                ["generate", "Let MAVLIT generate it from my content", "Enter your username and niche. We fill in the details, then you can edit anything.", Sparkles],
               ] as const).map(([value, title, text, Icon]) => {
                 const on = mode === value;
                 return (
@@ -126,10 +131,11 @@ export default function ProfileWizard(p: ProfileWizardProps) {
 
         {step === 3 && (
           <>
+            {showProgress ? <ProfileGenerationProgress progress={p.generationProgress} error={p.pollError} /> : <>
             <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm text-white" data-testid="text-method-summary">
               Method: <strong>{gen ? "MAVLIT generates from my content" : "I write it myself"}</strong>. Use Back to change.
             </p>
-            {gen && <p className="text-xs text-muted-foreground">Enter your username, niche, brands to avoid and preferences. MAVLIT fills in the rest from your content.</p>}
+            {gen && !showAllFields && <p className="text-xs text-muted-foreground">Enter your Instagram username and primary niche, then select Generate.</p>}
             {pending && <p role="status" className="text-sm text-primary" data-testid="status-pending">
               Description {status === "queued" ? "queued" : "generating"}. You can leave this page; progress resumes when you return.
             </p>}
@@ -144,45 +150,37 @@ export default function ProfileWizard(p: ProfileWizardProps) {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className={labelCls}>Instagram username
-                <input data-testid="input-username" className={`${INPUT_CLASS} mt-1.5`} value={ig.username} disabled={pending || p.generating}
+                <input data-testid="input-username" className={`${INPUT_CLASS} mt-1.5`} value={ig.username} disabled={pending || p.generating || p.saving}
                   placeholder="yourhandle" onChange={(e) => setIg({ username: e.target.value.replace(/^@/, "") })} />
               </label>
-              <label className={labelCls}>Follower count
+              {showAllFields && <label className={labelCls}>Follower count
                 <input data-testid="input-followers" type="number" min={0} step={1} className={`${INPUT_CLASS} mt-1.5`} value={ig.followers}
-                  disabled={locked} readOnly={locked} aria-readonly={locked}
+                  disabled={p.saving}
                   onChange={(e) => setIg({ followers: e.target.value })} />
-                {locked && <span className="mt-1 block text-[11px] normal-case tracking-normal">Filled in by MAVLIT.</span>}
-              </label>
+              </label>}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <MultiSelectDropdown label="Primary niches" options={NICHE_OPTIONS} selected={ig.primaryNiches}
-                disabled={pending || p.generating} placeholder="Select one or more"
+                disabled={pending || p.generating || p.saving} placeholder="Select one or more"
                 onChange={(items) => setIg({ primaryNiches: items, subNiches: ig.subNiches.filter((s) => subNicheOptions(items).includes(s)) })} />
-              <MultiSelectDropdown label="Sub-niches" options={subNicheOptions(ig.primaryNiches)} selected={ig.subNiches}
-                searchable disabled={locked} hint={locked ? "Filled in by MAVLIT." : undefined} placeholder="Select sub-niches"
-                onChange={(subNiches) => setIg({ subNiches })} />
+              {showAllFields && <MultiSelectDropdown label="Sub-niches" options={subNicheOptions(ig.primaryNiches)} selected={ig.subNiches}
+                searchable disabled={p.saving} placeholder="Select sub-niches"
+                onChange={(subNiches) => setIg({ subNiches })} />}
             </div>
 
+            {showAllFields && <>
             <BrandCategoriesToAvoid selected={ig.excludedCategories} primaryNiches={ig.primaryNiches}
               onChange={(excludedCategories) => setIg({ excludedCategories })} />
 
-            <ProfileAudience value={ig} onChange={setIg} readOnly={locked} />
+            <ProfileAudience value={ig} onChange={setIg} readOnly={false} />
 
             <label className={labelCls}>Instagram content description
               <textarea data-testid="input-description" rows={4} className={`${INPUT_CLASS} mt-1.5 resize-none`} value={ig.description}
-                disabled={locked} readOnly={locked} aria-readonly={locked}
+                disabled={p.saving}
                 placeholder={gen ? "MAVLIT will write this from your content." : "Describe your Instagram content."}
                 onChange={(e) => setIg({ description: e.target.value })} />
             </label>
-
-            {gen && (
-              <button type="button" data-testid="button-generate" className={`${btnPrimary} inline-flex items-center gap-2`}
-                onClick={p.onGenerate} disabled={busy}>
-                {p.generating || pending ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Sparkles size={16} aria-hidden />}
-                {p.generating || pending ? "Generating" : p.generationComplete ? "Generate again" : "Generate"}
-              </button>
-            )}
 
             <label className={labelCls}>Brand preferences
               <textarea data-testid="input-brand-preferences" rows={3} maxLength={1000} className={`${INPUT_CLASS} mt-1.5 resize-none`}
@@ -190,6 +188,8 @@ export default function ProfileWizard(p: ProfileWizardProps) {
                 placeholder="Brands or partnership styles you want." />
               <span aria-live="polite" className="mt-1 block text-right text-[11px] normal-case tracking-normal">{form.brandPreferences.length}/1000</span>
             </label>
+            </>}
+            </>}
           </>
         )}
       </section>
@@ -200,6 +200,12 @@ export default function ProfileWizard(p: ProfileWizardProps) {
           <button type="button" className={btnGhost} onClick={p.onBack} disabled={step === 1 || p.saving} data-testid="button-back">Back</button>
           {step < 3 ? (
             <button type="button" className={btnPrimary} onClick={p.onContinue} data-testid="button-continue">Continue</button>
+          ) : generateAction ? (
+            <button type="button" data-testid="button-generate" className={`${btnPrimary} inline-flex items-center gap-2`}
+              onClick={p.onGenerate} disabled={busy || showProgress}>
+              {busy || showProgress ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Sparkles size={16} aria-hidden />}
+              {busy || showProgress ? "Generating" : "Generate"}
+            </button>
           ) : (
             <button type="button" className={btnPrimary} onClick={p.onSave} disabled={!p.canSave || busy} data-testid="button-save">
               {p.saving ? "Saving" : "Save Profile"}

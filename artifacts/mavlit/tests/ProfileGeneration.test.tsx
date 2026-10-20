@@ -19,7 +19,7 @@ function details(mode: "manual" | "generate" = "generate") {
   }
 }
 async function mount(start = true) {
-  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
   fixture = installProfileApi(creatorProfile({ primary_platform: "instagram", instagram_description: null }));
   fixture.allowGeneration();
   const rendered = renderProfile(<ProfileSettings />);
@@ -44,31 +44,39 @@ function AuthProbe() {
 }
 
 describe("Instagram wizard generation", () => {
-  it("polls every 1.5 seconds, fills every generated read-only field, saves and reloads", async () => {
+  it("polls every 1.5 seconds, reaches 100% early, reveals editable fields, saves and reloads", async () => {
     const rendered = await mount();
     const initialReads = fixture.requests.filter((r) => r.method === "GET").length;
     await tick(1499);
     expect(fixture.requests.filter((r) => r.method === "GET")).toHaveLength(initialReads);
     finish();
     await tick(1);
+    expect(screen.getByTestId("generation-percentage")).toHaveTextContent("100%");
+    expect(screen.queryByTestId("input-followers")).not.toBeInTheDocument();
+    await tick(450);
     expect(screen.getByLabelText("instagram audience gender")).toHaveValue("female");
-    expect(screen.getByLabelText("instagram audience gender")).toBeDisabled();
+    expect(screen.getByLabelText("instagram audience gender")).toBeEnabled();
     expect(screen.getByLabelText("instagram audience age range")).toHaveValue("18-34");
     expect(screen.getByLabelText("Instagram audience description")).toHaveValue("Young musicians learning guitar.");
-    expect(screen.getByLabelText("Instagram audience description")).toBeDisabled();
+    expect(screen.getByLabelText("Instagram audience description")).toBeEnabled();
     expect(screen.getByTestId("input-followers")).toHaveValue(9876);
-    expect(screen.getByTestId("input-followers")).toHaveAttribute("readonly");
-    expect(screen.getByTestId("input-followers")).toBeDisabled();
+    expect(screen.getByTestId("input-followers")).not.toHaveAttribute("readonly");
+    expect(screen.getByTestId("input-followers")).toBeEnabled();
     expect(screen.getByTestId("input-description")).toHaveValue("Generated creator description");
-    expect(screen.getByTestId("input-description")).toHaveAttribute("readonly");
-    expect(screen.getByLabelText("Instagram content description")).toBeDisabled();
+    expect(screen.getByTestId("input-description")).not.toHaveAttribute("readonly");
+    expect(screen.getByLabelText("Instagram content description")).toBeEnabled();
+    fireEvent.change(screen.getByTestId("input-followers"), { target: { value: "10001" } });
+    fireEvent.change(screen.getByTestId("input-description"), { target: { value: "My corrected content description" } });
+    fireEvent.change(screen.getByLabelText("Instagram audience description"), { target: { value: "My corrected audience" } });
+    fireEvent.change(screen.getByLabelText("instagram audience age range"), { target: { value: "25-44" } });
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
     await settle();
     expect(fixture.persisted).toMatchObject({
-      primary_platform: "instagram", instagram_followers: 9876, instagram_sub_niches: ["Guitar"],
-      instagram_audience_gender: "female", instagram_audience_age_min: 18, instagram_audience_age_max: 34,
-      instagram_audience_description: "Young musicians learning guitar.",
+      primary_platform: "instagram", instagram_followers: 10001, instagram_sub_niches: ["Guitar"],
+      instagram_audience_gender: "female", instagram_audience_age_min: 25, instagram_audience_age_max: 44,
+      instagram_audience_description: "My corrected audience",
+      instagram_description: "My corrected content description",
       instagram_description_mode: "generate",
     });
     const sent = fixture.writes.at(-1)!.body as Record<string, unknown>;
@@ -80,47 +88,88 @@ describe("Instagram wizard generation", () => {
     renderProfile(<ProfileSettings />);
     await settle();
     details();
-    expect(screen.getByTestId("input-followers")).toHaveValue(9876);
-    expect(screen.getByLabelText("instagram audience age range")).toHaveValue("18-34");
+    expect(screen.getByTestId("input-followers")).toHaveValue(10001);
+    expect(screen.getByLabelText("instagram audience age range")).toHaveValue("25-44");
   });
 
-  it("exposes only the allowed editable fields in generate mode and blocks Save before generation", async () => {
+  it("shows only username and primary niches, with Generate in the Save button position", async () => {
     await mount(false);
     expect(screen.getByTestId("input-username")).toBeEnabled();
-    expect(screen.getByTestId("input-brand-preferences")).toBeEnabled();
-    expect(screen.getByTestId("input-followers")).toHaveAttribute("readonly");
-    expect(screen.getByLabelText("instagram audience age range")).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
+    expect(screen.getByText("Primary niches")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "2 selected" })).toBeEnabled();
+    expect(screen.queryByTestId("input-brand-preferences")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("input-followers")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("input-description")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("instagram audience age range")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Sub-niches/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save Profile" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Generate" })).toHaveLength(1);
     expect(fixture.writes).toHaveLength(0);
+  });
+
+  it.each(["GET", "PUT"] as const)("retains generated-profile corrections and the review step after a failed %s save and reload", async (method) => {
+    const rendered = await mount();
+    finish();
+    await tick(1500);
+    await tick(450);
+    fireEvent.change(screen.getByTestId("input-followers"), { target: { value: "25000" } });
+    fireEvent.change(screen.getByTestId("input-description"), { target: { value: "Retain my reviewed description" } });
+    if (method === "GET") fixture.failGet("Fixture read failed");
+    else fixture.failPut("Fixture save failed");
+    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    await settle();
+    expect(screen.getByTestId("text-error")).toHaveTextContent(method === "GET" ? "Fixture read failed" : "Fixture save failed");
+    fixture.failGet(null);
+    fixture.failPut(null);
+    rendered.unmount();
+    renderProfile(<ProfileSettings />);
+    await settle();
+    expect(screen.getByText("Step 3 of 3")).toBeInTheDocument();
+    expect(screen.getByTestId("input-followers")).toHaveValue(25000);
+    expect(screen.getByTestId("input-description")).toHaveValue("Retain my reviewed description");
+    expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
   });
 
   it("does not PUT while generation is queued/running and allows Back and Exit", async () => {
     await mount();
     expect(fixture.writes).toHaveLength(1); // identity prerequisites before POST
-    expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Generating" })).toBeDisabled();
+    expect(screen.getByTestId("generation-progress-screen")).toBeInTheDocument();
+    expect(screen.queryByTestId("input-username")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Back" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Exit" })).toBeEnabled();
     await tick(3000);
     expect(fixture.writes).toHaveLength(1);
   });
 
-  it("requires regeneration if username or primary niche changes after completion", async () => {
-    await mount();
+  it("allows username corrections after generation and preserves unsaved corrections on reload", async () => {
+    const rendered = await mount();
     finish();
     await tick(1500);
+    await tick(450);
     fireEvent.change(screen.getByTestId("input-username"), { target: { value: "changed_username" } });
-    expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
-    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "fixture_creator" } });
+    fireEvent.change(screen.getByTestId("input-followers"), { target: { value: "12000" } });
+    fireEvent.change(screen.getByTestId("input-description"), { target: { value: "Keep my correction" } });
+    await settle();
+    rendered.unmount();
+    renderProfile(<ProfileSettings />);
+    await settle();
+    expect(screen.getByTestId("input-username")).toHaveValue("changed_username");
+    expect(screen.getByTestId("input-followers")).toHaveValue(12000);
+    expect(screen.getByTestId("input-description")).toHaveValue("Keep my correction");
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    await settle();
+    expect(fixture.persisted).toMatchObject({ instagram_handle: "changed_username", instagram_followers: 12000, instagram_description: "Keep my correction" });
   });
 
   it("stops when the watched job ID changes without adopting the replacement", async () => {
     await mount();
     finish({ instagram_description_job_id: "replacement-job" });
     await tick(1500);
-    expect(screen.getByLabelText("instagram audience gender")).toHaveValue("");
+    expect(screen.queryByLabelText("instagram audience gender")).not.toBeInTheDocument();
     expect(screen.getByText(/generation job changed/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
     const reads = fixture.requests.length;
     await tick(5000);
     expect(fixture.requests).toHaveLength(reads);
@@ -134,12 +183,69 @@ describe("Instagram wizard generation", () => {
     const reads = fixture.requests.length;
     await tick(5000);
     expect(fixture.requests).toHaveLength(reads);
+    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    await settle();
+    expect(screen.getByTestId("generation-progress-screen")).toBeInTheDocument();
+    expect(fixture.requests.filter((request) => request.method === "POST")).toHaveLength(2);
+  });
+
+  it("animates over two minutes but never reveals fields or claims 100% before the backend finishes", async () => {
+    await mount();
+    await tick(60000);
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "47");
+    await tick(60000);
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "95");
+    expect(screen.getByText(/taking a little longer/)).toBeInTheDocument();
+    expect(screen.queryByTestId("input-followers")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save Profile" })).not.toBeInTheDocument();
+    expect(fixture.writes).toHaveLength(1);
+    finish();
+    await tick(1500);
+    expect(screen.getByTestId("generation-percentage")).toHaveTextContent("100%");
+    await tick(450);
+    expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
+    expect(screen.getByTestId("input-followers")).toBeEnabled();
+  });
+
+  it("restores the estimated percentage after leaving and returning to a pending job", async () => {
+    const rendered = await mount();
+    await tick(60000);
+    rendered.unmount();
+    renderProfile(<ProfileSettings />);
+    await settle();
+    expect(screen.getByText("Step 3 of 3")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "47");
+    finish();
+    await tick(1500);
+    await tick(450);
+    expect(screen.getByTestId("input-followers")).toBeEnabled();
+  });
+
+  it("does not accept a completed response missing the generated content", async () => {
+    await mount();
+    finish({ instagram_description: null });
+    await tick(1500);
+    expect(screen.getByText(/Generation finished without a content description/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save Profile" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
+  });
+
+  it("validates the username before making generation requests", async () => {
+    await mount(false);
+    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    await settle();
+    expect(screen.getByRole("alert")).toHaveTextContent(/Enter your Instagram username/);
+    expect(fixture.writes).toHaveLength(0);
+    expect(fixture.requests.filter((request) => request.method === "POST")).toHaveLength(0);
   });
 
   it("leaves null estimates empty", async () => {
     await mount();
     finish({ instagram_audience_gender: null, instagram_audience_age_min: null, instagram_audience_age_max: null });
     await tick(1500);
+    await tick(450);
     expect(screen.getByLabelText("instagram audience gender")).toHaveValue("");
     expect(screen.getByLabelText("instagram audience age range")).toHaveValue("");
   });
@@ -169,6 +275,7 @@ describe("Instagram wizard generation", () => {
     expect(fixture.requests).toHaveLength(reads);
     renderProfile(<ProfileSettings />);
     await settle();
+    await tick(450);
     expect(screen.getByText("Step 3 of 3")).toBeInTheDocument();
     expect(screen.getByTestId("input-followers")).toHaveValue(9876);
     expect(screen.getByLabelText("instagram audience age range")).toHaveValue("18-34");
@@ -176,7 +283,7 @@ describe("Instagram wizard generation", () => {
   });
 
   it("lets new creators generate without requiring manual follower counts, then explicitly save", async () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     fixture = installProfileApi(creatorProfile({
       full_name: null, age: null, gender: null, follower_count: null, instagram_followers: null,
       content_description: null, instagram_description: null, youtube_description: null,
@@ -193,6 +300,7 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByTestId("auth-name")).toHaveTextContent("");
     finish();
     await tick(1500);
+    await tick(450);
     expect(screen.getByTestId("auth-name")).toHaveTextContent("");
     fireEvent.change(screen.getByTestId("input-brand-preferences"), { target: { value: "Keep this after generation" } });
     await settle();

@@ -45,7 +45,6 @@ export default function ProfileWizard(p: ProfileWizardProps) {
   const setMode = (m: DescriptionMode) => setIg({ descriptionMode: m });
   const showAllFields = !gen || p.generationComplete;
   const showProgress = gen && p.showGenerationProgress;
-  const generateAction = gen && (!p.generationComplete || showProgress);
   const headings = ["Creator information", "How would you like to create your description?", "Your Instagram profile"];
 
   return (
@@ -173,7 +172,8 @@ export default function ProfileWizard(p: ProfileWizardProps) {
             <BrandCategoriesToAvoid selected={ig.excludedCategories} primaryNiches={ig.primaryNiches}
               onChange={(excludedCategories) => setIg({ excludedCategories })} />
 
-            <ProfileAudience value={ig} onChange={setIg} readOnly={false} />
+            <ProfileAudience value={ig} onChange={setIg} readOnly={false}
+              showMissingDescriptionWarning={gen && p.generationComplete} />
 
             <label className={labelCls}>Instagram content description
               <textarea data-testid="input-description" rows={4} className={`${INPUT_CLASS} mt-1.5 resize-none`} value={ig.description}
@@ -196,23 +196,28 @@ export default function ProfileWizard(p: ProfileWizardProps) {
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <button type="button" className={btnGhost} onClick={p.onExit} disabled={p.saving} data-testid="button-exit">Exit</button>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap justify-end gap-3">
           <button type="button" className={btnGhost} onClick={p.onBack} disabled={step === 1 || p.saving} data-testid="button-back">Back</button>
           {step < 3 ? (
             <button type="button" className={btnPrimary} onClick={p.onContinue} data-testid="button-continue">Continue</button>
-          ) : generateAction ? (
+          ) : (
+            <>
+            {gen && (
             <button type="button" data-testid="button-generate" className={`${btnPrimary} inline-flex items-center gap-2`}
               onClick={p.onGenerate} disabled={busy || showProgress}>
               {busy || showProgress ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Sparkles size={16} aria-hidden />}
               {busy || showProgress ? "Generating" : "Generate"}
             </button>
-          ) : (
-            <button type="button" className={btnPrimary} onClick={p.onSave} disabled={!p.canSave || busy} data-testid="button-save">
+            )}
+            <button type="button" className={btnPrimary} onClick={p.onSave} disabled={!p.canSave || busy || showProgress} data-testid="button-save">
               {p.saving ? "Saving" : "Save Profile"}
             </button>
+            </>
           )}
         </div>
       </div>
+      {step === 3 && gen && p.generationComplete && !showProgress &&
+        <p className="mt-3 text-right text-xs text-muted-foreground">Generate replaces the current generated details. Save Profile keeps your edits.</p>}
     </main>
   );
 }

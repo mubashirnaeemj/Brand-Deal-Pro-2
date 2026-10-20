@@ -13,7 +13,9 @@ The profile has three pages: (1) creator information only, (2) description-metho
 
 **Why:** The user chose this layout rather than putting fields on page two and review on page three.
 
-**How to apply:** Manual mode shows all Instagram fields immediately. Generate mode initially shows only username and primary niches. The bottom primary action is Generate until generation finishes, then Save Profile.
+**How to apply:** Manual mode shows all Instagram fields immediately. Generate mode initially shows only username and primary niches. Keep both Generate and Save Profile visible on page three, before and after generation; disable saving until generation is complete.
+
+**Why:** The user explicitly requested both buttons because hiding Generate after completion prevented retrying a missing audience description.
 
 After generation, reveal all fields and let the creator edit any of them, including followers, username, primary niches, audience, and “Instagram content description.”
 

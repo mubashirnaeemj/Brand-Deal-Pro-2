@@ -52,6 +52,7 @@ describe("Instagram wizard generation", () => {
     finish();
     await tick(1);
     expect(screen.getByTestId("generation-percentage")).toHaveTextContent("100%");
+    expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
     expect(screen.queryByTestId("input-followers")).not.toBeInTheDocument();
     await tick(450);
     expect(screen.getByLabelText("instagram audience gender")).toHaveValue("female");
@@ -92,7 +93,7 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByLabelText("instagram audience age range")).toHaveValue("25-44");
   });
 
-  it("shows only username and primary niches, with Generate in the Save button position", async () => {
+  it("shows only username and primary niches with both Generate and disabled Save Profile", async () => {
     await mount(false);
     expect(screen.getByTestId("input-username")).toBeEnabled();
     expect(screen.getByText("Primary niches")).toBeInTheDocument();
@@ -102,7 +103,7 @@ describe("Instagram wizard generation", () => {
     expect(screen.queryByTestId("input-description")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("instagram audience age range")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Sub-niches/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save Profile" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
     expect(screen.getAllByRole("button", { name: "Generate" })).toHaveLength(1);
     expect(fixture.writes).toHaveLength(0);
   });
@@ -158,6 +159,7 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByTestId("input-followers")).toHaveValue(12000);
     expect(screen.getByTestId("input-description")).toHaveValue("Keep my correction");
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
     await settle();
     expect(fixture.persisted).toMatchObject({ instagram_handle: "changed_username", instagram_followers: 12000, instagram_description: "Keep my correction" });
@@ -198,7 +200,7 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "95");
     expect(screen.getByText(/taking a little longer/)).toBeInTheDocument();
     expect(screen.queryByTestId("input-followers")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save Profile" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
     expect(fixture.writes).toHaveLength(1);
     finish();
     await tick(1500);
@@ -227,7 +229,7 @@ describe("Instagram wizard generation", () => {
     finish({ instagram_description: null });
     await tick(1500);
     expect(screen.getByText(/Generation finished without a content description/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save Profile" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
   });
 
@@ -248,6 +250,49 @@ describe("Instagram wizard generation", () => {
     await tick(450);
     expect(screen.getByLabelText("instagram audience gender")).toHaveValue("");
     expect(screen.getByLabelText("instagram audience age range")).toHaveValue("");
+  });
+
+  it("shows a missing audience description notice and saves a manual correction instead of null", async () => {
+    const rendered = await mount();
+    finish({ instagram_audience_description: null });
+    await tick(1500);
+    await tick(450);
+    expect(screen.getByLabelText("Instagram audience description")).toHaveValue("");
+    expect(screen.getByTestId("audience-description-missing")).toHaveTextContent("MAVLIT returned no audience description");
+    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("Instagram audience description"), { target: { value: "Guitar students aged 25-44." } });
+    expect(screen.queryByTestId("audience-description-missing")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    await settle();
+    expect(fixture.persisted.instagram_audience_description).toBe("Guitar students aged 25-44.");
+    rendered.unmount();
+    renderProfile(<ProfileSettings />);
+    await settle();
+    details();
+    expect(screen.getByLabelText("Instagram audience description")).toHaveValue("Guitar students aged 25-44.");
+    expect(screen.queryByTestId("audience-description-missing")).not.toBeInTheDocument();
+  });
+
+  it("keeps Generate available after completion and accepts an audience description from a new generation", async () => {
+    await mount();
+    finish({ instagram_audience_description: null });
+    await tick(1500);
+    await tick(450);
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    await settle();
+    expect(screen.getByRole("button", { name: "Generating" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
+    expect(fixture.requests.filter((request) => request.method === "POST")).toHaveLength(2);
+    finish({ instagram_audience_description: "Newly generated audience description." });
+    await tick(1500);
+    await tick(450);
+    expect(screen.getByLabelText("Instagram audience description")).toHaveValue("Newly generated audience description.");
+    expect(screen.queryByTestId("audience-description-missing")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    await settle();
+    expect(fixture.persisted.instagram_audience_description).toBe("Newly generated audience description.");
   });
 
   it("switching to manual unlocks fields and protects manual edits while a job finishes", async () => {

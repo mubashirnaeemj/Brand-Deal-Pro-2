@@ -1,0 +1,43 @@
+Update the Pitch page so the pitch email appears LIVE, word by word, while MAVLIT is writing it, instead of waiting for the whole email. The backend already has the endpoint; only the frontend changes. Do not change the backend.
+
+ENDPOINT
+POST /pitches/stream  (send cookies / credentials: include, Content-Type: application/json)
+
+Request body: exactly the same as POST /pitches:
+{
+  "is_custom": false,                  // true for the user's own brand
+  "brand_id": 123,                     // matched brand; null/omit when is_custom is true
+  "custom_brand_name": null,           // required when is_custom is true
+  "story": "...",                      // required
+  "product_reference": null,           // "Reference a recent product launch" (optional)
+  "past_brand_partnership": null,      // optional
+  "content_link": "https://..."
+}
+
+Response: HTTP 200 with Content-Type text/event-stream. The body is a series of events, each one a line "data: {json}" followed by a blank line:
+  data: {"type":"delta","text":"Hi Lau"}          a piece of the email text, in order. Append it.
+  data: {"type":"delta","text":"ren,\n\nI have..."}
+  data: {"type":"done","pitch":{ ...PitchResponse... }}   last event on success. The pitch is now saved (status "generated", not sent). pitch.id, pitch.pitch_text, pitch.brand_name, pitch.contact_name, pitch.contact_email are in it.
+  data: {"type":"error","detail":"..."}          generation failed, NOTHING was saved. Show the message.
+
+Errors before the stream starts are normal HTTP errors (check response.ok first): 400 bad is_custom/brand combination, 401 not signed in (redirect to sign-in), 404 brand not found. Read r.json().detail for the message.
+
+WHAT TO BUILD
+1) When the user clicks "Generate pitch email draft", validate the form as before, then call POST /pitches/stream with fetch (NOT EventSource: it must be a POST with a JSON body).
+2) Show the draft box immediately, empty, read-only, with the placeholder "MAVLIT is writing your pitch…" and a status line "Writing your pitch…". Disable the Generate / Generate again buttons while it writes.
+3) Read response.body with getReader() + TextDecoder (decode with {stream:true}). Keep a text buffer, split it on a blank line ("\n\n"), keep the last incomplete part in the buffer, and for every complete block parse each line that starts with "data:" as JSON (JSON.parse(line.slice(5).trim())). An event can arrive split across chunks, so never parse a partial block.
+4) On "delta": append event.text to the draft box value and keep it scrolled to the bottom.
+5) On "done": set the box to pitch.pitch_text (the final trimmed text), remember pitch.id, make the box editable, clear the status, show the suggested contact if pitch.contact_name exists. The pitch is already saved in the user's pitches at this point.
+6) On "error" or if the stream ends WITHOUT a "done" event: remove the partial text, hide the draft box, and show the error ("The connection ended before your pitch was finished. Please try again." when there was no done event). Re-enable the buttons.
+7) Fallback: if response.body or getReader is not available, read response.text() and process all events at once at the end.
+
+EDITING THE RESULT (after "done")
+The draft box becomes editable. Keep a "Save changes" button that is disabled until the text differs from what was received. Clicking it calls PATCH /pitches/{pitch.id} with {"pitch_text": "<edited text>"} (blank text is rejected with 422). Show "Your changes were saved." on success. If the user clicks "Generate again" with unsaved edits, ask for confirmation first. Nothing is ever sent by email.
+
+NOTES
+- The first piece of text arrives after about 5 to 10 seconds (the model thinks first) and then the whole email streams in within a couple of seconds, so keep the "Writing your pitch…" state visible from the click until the first piece arrives.
+- Keep POST /pitches only as a fallback; don't call both for one click.
+- Keep the existing styling and the rest of the form.
+
+TEST
+Generate a pitch for a matched brand and for "My own brand". Confirm the text appears progressively, the final text equals what is in the user's pitches list (GET /pitches/me), editing + "Save changes" updates it, and a bad brand_id or a dropped connection shows a clear error without leaving partial text on the screen.

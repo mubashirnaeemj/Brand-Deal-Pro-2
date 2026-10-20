@@ -4,10 +4,11 @@ import { Link, useLocation, useSearch } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, Copy, Check, ChevronDown, AlertTriangle, Lightbulb,
-  User, ArrowRight, Building2, Mail, CheckCircle2,
+  User, ArrowRight, Building2, CheckCircle2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import PitchDraftEditor from "@/components/PitchDraftEditor";
 import { api, getAllMatches, type ApiBrand, type ApiPitch } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -31,12 +32,6 @@ interface OutboundForm {
   brandSource: "matched" | "found";
   selectedBrand: string;
   customBrand: string;
-  creatorName: string;
-  handle: string;
-  platform: string;
-  followers: string;
-  engagementRate: string;
-  niche: string;
   story: string;
   recentProductLaunch: string;
   pastDeals: string;
@@ -45,8 +40,6 @@ interface OutboundForm {
 
 const EMPTY_OUTBOUND: OutboundForm = {
   brandSource: "matched", selectedBrand: "", customBrand: "",
-  creatorName: "", handle: "", platform: "Instagram",
-  followers: "", engagementRate: "", niche: "Music Production",
   story: "", recentProductLaunch: "", pastDeals: "", contentLink: "",
 };
 
@@ -109,12 +102,12 @@ function OutboundMode() {
     ? { ...EMPTY_OUTBOUND, brandSource: "found", customBrand: prefillBrand }
     : EMPTY_OUTBOUND);
   const [generating, setGenerating] = useState(false);
-  const [email, setEmail]           = useState<string | null>(null);
-  const [copied, setCopied]         = useState(false);
-  const [hasCopied, setHasCopied]   = useState(false);
-  const [pitchLogged, setPitchLogged] = useState(false);
+  const [draft, setDraft] = useState<ApiPitch | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const emailRef = useRef<HTMLDivElement>(null);
+  const generationInFlight = useRef(false);
 
   useEffect(() => {
     const prefilledMatch = matches?.find(b => b.brand_name === prefillBrand);
@@ -136,11 +129,14 @@ function OutboundMode() {
     staleTime: 60_000,
   });
   const activeContact = form.brandSource === "matched" ? brandDetail?.top_contact : null;
-  const canGenerate  = brandName.trim() && form.creatorName.trim() && form.handle.trim() && form.followers.trim() && form.engagementRate.trim() && form.story.trim();
+  // Creator details come from the saved account profile, not hidden legacy inputs.
+  const canGenerate = !!brandName.trim() && !!form.story.trim();
 
   const generate = async () => {
-    if (!canGenerate) return;
-    setGenerating(true); setEmail(null); setError(null); setHasCopied(false); setPitchLogged(false);
+    if (!canGenerate || saving || generationInFlight.current) return;
+    if (dirty && !window.confirm("Generate a new pitch and discard your unsaved email edits? The previous generated draft remains in Pipeline.")) return;
+    generationInFlight.current = true;
+    setGenerating(true); setError(null);
     try {
       const body = form.brandSource === "matched" && selectedMatch
         ? {
@@ -160,9 +156,9 @@ function OutboundMode() {
             content_link: form.contentLink || undefined,
           };
       const data = await api.post<ApiPitch>("/pitches", body);
-      setPitchLogged(true); // API auto-saves the pitch
-      if (data.pitch_text) setEmail(data.pitch_text);
-      else setError("Your draft was saved, but the API returned no email text. Find it in your Pipeline rather than generating a duplicate.");
+      setDraft(data);
+      setDirty(false);
+      if (!data.pitch_text) setError("The API returned no email text. You can write your email in the draft editor below and save it to the same pitch.");
       // Invalidate cached pitches and dashboard stats so Pipeline + Dashboard reflect the new pitch immediately
       queryClient.invalidateQueries({ queryKey: ["pitches"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -170,15 +166,13 @@ function OutboundMode() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong generating your email. Please try again.");
     }
-    finally { setGenerating(false); }
+    finally { generationInFlight.current = false; setGenerating(false); }
   };
 
-  const copyEmail = () => {
-    if (!email) return;
-    navigator.clipboard.writeText(email).then(() => {
-      setCopied(true); setHasCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+  const saved = () => {
+    queryClient.invalidateQueries({ queryKey: ["pitches"] });
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    setLocation("/deals");
   };
 
 
@@ -282,7 +276,7 @@ function OutboundMode() {
         </div>
 
         {/* Generate */}
-        <button onClick={generate} disabled={!canGenerate || generating}
+        <button onClick={generate} disabled={!canGenerate || generating || saving}
           className="w-full py-4 rounded-2xl text-base font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-lg shadow-primary/30 transition-all flex items-center justify-center gap-2">
           {generating
             ? (<><motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />Generating your pitch email…</>)
@@ -290,57 +284,13 @@ function OutboundMode() {
         </button>
 
         {error && <div role="alert" className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}
-          {pitchLogged && <button onClick={() => setLocation("/deals")} className="ml-2 underline">View Pipeline</button>}
         </div>}
 
         {/* Email output */}
         <AnimatePresence>
-          {email && (
-            <motion.div ref={emailRef} key="email-output" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className="space-y-4">
-              {activeContact && (
-                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card border border-border">
-                  <Mail size={13} className="text-muted-foreground shrink-0" />
-                  <span className="text-xs text-muted-foreground font-semibold mr-1 shrink-0">To:</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-white font-semibold leading-tight">{activeContact.name}</p>
-                    <p className="text-xs text-white/60 font-mono leading-tight">{activeContact.email}</p>
-                  </div>
-                  <CopyButton text={`${activeContact.name} <${activeContact.email}>`} />
-                </div>
-              )}
-              <div className="relative bg-black/60 border border-border rounded-2xl p-5">
-                <pre className="font-mono text-sm text-white/90 whitespace-pre-wrap leading-relaxed">{email}</pre>
-                <button onClick={copyEmail}
-                  className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card border border-border text-xs font-semibold text-muted-foreground hover:text-white hover:border-primary/50 transition-all">
-                  {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-                  {copied ? "Copied!" : "Copy"}
-                </button>
-              </div>
-
-              <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                <AlertTriangle size={15} className="text-amber-400 mt-0.5 shrink-0" />
-                <p className="text-sm text-amber-200/90 leading-relaxed">
-                  <span className="font-bold text-amber-300">Before you send:</span> Do not mention rates. Get in the door first. When they respond, use Deal Tools in your Pipeline to plan your next move.
-                </p>
-              </div>
-
-              <AnimatePresence>
-                {pitchLogged && (
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                    className="flex items-start justify-between gap-3 px-4 py-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                    <div className="flex items-start gap-2.5">
-                      <CheckCircle2 size={15} className="text-emerald-400 mt-0.5 shrink-0" />
-                      <p className="text-sm text-emerald-300 leading-relaxed">Draft saved to your Pipeline. Mark it sent there once you've actually sent the email.</p>
-                    </div>
-                    <button
-                      onClick={() => setLocation("/deals")}
-                      className="shrink-0 text-sm font-bold text-emerald-300 hover:text-emerald-200 whitespace-nowrap transition-colors"
-                    >
-                      View in Pipeline →
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+          {draft && (
+            <motion.div ref={emailRef} key={draft.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className={generating ? "pointer-events-none opacity-50" : ""}>
+              <PitchDraftEditor pitch={draft} disabled={generating} onSaved={saved} onSavingChange={setSaving} onDirtyChange={setDirty} />
             </motion.div>
           )}
         </AnimatePresence>

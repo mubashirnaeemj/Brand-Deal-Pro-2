@@ -79,6 +79,12 @@ Profile PUT is a full replacement, not a patch. Preserve the entire latest GET o
 
 ## Pitch lifecycle
 
+The pitch review flow uses the existing generated pitch, not a separate unsaved-draft API. Review and edit on the Pitch page, then explicitly save edits before opening Pipeline. Do not promise that generation waits until Save to create the Pipeline entry.
+
+**Why:** The user clarified that generation already creates the row and chose to extend same-row email editing rather than introduce separate generate/save endpoints. Saving email text must not mark outreach sent or change its sent date.
+
+**How to apply:** Keep draft review separate from sending, update the original pitch rather than creating a duplicate, and only leave the editor after the edited email is confirmed saved.
+
 Generating an email is not evidence that the creator sent it. New generated pitches are drafts; the creator supplies an actual sent date when moving them to sent. Earlier `proposal_sent` records may have been generated but never sent, so do not silently interpret their creation date as a sent date.
 
 **Why:** The older external API assigned `proposal_sent` at generation time; the revised September 2026 contract separates `generated` from `sent` and persists manual outreach and deal updates.

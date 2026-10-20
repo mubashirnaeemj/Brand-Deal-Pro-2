@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 interface PitchRecord {
   id: number;
   brand: string;
+  pitchText?: string | null;
   date: string;
   status: string;
   agreedRate?: string;
@@ -585,7 +586,7 @@ function MyPitchesTab({
       ) : (
         <div className="space-y-2">
           {pitches.map(deal => (
-            <div key={deal.id} className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-card border border-border">
+            <div key={deal.id} className="flex flex-wrap items-center gap-3 px-4 py-3.5 rounded-2xl bg-card border border-border">
               <BrandAvatar brand={deal.brand} />
 
               <div className="flex-1 min-w-0">
@@ -649,6 +650,15 @@ function MyPitchesTab({
                 <span className="shrink-0 text-xs text-emerald-400 font-semibold">
                   {formatRate(deal.agreedRate)}
                 </span>
+              )}
+              {deal.pitchText && (
+                <details className="basis-full min-w-0 border-t border-border pt-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-primary">View saved email</summary>
+                  <div className="mt-3 space-y-3">
+                    <CopyBtn text={deal.pitchText} />
+                    <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-black/30 p-4 font-mono text-sm leading-relaxed text-white/90">{deal.pitchText}</pre>
+                  </div>
+                </details>
               )}
             </div>
           ))}
@@ -1211,6 +1221,7 @@ export default function Pipeline() {
   const pitches: PitchRecord[] = (apiPitches ?? []).map(p => ({
       id: p.id,
       brand: p.brand_name,
+      pitchText: p.pitch_text,
       date: p.sent_at
         ? new Date(`${p.sent_at}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
         : new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),

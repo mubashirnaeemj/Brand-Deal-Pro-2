@@ -82,6 +82,7 @@ export interface PitchListResponse {
 }
 
 export interface PitchUpdateRequest {
+  pitch_text?: string | null;
   status?: string;
   sent_at?: string | null;
   agreed_rate?: number | null;

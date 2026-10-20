@@ -135,7 +135,7 @@ export default function ProfileWizard(p: ProfileWizardProps) {
             <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm text-white" data-testid="text-method-summary">
               Method: <strong>{gen ? "MAVLIT generates from my content" : "I write it myself"}</strong>. Use Back to change.
             </p>
-            {gen && !showAllFields && <p className="text-xs text-muted-foreground">Enter your Instagram username and primary niche, then select Generate.</p>}
+            {gen && !showAllFields && <p className="text-xs text-muted-foreground">Enter your Instagram username and primary niche, then fetch your profile details with MAVLIT.</p>}
             {pending && <p role="status" className="text-sm text-primary" data-testid="status-pending">
               Description {status === "queued" ? "queued" : "generating"}. You can leave this page; progress resumes when you return.
             </p>}
@@ -207,7 +207,7 @@ export default function ProfileWizard(p: ProfileWizardProps) {
             <button type="button" data-testid="button-generate" className={`${btnPrimary} inline-flex items-center gap-2`}
               onClick={p.onGenerate} disabled={busy || showProgress}>
               {busy || showProgress ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Sparkles size={16} aria-hidden />}
-              {busy || showProgress ? "Generating" : "Generate"}
+              {busy || showProgress ? "Generating" : "Fetch profile details with MAVLIT"}
             </button>
             )}
             <button type="button" className={btnPrimary} onClick={p.onSave} disabled={!p.canSave || busy || showProgress} data-testid="button-save">
@@ -218,7 +218,7 @@ export default function ProfileWizard(p: ProfileWizardProps) {
         </div>
       </div>
       {step === 3 && gen && p.generationComplete && !showProgress &&
-        <p className="mt-3 text-right text-xs text-muted-foreground">Generate replaces the current generated details. Save Profile keeps your edits.</p>}
+        <p className="mt-3 text-right text-xs text-muted-foreground">Fetching profile details again replaces the current generated details. Save Profile keeps your edits.</p>}
     </main>
   );
 }

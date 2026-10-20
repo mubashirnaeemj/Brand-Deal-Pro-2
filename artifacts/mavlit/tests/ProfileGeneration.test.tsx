@@ -104,7 +104,7 @@ describe("Instagram wizard generation", () => {
     expect(screen.queryByLabelText("instagram audience age range")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Sub-niches/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
-    expect(screen.getAllByRole("button", { name: "Generate" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Fetch profile details with MAVLIT" })).toHaveLength(1);
     expect(fixture.writes).toHaveLength(0);
   });
 
@@ -159,7 +159,7 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByTestId("input-followers")).toHaveValue(12000);
     expect(screen.getByTestId("input-description")).toHaveValue("Keep my correction");
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
     await settle();
     expect(fixture.persisted).toMatchObject({ instagram_handle: "changed_username", instagram_followers: 12000, instagram_description: "Keep my correction" });
@@ -171,7 +171,7 @@ describe("Instagram wizard generation", () => {
     await tick(1500);
     expect(screen.queryByLabelText("instagram audience gender")).not.toBeInTheDocument();
     expect(screen.getByText(/generation job changed/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeEnabled();
     const reads = fixture.requests.length;
     await tick(5000);
     expect(fixture.requests).toHaveLength(reads);
@@ -185,8 +185,8 @@ describe("Instagram wizard generation", () => {
     const reads = fixture.requests.length;
     await tick(5000);
     expect(fixture.requests).toHaveLength(reads);
-    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
-    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" }));
     await settle();
     expect(screen.getByTestId("generation-progress-screen")).toBeInTheDocument();
     expect(fixture.requests.filter((request) => request.method === "POST")).toHaveLength(2);
@@ -230,13 +230,13 @@ describe("Instagram wizard generation", () => {
     await tick(1500);
     expect(screen.getByText(/Generation finished without a content description/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeEnabled();
   });
 
   it("validates the username before making generation requests", async () => {
     await mount(false);
     fireEvent.change(screen.getByTestId("input-username"), { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" }));
     await settle();
     expect(screen.getByRole("alert")).toHaveTextContent(/Enter your Instagram username/);
     expect(fixture.writes).toHaveLength(0);
@@ -271,7 +271,7 @@ describe("Instagram wizard generation", () => {
     await tick(450);
     expect(screen.getByLabelText("Instagram audience description")).toHaveValue("");
     expect(screen.getByTestId("audience-description-missing")).toHaveTextContent("MAVLIT returned no audience description");
-    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
     fireEvent.change(screen.getByLabelText("Instagram audience description"), { target: { value: "Guitar students aged 25-44." } });
     expect(screen.queryByTestId("audience-description-missing")).not.toBeInTheDocument();
@@ -291,7 +291,7 @@ describe("Instagram wizard generation", () => {
     finish({ instagram_audience_description: null });
     await tick(1500);
     await tick(450);
-    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" }));
     await settle();
     expect(screen.getByRole("button", { name: "Generating" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
@@ -301,7 +301,7 @@ describe("Instagram wizard generation", () => {
     await tick(450);
     expect(screen.getByLabelText("Instagram audience description")).toHaveValue("Newly generated audience description.");
     expect(screen.queryByTestId("audience-description-missing")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
     await settle();
     expect(fixture.persisted.instagram_audience_description).toBe("Newly generated audience description.");

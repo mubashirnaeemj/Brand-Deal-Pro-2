@@ -48,7 +48,7 @@ export default function ProfileAudience({ value, onChange, readOnly, showMissing
         <span aria-live="polite" className="mt-1 block text-right text-[11px] normal-case tracking-normal">{value.audienceDescription.length}/1500</span>
       </label>
       {missingDescription && <p id="audience-description-missing" data-testid="audience-description-missing" role="status" className="text-sm text-amber-300">
-        MAVLIT returned no audience description. Enter one above or click Generate to try again.
+        MAVLIT returned no audience description. Enter one above or select “Fetch profile details with MAVLIT” to try again.
       </p>}
       {descriptionError && <p role="alert" className="text-sm text-red-400">Audience description must be 1500 characters or fewer.</p>}
       {readOnly && <p className="text-xs text-muted-foreground">Audience details are estimated by MAVLIT and cannot be edited in this mode.</p>}

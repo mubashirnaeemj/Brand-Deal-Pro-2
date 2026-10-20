@@ -58,8 +58,10 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByLabelText("Instagram audience description")).toBeDisabled();
     expect(screen.getByTestId("input-followers")).toHaveValue(9876);
     expect(screen.getByTestId("input-followers")).toHaveAttribute("readonly");
+    expect(screen.getByTestId("input-followers")).toBeDisabled();
     expect(screen.getByTestId("input-description")).toHaveValue("Generated creator description");
     expect(screen.getByTestId("input-description")).toHaveAttribute("readonly");
+    expect(screen.getByLabelText("Instagram content description")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
     await settle();
@@ -154,6 +156,8 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByLabelText("instagram audience gender")).toHaveValue("male");
     expect(screen.getByTestId("input-description")).toHaveValue("My own text");
     expect(screen.getByTestId("input-followers")).not.toHaveAttribute("readonly");
+    expect(screen.getByTestId("input-followers")).toBeEnabled();
+    expect(screen.getByLabelText("Instagram content description")).toBeEnabled();
   });
 
   it("stops checks on unmount and recovers completed values from a persisted pending draft", async () => {

@@ -15,6 +15,12 @@ The profile has three pages: (1) creator information only, (2) description-metho
 
 **How to apply:** Manual mode makes all Instagram fields editable. Generate mode permits editing only username, primary niches, brand categories to avoid, and brand preferences. All generated outputs stay read-only, including after completion.
 
+In generate mode, follower count and the field labeled “Instagram content description” must be visibly disabled, not merely read-only-looking editable controls.
+
+**Why:** The user repeated that these fields must not be writable and explicitly renamed the content-description label.
+
+**How to apply:** Disable both fields throughout generate mode, before and after generation; re-enable them when the creator switches to manual mode.
+
 Page three includes a separate Instagram audience description and one age-range input displayed as `25-44`, not separate visible minimum/maximum inputs. Do not show the line “MAVLIT builds your profile around Instagram.”
 
 **Why:** The user explicitly requested this profile presentation.

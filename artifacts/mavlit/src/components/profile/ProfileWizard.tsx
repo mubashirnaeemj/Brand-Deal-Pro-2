@@ -149,7 +149,8 @@ export default function ProfileWizard(p: ProfileWizardProps) {
               </label>
               <label className={labelCls}>Follower count
                 <input data-testid="input-followers" type="number" min={0} step={1} className={`${INPUT_CLASS} mt-1.5`} value={ig.followers}
-                  readOnly={locked} aria-readonly={locked} onChange={(e) => setIg({ followers: e.target.value })} />
+                  disabled={locked} readOnly={locked} aria-readonly={locked}
+                  onChange={(e) => setIg({ followers: e.target.value })} />
                 {locked && <span className="mt-1 block text-[11px] normal-case tracking-normal">Filled in by MAVLIT.</span>}
               </label>
             </div>
@@ -168,9 +169,9 @@ export default function ProfileWizard(p: ProfileWizardProps) {
 
             <ProfileAudience value={ig} onChange={setIg} readOnly={locked} />
 
-            <label className={labelCls}>Instagram description
+            <label className={labelCls}>Instagram content description
               <textarea data-testid="input-description" rows={4} className={`${INPUT_CLASS} mt-1.5 resize-none`} value={ig.description}
-                readOnly={locked} aria-readonly={locked}
+                disabled={locked} readOnly={locked} aria-readonly={locked}
                 placeholder={gen ? "MAVLIT will write this from your content." : "Describe your Instagram content."}
                 onChange={(e) => setIg({ description: e.target.value })} />
             </label>

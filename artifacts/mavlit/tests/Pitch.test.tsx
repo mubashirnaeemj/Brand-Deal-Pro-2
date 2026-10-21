@@ -1,9 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import Pitch from "@/pages/Pitch";
 import Pipeline from "@/pages/Pipeline";
-import { api, type ApiMatch, type ApiPitch } from "@/lib/api";
+import { api, ApiRequestError, type ApiMatch, type ApiPitch } from "@/lib/api";
+import type { OwnBrand, OwnBrandJob } from "@/hooks/useOwnBrandLookup";
 import * as pitchStreaming from "@/lib/pitchStream";
 
 vi.mock("@/contexts/AuthContext", () => ({
@@ -20,6 +21,23 @@ const pitch: ApiPitch = {
   is_manual: false, sent_at: null, agreed_rate: null, created_at: "2026-10-20T10:00:00Z",
 };
 
+const ownBrand: OwnBrand = {
+  brand_id: 99, name: "Fresh Brand", instagram_handle: "freshbrand", niche: "Beauty",
+  description: "Skincare for sensitive skin.", target_audience_gender: "female",
+  target_audience_min_age: 18, target_audience_max_age: 24, latest_product: "Glow Serum",
+};
+const job = (extra: Partial<OwnBrandJob> = {}): OwnBrandJob =>
+  ({ job_id: "job-1", status: "running", stage: null, error: null, brand: null, ...extra });
+const OWN_PLACEHOLDER = "https://www.instagram.com/brandname or @brandname";
+afterEach(() => { vi.useRealTimers(); });
+// The tab swap is animated, so wait for it with real timers; lookup polling then runs on fake ones.
+const findBrand = async (text = "@freshbrand", fakeTimers = false) => {
+  fireEvent.click(screen.getByRole("button", { name: "A brand I found myself" }));
+  const input = await screen.findByPlaceholderText(OWN_PLACEHOLDER);
+  if (fakeTimers) vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  fireEvent.change(input, { target: { value: text } });
+  fireEvent.click(screen.getByRole("button", { name: "Find this brand" }));
+};
 const LINK_PLACEHOLDER = "https://instagram.com/p/your-best-post";
 const fillLink = (value = "https://example.com/post") =>
   fireEvent.change(screen.getByPlaceholderText(LINK_PLACEHOLDER), { target: { value } });
@@ -81,14 +99,139 @@ describe("Pitch page generation and review", () => {
     queryClient.clear();
   });
 
-  it("does not carry a matched brand's product into a custom brand", async () => {
+  it("does not carry a matched brand's product into the own-brand tab", () => {
     const queryClient = mountMatches();
     fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
+    expect(screen.getByPlaceholderText("Enter a product launch, or leave blank to skip")).toHaveValue("Latest Studio Mic");
     fireEvent.click(screen.getByRole("button", { name: "A brand I found myself" }));
-    fireEvent.change(await screen.findByPlaceholderText("e.g. Focusrite, Rode, Ableton"),
-      { target: { value: "Custom Brand" } });
-    expect(screen.getByPlaceholderText("Enter a product launch, or leave blank to skip")).toHaveValue("");
+    expect(screen.queryByPlaceholderText("Enter a product launch, or leave blank to skip")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate pitch email draft" })).toBeDisabled();
     queryClient.clear();
+  });
+
+  describe("own brand lookup from Instagram", () => {
+    const generateButton = () => screen.getByRole("button", { name: "Generate pitch email draft" });
+    async function setup(start: OwnBrandJob, poll: OwnBrandJob[] = []) {
+      Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      queryClient.setQueryData(["pitch-matches"], matches);
+      const polls = [...poll];
+      const get = vi.spyOn(api, "get").mockImplementation(async (path: string) =>
+        path.startsWith("/own-brands/jobs/") ? polls.shift() ?? polls.at(-1) : { top_contact: null });
+      const post = vi.spyOn(api, "post").mockResolvedValue(start);
+      window.history.replaceState(null, "", "/pitch");
+      render(<QueryClientProvider client={queryClient}><Pitch /></QueryClientProvider>);
+      return { queryClient, get, post };
+    }
+    const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+    const pollCalls = (get: ReturnType<typeof vi.spyOn>) => get.mock.calls.filter(([path]: unknown[]) => String(path).startsWith("/own-brands/jobs/"));
+
+    it("shows the server's message for text that is not an Instagram profile and starts nothing", async () => {
+      const { queryClient, get, post } = await setup(job());
+      post.mockRejectedValue(new ApiRequestError("That doesn't look like an Instagram profile.", 400));
+      await findBrand("hello world!", true);
+      await tick(0);
+      expect(post).toHaveBeenCalledExactlyOnceWith("/own-brands", { instagram: "hello world!" });
+      expect(screen.getByRole("alert")).toHaveTextContent("That doesn't look like an Instagram profile.");
+      await tick(5000);
+      expect(pollCalls(get)).toHaveLength(0);
+      expect(generateButton()).toBeDisabled();
+      queryClient.clear();
+    });
+
+    it("polls every 2 seconds with changing stage text, shows the card, then writes the pitch for that brand_id", async () => {
+      const { queryClient, get } = await setup(
+        job({ stage: "Reading the brand's Instagram posts (this can take a minute)" }),
+        [job({ stage: "Writing the brand profile" }), job({ status: "ready", brand: ownBrand })],
+      );
+      const generate = vi.spyOn(pitchStreaming, "generatePitch").mockResolvedValue({ ...pitch, brand_id: 99, is_custom: false });
+      fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
+      await findBrand("@freshbrand", true);
+      await tick(0);
+      expect(screen.getByRole("status")).toHaveTextContent("MAVLIT is gathering info for this brand… Reading the brand's Instagram posts (this can take a minute)");
+      expect(screen.getByRole("button", { name: "Find this brand" })).toBeDisabled();
+      expect(generateButton()).toBeDisabled();
+      await tick(1999);
+      expect(pollCalls(get)).toHaveLength(0);
+      await tick(1);
+      expect(get).toHaveBeenCalledWith("/own-brands/jobs/job-1");
+      expect(screen.getByRole("status")).toHaveTextContent("Writing the brand profile");
+      expect(generateButton()).toBeDisabled();
+      await tick(2000);
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      const card = screen.getByTestId("own-brand-card");
+      expect(card).toHaveTextContent("Fresh Brand");
+      expect(card).toHaveTextContent("Beauty");
+      expect(card).toHaveTextContent("mostly women about 18 to 24 (estimate)");
+      expect(card).toHaveTextContent("Glow Serum");
+      expect(card).toHaveTextContent("The audience age is an estimate, not confirmed.");
+      expect(screen.getByText(/Your authentic connection to Fresh Brand/)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Enter a product launch, or leave blank to skip")).toHaveValue("Glow Serum");
+      await tick(6000);
+      expect(pollCalls(get)).toHaveLength(2);
+      fillLink();
+      expect(generateButton()).toBeEnabled();
+      fireEvent.click(generateButton());
+      await tick(0);
+      expect(generate).toHaveBeenCalledExactlyOnceWith({
+        is_custom: false, brand_id: 99, story: pitch.story,
+        product_reference: "Glow Serum", past_brand_partnership: null, content_link: "https://example.com/post",
+      }, expect.any(Function), expect.any(AbortSignal), expect.any(Function));
+      queryClient.clear();
+    });
+
+    it("shows the card at once for a brand MAVLIT already knows, with @handle and fallbacks", async () => {
+      const { queryClient, get } = await setup(job({
+        status: "ready", brand: { ...ownBrand, name: "", latest_product: null, target_audience_gender: "both", target_audience_min_age: null },
+      }));
+      await findBrand("https://www.instagram.com/freshbrand", true);
+      await tick(0);
+      const card = screen.getByTestId("own-brand-card");
+      expect(card).toHaveTextContent("@freshbrand");
+      expect(card).toHaveTextContent("men and women");
+      expect(card).not.toHaveTextContent("estimate)");
+      expect(card).toHaveTextContent("None found");
+      expect(pollCalls(get)).toHaveLength(0);
+      expect(screen.getByPlaceholderText("Enter a product launch, or leave blank to skip")).toHaveValue("");
+      queryClient.clear();
+    });
+
+    it("forgets the result when the input changes, and Find starts a new lookup on Enter", async () => {
+      const { queryClient, post } = await setup(job({ status: "ready", brand: ownBrand }));
+      await findBrand("@freshbrand", true);
+      await tick(0);
+      expect(screen.getByTestId("own-brand-card")).toBeInTheDocument();
+      fireEvent.change(screen.getByPlaceholderText(OWN_PLACEHOLDER), { target: { value: "@other" } });
+      expect(screen.queryByTestId("own-brand-card")).not.toBeInTheDocument();
+      expect(generateButton()).toBeDisabled();
+      fireEvent.keyDown(screen.getByPlaceholderText(OWN_PLACEHOLDER), { key: "Enter" });
+      await tick(0);
+      expect(post).toHaveBeenLastCalledWith("/own-brands", { instagram: "@other" });
+      expect(screen.getByTestId("own-brand-card")).toBeInTheDocument();
+      queryClient.clear();
+    });
+
+    it("stops polling when the input is edited mid-lookup", async () => {
+      const { queryClient, get } = await setup(job({ stage: "Reading" }), [job({ stage: "Writing" })]);
+      await findBrand("@freshbrand", true);
+      await tick(0);
+      fireEvent.change(screen.getByPlaceholderText(OWN_PLACEHOLDER), { target: { value: "@other" } });
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      await tick(10000);
+      expect(pollCalls(get)).toHaveLength(0);
+      queryClient.clear();
+    });
+
+    it("shows a failed job's error in red and allows another try", async () => {
+      const { queryClient } = await setup(job(), [job({ status: "failed", error: "Instagram profile is private." })]);
+      await findBrand("@freshbrand", true);
+      await tick(0);
+      await tick(2000);
+      expect(screen.getByRole("alert")).toHaveTextContent("Instagram profile is private.");
+      expect(screen.getByRole("button", { name: "Find this brand" })).toBeEnabled();
+      expect(generateButton()).toBeDisabled();
+      queryClient.clear();
+    });
   });
 
   describe("multiple product launches, partnerships and links", () => {
@@ -208,6 +351,7 @@ describe("Pitch page generation and review", () => {
 
   it("generates with visible brand/story inputs, edits, and confirms same-row saving without leaving the page", async () => {
     vi.spyOn(api, "get").mockResolvedValue({ matches: [], total: 0 });
+    vi.spyOn(api, "post").mockResolvedValue(job({ status: "ready", brand: { ...ownBrand, name: pitch.brand_name, latest_product: null } }));
     const post = vi.spyOn(pitchStreaming, "generatePitch").mockResolvedValue(pitch);
     const edited = "Subject: My edits\n\nFinal email";
     const patch = vi.spyOn(api, "patch").mockResolvedValue({ ...pitch, pitch_text: edited });
@@ -219,9 +363,8 @@ describe("Pitch page generation and review", () => {
 
     const generate = screen.getByRole("button", { name: "Generate pitch email draft" });
     expect(generate).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "A brand I found myself" }));
-    fireEvent.change(await screen.findByPlaceholderText("e.g. Focusrite, Rode, Ableton"),
-      { target: { value: pitch.brand_name } });
+    await findBrand("@freshbrand");
+    await screen.findByTestId("own-brand-card");
     fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
     fillLink();
     expect(generate).toBeEnabled();
@@ -237,7 +380,7 @@ describe("Pitch page generation and review", () => {
     expect(window.location.pathname).toBe("/pitch");
     expect(screen.getByRole("link", { name: "View in Pipeline" })).toHaveAttribute("href", "/deals");
     expect(post).toHaveBeenCalledExactlyOnceWith({
-      is_custom: true, custom_brand_name: pitch.brand_name, story: pitch.story,
+      is_custom: false, brand_id: 99, story: pitch.story,
       product_reference: null, past_brand_partnership: null, content_link: "https://example.com/post",
     }, expect.any(Function), expect.any(AbortSignal), expect.any(Function));
     expect(patch).toHaveBeenCalledExactlyOnceWith("/pitches/43", { pitch_text: edited });

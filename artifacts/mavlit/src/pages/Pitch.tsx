@@ -9,6 +9,8 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PitchDraftEditor from "@/components/PitchDraftEditor";
+import OwnBrandLookupField from "@/components/OwnBrandLookup";
+import { useOwnBrandLookup, brandDisplayName } from "@/hooks/useOwnBrandLookup";
 import LivePitchDraft, { DEFAULT_PITCH_STATUS } from "@/components/LivePitchDraft";
 import { generatePitch } from "@/lib/pitchStream";
 import { api, getAllMatches, type ApiBrand, type ApiPitch } from "@/lib/api";
@@ -33,7 +35,6 @@ const TIPS = [
 interface OutboundForm {
   brandSource: "matched" | "found";
   selectedBrand: string;
-  customBrand: string;
   story: string;
   recentProductLaunch: string[];
   pastDeals: string[];
@@ -43,7 +44,7 @@ interface OutboundForm {
 const MAX_ENTRIES = 3;
 
 const EMPTY_OUTBOUND: OutboundForm = {
-  brandSource: "matched", selectedBrand: "", customBrand: "",
+  brandSource: "matched", selectedBrand: "",
   story: "", recentProductLaunch: [""], pastDeals: [""], contentLinks: [""],
 };
 
@@ -150,9 +151,13 @@ function OutboundMode() {
     retry: 1,
   });
   const [prefillBrand] = useState(() => new URLSearchParams(search).get("brand") ?? "");
+  // A ?brand= link starts on the own-brand tab until it resolves to one of the creator's matches.
   const [form, setFormState] = useState<OutboundForm>(() => prefillBrand
-    ? { ...EMPTY_OUTBOUND, brandSource: "found", customBrand: prefillBrand }
+    ? { ...EMPTY_OUTBOUND, brandSource: "found" }
     : EMPTY_OUTBOUND);
+  const lookup = useOwnBrandLookup();
+  const ownInput = useRef(lookup.input);
+  ownInput.current = lookup.input;
   const [generating, setGenerating] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [streamStatus, setStreamStatus] = useState(DEFAULT_PITCH_STATUS);
@@ -172,8 +177,8 @@ function OutboundMode() {
   useEffect(() => {
     const prefilledMatch = matches?.find(b => b.brand_name === prefillBrand);
     if (prefilledMatch) {
-      setFormState(previous => previous.brandSource === "found" && previous.customBrand === prefillBrand
-        ? { ...previous, brandSource: "matched", selectedBrand: String(prefilledMatch.brand_raw_id), customBrand: "",
+      setFormState(previous => previous.brandSource === "found" && !ownInput.current
+        ? { ...previous, brandSource: "matched", selectedBrand: String(prefilledMatch.brand_raw_id),
             recentProductLaunch: productReferenceEdited.current ? previous.recentProductLaunch : withFirst(previous.recentProductLaunch, prefilledMatch.latest_product?.trim() || "") }
         : previous);
     }
@@ -187,13 +192,23 @@ function OutboundMode() {
       ...(k === "brandSource" ? {
         recentProductLaunch: [v === "matched"
           ? matches?.find(b => String(b.brand_raw_id) === p.selectedBrand)?.latest_product?.trim() || ""
-          : ""],
+          : lookup.state.brand?.latest_product?.trim() || ""],
       } : {}),
     }));
   };
 
+  // The lookup result decides the first product launch input on the own-brand tab.
+  const lookedUpBrand = lookup.state.brand;
+  useEffect(() => {
+    if (productReferenceEdited.current) return;
+    setFormState(p => p.brandSource === "found"
+      ? { ...p, recentProductLaunch: withFirst(p.recentProductLaunch, lookedUpBrand?.latest_product?.trim() || "") }
+      : p);
+  }, [lookedUpBrand]);
+
   const selectedMatch = matches?.find(b => String(b.brand_raw_id) === form.selectedBrand);
-  const brandName = form.brandSource === "matched" ? selectedMatch?.brand_name ?? "" : form.customBrand;
+  const brandName = form.brandSource === "matched" ? selectedMatch?.brand_name ?? "" : lookedUpBrand ? brandDisplayName(lookedUpBrand) : "";
+  const brandId = form.brandSource === "matched" ? selectedMatch?.brand_raw_id : lookedUpBrand?.brand_id;
   const { data: brandDetail } = useQuery<ApiBrand>({
     queryKey: ["brand", selectedMatch?.brand_raw_id],
     queryFn: () => api.get(`/brands/${selectedMatch!.brand_raw_id}`),
@@ -202,7 +217,7 @@ function OutboundMode() {
   });
   const activeContact = form.brandSource === "matched" ? brandDetail?.top_contact : null;
   // Creator details come from the saved account profile, not hidden legacy inputs.
-  const canGenerate = !!brandName.trim() && !!form.story.trim();
+  const canGenerate = brandId != null && !lookup.busy && !!form.story.trim();
 
   const generate = async () => {
     if (!canGenerate || saving || generationInFlight.current) return;
@@ -215,23 +230,14 @@ function OutboundMode() {
     streamController.current = controller;
     setGenerating(true); setError(null); setDraft(null); setStreamText(""); setStreamStatus(DEFAULT_PITCH_STATUS); setDirty(false);
     try {
-      const body = form.brandSource === "matched" && selectedMatch
-        ? {
-            is_custom: false,
-            brand_id: selectedMatch.brand_raw_id,
-            story: form.story,
-            product_reference: joinEntries(form.recentProductLaunch),
-            past_brand_partnership: joinEntries(form.pastDeals),
-            content_link: joinEntries(form.contentLinks),
-          }
-        : {
-            is_custom: true,
-            custom_brand_name: brandName,
-            story: form.story,
-            product_reference: joinEntries(form.recentProductLaunch),
-            past_brand_partnership: joinEntries(form.pastDeals),
-            content_link: joinEntries(form.contentLinks),
-          };
+      const body = {
+        is_custom: false,
+        brand_id: brandId!,
+        story: form.story,
+        product_reference: joinEntries(form.recentProductLaunch),
+        past_brand_partnership: joinEntries(form.pastDeals),
+        content_link: joinEntries(form.contentLinks),
+      };
       const data = await generatePitch(body, (delta) => setStreamText(previous => previous + delta), controller.signal, setStreamStatus);
       if (controller.signal.aborted) return;
       setDraft(data);
@@ -307,8 +313,7 @@ function OutboundMode() {
               </motion.div>
             ) : (
               <motion.div key="found" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-                <Label>Brand name</Label>
-                <Input value={form.customBrand} onChange={v => set("customBrand", v)} placeholder="e.g. Focusrite, Rode, Ableton" />
+                <OwnBrandLookupField lookup={lookup} />
               </motion.div>
             )}
           </AnimatePresence>

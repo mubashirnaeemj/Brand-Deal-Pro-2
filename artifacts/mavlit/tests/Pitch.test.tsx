@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Pitch from "@/pages/Pitch";
@@ -7,9 +7,13 @@ import { api, ApiRequestError, type ApiMatch, type ApiPitch } from "@/lib/api";
 import type { OwnBrand, OwnBrandJob } from "@/hooks/useOwnBrandLookup";
 import * as pitchStreaming from "@/lib/pitchStream";
 
-vi.mock("@/contexts/AuthContext", () => ({
-  useAuth: () => ({ user: { id: 808, content_niche: "Music", follower_count: 12345 } }),
-}));
+const auth = vi.hoisted(() => ({ user: null as Record<string, unknown> | null }));
+vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: auth.user }) }));
+const incompleteUser = { id: 808, content_niche: "Music", follower_count: 12345 };
+const completeUser = {
+  ...incompleteUser, instagram_audience_description: "Young musicians.", instagram_highest_views: 120000,
+  instagram_description: "Guitar tutorials and gear reviews.",
+};
 vi.mock("@/components/Navbar", () => ({ default: () => null }));
 vi.mock("@/components/Footer", () => ({ default: () => null }));
 
@@ -47,6 +51,7 @@ const savedPost = (id: number, extra: { full_caption?: string } & Record<string,
 });
 let savedPosts: ReturnType<typeof savedPost>[] = [];
 beforeEach(() => {
+  auth.user = incompleteUser;
   savedPosts = [savedPost(1), savedPost(2), savedPost(3), savedPost(4, { is_partnership_post: true }), savedPost(5, { is_partnership_post: true })];
 });
 // `full_caption` stays on the "server": clients only receive the start of it, and search matches all of it.
@@ -596,6 +601,34 @@ describe("Pitch page generation and review", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Writing your pitch…");
     expect(screen.getByPlaceholderText("MAVLIT is writing your pitch…")).toHaveValue("Hi");
     queryClient.clear();
+  });
+
+  describe("profile reminder", () => {
+    const reminder = () => screen.queryByText(/Keep your profile complete/);
+    it("is shown while the audience description, highest views or content description is missing", () => {
+      for (const [field, value] of [
+        ["instagram_audience_description", null], ["instagram_audience_description", "  "],
+        ["instagram_highest_views", null], ["instagram_description", ""],
+      ] as const) {
+        auth.user = { ...completeUser, [field]: value };
+        const queryClient = mountMatches();
+        expect(reminder()).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: /Update profile/ })).toHaveAttribute("href", "/profile");
+        cleanup();
+        queryClient.clear();
+      }
+    });
+
+    it("is hidden once all three are filled in, including zero highest views", () => {
+      for (const views of [120000, 0]) {
+        auth.user = { ...completeUser, instagram_highest_views: views };
+        const queryClient = mountMatches();
+        expect(reminder()).not.toBeInTheDocument();
+        expect(screen.queryByRole("link", { name: /Update profile/ })).not.toBeInTheDocument();
+        cleanup();
+        queryClient.clear();
+      }
+    });
   });
 
   it("shows the saved final email on its Pipeline card", () => {

@@ -15,7 +15,7 @@ import { useOwnBrandLookup, brandDisplayName } from "@/hooks/useOwnBrandLookup";
 import LivePitchDraft, { DEFAULT_PITCH_STATUS } from "@/components/LivePitchDraft";
 import { generatePitch } from "@/lib/pitchStream";
 import { api, getAllMatches, type ApiBrand, type ApiPitch } from "@/lib/api";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, type CreatorProfile } from "@/contexts/AuthContext";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -48,6 +48,12 @@ const EMPTY_OUTBOUND: OutboundForm = {
   brandSource: "matched", selectedBrand: "",
   story: "", recentProductLaunch: [""], pastPartnerships: [], contentPosts: [],
 };
+
+// The profile reminder is for creators whose pitch inputs are still empty.
+const blank = (value: string | null | undefined) => !value?.trim();
+function profileStatsIncomplete(user: CreatorProfile | null): boolean {
+  return !!user && (blank(user.instagram_audience_description) || user.instagram_highest_views == null || blank(user.instagram_description));
+}
 
 // ── Shared UI ──────────────────────────────────────────────────────────────────
 
@@ -360,7 +366,7 @@ function OutboundMode() {
             onUnchoose={url => setFormState(p => ({ ...p, pastPartnerships: p.pastPartnerships.filter(e => e.kind !== "post" || e.url !== url) }))}
             onDescribe={text => setFormState(p => p.pastPartnerships.length >= MAX_PICKS || p.pastPartnerships.some(e => e.kind === "described" && e.text === text)
               ? p : { ...p, pastPartnerships: [...p.pastPartnerships, { kind: "described", text }] })} />
-          <div className="flex items-start justify-between gap-4 pt-1 px-4 py-3.5 rounded-xl bg-primary/5 border border-primary/20">
+          {profileStatsIncomplete(user) && <div className="flex items-start justify-between gap-4 pt-1 px-4 py-3.5 rounded-xl bg-primary/5 border border-primary/20" data-testid="profile-reminder">
             <div className="flex items-start gap-3 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 mt-0.5"><User size={13} className="text-primary" /></div>
               <div className="min-w-0">
@@ -373,7 +379,7 @@ function OutboundMode() {
             <Link href="/profile" className="shrink-0 flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors whitespace-nowrap pt-0.5">
               Update profile <ArrowRight size={11} />
             </Link>
-          </div>
+          </div>}
         </div>
 
         {/* Generate */}

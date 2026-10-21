@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { INPUT_CLASS } from "@/components/onboarding/types";
 import {
   addCreatorPost, deleteCreatorPost, isPostsList, listCreatorPosts, setPostPartnership,
-  formatCount, postedAtLabel, type CreatorPost, type CreatorPostsList,
+  formatCount, openPost, postedAtLabel, type CreatorPost, type CreatorPostsList,
 } from "@/lib/creatorPosts";
 
 type Message = { kind: "error" | "success"; text: string };
@@ -15,6 +15,8 @@ const MAX_QUERY = 100;
 const SEARCH_DELAY_MS = 300;
 const errorText = (cause: unknown, fallback: string) => cause instanceof Error && cause.message ? cause.message : fallback;
 const btnGhost = "rounded-xl border border-border px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+
+const btnView = "rounded-lg border border-primary/50 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 /** The creator's scraped Instagram posts; shown only when MAVLIT has read some. */
 export default function RecentPostsCard({ posts, onPostsChange }: Props) {
@@ -185,27 +187,29 @@ function PostsDialog({ open, onOpenChange, posts, onPostsChange }: {
           <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto" data-testid="posts-list">
             {posts.posts.map(post => (
               <li key={post.id} className="space-y-2 p-4" data-testid="post-row">
-                <a href={post.post_url} target="_blank" rel="noopener noreferrer" className="block truncate text-sm font-semibold text-primary hover:underline">{post.post_url}</a>
                 <p className="line-clamp-2 text-sm text-white/80">{post.caption_preview?.trim() || "(no caption)"}</p>
                 <p className="text-xs text-muted-foreground/70" data-testid="post-posted-at">{postedAtLabel(post.timestamp)}</p>
                 <p className="text-xs text-muted-foreground">
                   Likes {formatCount(post.likes_count)} · Comments {formatCount(post.comments_count)} · Views {formatCount(post.views_count)}
                 </p>
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-end justify-between gap-3">
                   <label className="flex items-center gap-2 text-sm text-white">
                     <Switch checked={post.is_partnership_post} disabled={toggling.has(post.id)}
                       aria-label={`Paid partnership: ${post.post_url}`}
                       onCheckedChange={next => void toggle(post, next)} />
                     Paid partnership
                   </label>
-                  <span title={posts.can_delete ? undefined : `At least ${posts.min_keep} posts have to stay`}>
-                    <button type="button" className={btnGhost} aria-label={`Delete ${post.post_url}`}
-                      disabled={!posts.can_delete || deleting !== null}
-                      title={posts.can_delete ? undefined : `At least ${posts.min_keep} posts have to stay`}
-                      onClick={() => void remove(post)}>
-                      Delete
-                    </button>
-                  </span>
+                  <div className="flex flex-col items-stretch gap-2">
+                    <button type="button" className={btnView} disabled={!post.post_url} onClick={() => openPost(post.post_url)}>View post</button>
+                    <span title={posts.can_delete ? undefined : `At least ${posts.min_keep} posts have to stay`} className="flex flex-col">
+                      <button type="button" className={btnGhost} aria-label={`Delete ${post.post_url}`}
+                        disabled={!posts.can_delete || deleting !== null}
+                        title={posts.can_delete ? undefined : `At least ${posts.min_keep} posts have to stay`}
+                        onClick={() => void remove(post)}>
+                        Delete
+                      </button>
+                    </span>
+                  </div>
                 </div>
               </li>
             ))}

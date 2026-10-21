@@ -331,9 +331,9 @@ describe("Pitch page generation and review", () => {
       const boxes = within(dialog).getAllByRole("checkbox");
       for (const box of boxes.slice(0, 3)) fireEvent.click(box);
       expect(dialog).toHaveTextContent("3 of 3 chosen. You can choose up to 3.");
-      expect(boxes[3]).toBeDisabled();
-      expect(boxes[4]).toBeDisabled();
-      expect(boxes[0]).toBeEnabled();
+      expect(boxes[3]).toHaveAttribute("aria-disabled", "true");
+      expect(boxes[4]).toHaveAttribute("aria-disabled", "true");
+      expect(boxes[0]).toHaveAttribute("aria-disabled", "false");
       await closePicker(dialog);
       expect(chips("link")).toHaveLength(3);
       expect(chips("link")[0]).toHaveTextContent("Caption 1");
@@ -342,7 +342,7 @@ describe("Pitch page generation and review", () => {
       fireEvent.click(screen.getByRole("button", { name: "Remove https://www.instagram.com/p/P2/" }));
       expect(chips("link")).toHaveLength(2);
       const again = await openPicker("link");
-      expect(within(again).getAllByRole("checkbox")[3]).toBeEnabled();
+      expect(within(again).getAllByRole("checkbox")[3]).toHaveAttribute("aria-disabled", "false");
       fireEvent.click(within(again).getAllByRole("checkbox")[3]);
       await closePicker(again);
       expect(chips("link")).toHaveLength(3);
@@ -453,6 +453,49 @@ describe("Pitch page generation and review", () => {
       });
     });
 
+    it("ticks a post from a click anywhere in its box, shows its URL as plain text and opens it with View post", async () => {
+      const { queryClient } = setup();
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      const dialog = await openPicker("link");
+      const [row] = within(dialog).getAllByTestId("picker-row");
+      const box = within(row).getByRole("checkbox");
+      expect(within(row).queryByRole("link")).not.toBeInTheDocument();
+      expect(within(row).getByTestId("picker-post-url")).toHaveTextContent("https://www.instagram.com/p/P1/");
+      expect(box).toHaveClass("h-6", "w-6");
+      expect(box.previousElementSibling).not.toBeNull(); // the checkbox sits after the post details
+      fireEvent.click(within(row).getByText("Caption 1"));
+      expect(box).toBeChecked();
+      fireEvent.click(row);
+      expect(box).not.toBeChecked();
+      // A click on the checkbox itself toggles once, not twice.
+      fireEvent.click(box);
+      expect(box).toBeChecked();
+      expect(dialog).toHaveTextContent("1 of 3 chosen.");
+      // View post opens the post and leaves the choice alone.
+      fireEvent.click(within(row).getByRole("button", { name: "View post" }));
+      expect(open).toHaveBeenCalledExactlyOnceWith("https://www.instagram.com/p/P1/", "_blank", "noopener,noreferrer");
+      expect(box).toBeChecked();
+      queryClient.clear();
+    });
+
+    it("dims the other posts at three chosen and explains why a click chooses nothing", async () => {
+      savedPosts = [1, 2, 3, 4].map(id => savedPost(id));
+      const { queryClient } = setup();
+      const dialog = await openPicker("link");
+      const rowsNow = () => within(dialog).getAllByTestId("picker-row");
+      for (const row of rowsNow().slice(0, 3)) fireEvent.click(row);
+      expect(dialog).toHaveTextContent("3 of 3 chosen.");
+      expect(rowsNow()[3]).toHaveClass("opacity-50");
+      expect(rowsNow()[0]).not.toHaveClass("opacity-50");
+      fireEvent.click(rowsNow()[3]);
+      expect(within(dialog).getByRole("alert")).toHaveTextContent("You can choose up to 3. Remove one first.");
+      expect(within(rowsNow()[3]).getByRole("checkbox")).not.toBeChecked();
+      expect(dialog).toHaveTextContent("3 of 3 chosen.");
+      fireEvent.click(rowsNow()[0]);
+      expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
+      queryClient.clear();
+    });
+
     it("closes the picker with ×, Escape and a click outside", async () => {
       const { queryClient } = setup();
       for (const close of [
@@ -551,7 +594,7 @@ describe("Pitch page generation and review", () => {
         fireEvent.click(within(dialog).getByRole("button", { name: "Add" }));
       }
       expect(dialog).toHaveTextContent("3 of 3 chosen. You can choose up to 3.");
-      for (const box of within(dialog).getAllByRole("checkbox")) expect(box).toBeDisabled();
+      for (const box of within(dialog).getAllByRole("checkbox")) expect(box).toHaveAttribute("aria-disabled", "true");
       fireEvent.change(field, { target: { value: "Four" } });
       expect(within(dialog).getByRole("button", { name: "Add" })).toBeDisabled();
       await closePicker(dialog);

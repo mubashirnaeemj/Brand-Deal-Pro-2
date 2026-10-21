@@ -47,8 +47,8 @@ describe("recent Instagram posts on the profile page", () => {
     expect(within(dialog).getByText("Your recent Instagram posts")).toBeInTheDocument();
     expect(dialog).toHaveTextContent("You have 10 posts. At least 10 posts stay on your profile, so nothing can be deleted until you add more.");
     const first = rows()[0];
-    expect(within(first).getByRole("link")).toHaveAttribute("href", "https://www.instagram.com/p/POST10/");
-    expect(within(first).getByRole("link")).toHaveAttribute("target", "_blank");
+    expect(within(first).queryByRole("link")).not.toBeInTheDocument();
+    expect(first).not.toHaveTextContent("instagram.com");
     expect(first).toHaveTextContent("Caption 10");
     expect(first).toHaveTextContent("Likes 1,234 · Comments 56 · Views 78,000");
     for (const button of deleteButtons()) {
@@ -57,10 +57,33 @@ describe("recent Instagram posts on the profile page", () => {
     }
   });
 
+  it("opens a post from its View post button, stacked above Delete, in a new tab without noopener leaks", async () => {
+    const user = userEvent.setup();
+    await mount(posts(10));
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    await openDialog();
+    const first = rows()[0];
+    const view = within(first).getByRole("button", { name: "View post" });
+    const del = within(first).getByRole("button", { name: /^Delete / });
+    expect(view.compareDocumentPosition(del) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(view.parentElement).toBe(del.parentElement!.parentElement);
+    expect(view).toBeEnabled();
+    await user.click(view);
+    expect(open).toHaveBeenCalledExactlyOnceWith("https://www.instagram.com/p/POST10/", "_blank", "noopener,noreferrer");
+    // Unlike Delete, it works even when nothing can be deleted.
+    expect(del).toBeDisabled();
+  });
+
+  it("disables View post for a post without a link", async () => {
+    await mount([fixturePost(1, { post_url: "" }), ...posts(10).slice(1)]);
+    await openDialog();
+    expect(within(rows().find((r) => r.textContent?.includes("Caption 1Posted"))!).getByRole("button", { name: "View post" })).toBeDisabled();
+  });
+
   it("shows (no caption) and a dash for missing numbers", async () => {
     await mount([fixturePost(1, { caption_preview: null, likes_count: null, views_count: null }), ...posts(10).slice(1)]);
     await openDialog();
-    const row = rows().find((r) => r.textContent?.includes("POST1/"))!;
+    const row = rows().find((r) => r.textContent?.includes("Likes – "))!;
     expect(row).toHaveTextContent("(no caption)");
     expect(row).toHaveTextContent("Likes – · Comments 56 · Views –");
   });
@@ -182,7 +205,7 @@ describe("recent Instagram posts on the profile page", () => {
     expect(await screen.findByText("Post added.")).toBeInTheDocument();
     expect(input).toHaveValue("");
     expect(rows()).toHaveLength(11);
-    expect(within(rows()[0]).getByRole("link")).toHaveAttribute("href", "https://www.instagram.com/p/NEWPOST/");
+    expect(rows()[0]).toHaveTextContent("Caption 1000");
     expect(screen.getByRole("button", { name: "Add post" })).toBeEnabled();
     await user.type(input, "https://www.instagram.com/p/NEWPOST/{Enter}");
     await screen.findByText("Post added.");
@@ -255,7 +278,7 @@ describe("searching the recent posts by caption", () => {
     expect(screen.queryByText(/Zephyr/)).not.toBeInTheDocument();
     await searchFor(user, "zephyr pedal");
     await waitFor(() => expect(rows()).toHaveLength(1));
-    expect(rows()[0]).toHaveTextContent("POST3/");
+    expect(rows()[0]).toHaveTextContent("Behind the scenes");
     expect(lastQuery()).toBe("?q=zephyr%20pedal");
   });
 

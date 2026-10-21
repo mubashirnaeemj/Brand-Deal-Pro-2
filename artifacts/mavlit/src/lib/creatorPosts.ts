@@ -49,4 +49,8 @@ export function postedAtLabel(timestamp: string | null | undefined): string {
     : "Posted –";
 }
 
+export const openPost = (url: string | null | undefined) => {
+  if (url) window.open(url, "_blank", "noopener,noreferrer");
+};
+
 export const formatCount = (value: number | null) => value == null ? "–" : value.toLocaleString("en-US");

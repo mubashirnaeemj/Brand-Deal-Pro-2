@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Loader2, X } from "lucide-react";
 import {
-  addCreatorPost, formatCount, isPostsList, listCreatorPosts, postedAtLabel, type CreatorPost, type CreatorPostsList,
+  addCreatorPost, formatCount, isPostsList, listCreatorPosts, openPost, postedAtLabel, type CreatorPost, type CreatorPostsList,
 } from "@/lib/creatorPosts";
 
 export const MAX_PICKS = 3;
@@ -160,6 +160,13 @@ export function PostPickerDialog({ kind, open, onOpenChange, entries, onChoose, 
     return () => clearTimeout(timer);
   }, [open, query, activeQuery]);
 
+  // A click anywhere on a post box ticks or unticks it; a full selection only explains why.
+  const toggle = (post: CreatorPost) => {
+    if (chosenUrls.has(post.post_url)) { setMessage(null); onUnchoose(post.post_url); }
+    else if (full) setMessage({ kind: "error", text: "You can choose up to 3. Remove one first." });
+    else { setMessage(null); onChoose(post); }
+  };
+
   const describe = () => {
     const text = description.replace(/,/g, " ").replace(/\s+/g, " ").trim();
     if (!text || full) return;
@@ -206,19 +213,25 @@ export function PostPickerDialog({ kind, open, onOpenChange, entries, onChoose, 
             <ul className="divide-y divide-border">
               {shownPosts.map(post => {
                 const checked = chosenUrls.has(post.post_url);
+                const blocked = !checked && full;
                 return (
-                  <li key={post.id} data-testid="picker-row" className="flex items-start gap-3 p-4">
-                    <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-primary" checked={checked}
-                      disabled={!checked && full} aria-label={`Choose ${post.post_url}`}
-                      onChange={e => e.target.checked ? onChoose(post) : onUnchoose(post.post_url)} />
+                  <li key={post.id} data-testid="picker-row" onClick={() => toggle(post)}
+                    className={`flex cursor-pointer items-center gap-4 p-4 transition-colors hover:bg-white/5 ${checked ? "bg-primary/5" : ""} ${blocked ? "opacity-50" : ""}`}>
                     <div className="min-w-0 flex-1 space-y-1.5">
-                      <a href={post.post_url} target="_blank" rel="noopener noreferrer" className="block truncate text-sm font-semibold text-primary hover:underline">{post.post_url}</a>
+                      <p className="truncate text-xs text-muted-foreground/70" data-testid="picker-post-url">{post.post_url}</p>
                       <p className="line-clamp-2 text-sm text-white/80">{post.caption_preview?.trim() || "(no caption)"}</p>
                       <p className="text-xs text-muted-foreground/70" data-testid="picker-posted-at">{postedAtLabel(post.timestamp)}</p>
                       <p className="text-xs text-muted-foreground">
                         Likes {formatCount(post.likes_count)} · Comments {formatCount(post.comments_count)} · Views {formatCount(post.views_count)}
                       </p>
+                      <button type="button" disabled={!post.post_url} className="rounded-lg border border-primary/50 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/10 disabled:opacity-40"
+                        onClick={e => { e.stopPropagation(); openPost(post.post_url); }}>
+                        View post
+                      </button>
                     </div>
+                    <input type="checkbox" className="h-6 w-6 shrink-0 cursor-pointer accent-primary" checked={checked}
+                      aria-disabled={blocked} aria-label={`Choose ${post.post_url}`}
+                      onClick={e => e.stopPropagation()} onChange={() => toggle(post)} />
                   </li>
                 );
               })}

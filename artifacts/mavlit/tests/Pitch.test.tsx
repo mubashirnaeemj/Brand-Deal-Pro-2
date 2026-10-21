@@ -40,7 +40,8 @@ const findBrand = async (text = "@freshbrand", fakeTimers = false) => {
 };
 
 // The creator's saved Instagram posts, as the API returns them.
-const savedPost = (id: number, extra: Record<string, unknown> = {}) => ({
+const savedPost = (id: number, extra: { full_caption?: string } & Record<string, unknown> = {}) => ({
+  full_caption: undefined as string | undefined,
   id, post_url: `https://www.instagram.com/p/P${id}/`, caption_preview: `Caption ${id}`, likes_count: 1234,
   comments_count: 56, views_count: 78000, is_partnership_post: false, ...extra,
 });
@@ -48,8 +49,14 @@ let savedPosts: ReturnType<typeof savedPost>[] = [];
 beforeEach(() => {
   savedPosts = [savedPost(1), savedPost(2), savedPost(3), savedPost(4, { is_partnership_post: true }), savedPost(5, { is_partnership_post: true })];
 });
+// `full_caption` stays on the "server": clients only receive the start of it, and search matches all of it.
 const postsResponse = (path: string) => {
-  const posts = savedPosts.filter(post => !path.includes("partnership_only=true") || post.is_partnership_post);
+  const params = new URL(path, "http://localhost").searchParams;
+  const needle = (params.get("q") ?? "").toLowerCase();
+  const posts = savedPosts
+    .filter(post => params.get("partnership_only") !== "true" || post.is_partnership_post)
+    .filter(post => !needle || String(post.full_caption ?? post.caption_preview).toLowerCase().includes(needle))
+    .map(({ full_caption: _full, ...post }) => post);
   return { total: savedPosts.length, shown: posts.length, min_keep: 10, can_delete: false, posts };
 };
 /** api.get for the Pitch page: saved posts come from `savedPosts`, everything else from `fallback`. */
@@ -335,6 +342,84 @@ describe("Pitch page generation and review", () => {
       expect(within(third).getByTestId("picker-posted-at")).toHaveTextContent("Posted –");
       expect(dialog).not.toHaveTextContent("Invalid Date");
       queryClient.clear();
+    });
+
+    describe("caption search", () => {
+      const longCaption = `${"Studio tour and setup notes. ".repeat(4)}Finally unboxing the Zephyr pedal`;
+      beforeEach(() => {
+        savedPosts = [
+          savedPost(1, { caption_preview: longCaption.slice(0, 30), full_caption: longCaption }),
+          savedPost(2), savedPost(3),
+          savedPost(4, { is_partnership_post: true, caption_preview: "Lash collab", full_caption: "Lash collab with Falscara" }),
+          savedPost(5, { is_partnership_post: true }),
+        ];
+      });
+      const searchInput = (dialog: HTMLElement) => within(dialog).getByRole("searchbox");
+      const getCalls = () => vi.mocked(api.get).mock.calls.map(([path]) => String(path)).filter(path => path.startsWith("/creator-profile/me/posts"));
+      const searchFor = async (dialog: HTMLElement, text: string) => {
+        fireEvent.change(searchInput(dialog), { target: { value: text } });
+        fireEvent.keyDown(searchInput(dialog), { key: "Enter" });
+        fireEvent.submit(searchInput(dialog).closest("form")!);
+      };
+
+      it("finds a word at the end of a long caption through the API, and Clear brings everything back", async () => {
+        const { queryClient } = setup();
+        const dialog = await openPicker("link");
+        expect(within(dialog).queryByRole("button", { name: "Clear" })).not.toBeInTheDocument();
+        expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(5);
+        await searchFor(dialog, "ZEPHYR pedal");
+        await waitFor(() => expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(1));
+        expect(getCalls().at(-1)).toBe("/creator-profile/me/posts?q=ZEPHYR%20pedal");
+        expect(within(dialog).queryByText(/Zephyr/)).not.toBeInTheDocument();
+        fireEvent.click(within(dialog).getByRole("button", { name: "Clear" }));
+        await waitFor(() => expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(5));
+        expect(searchInput(dialog)).toHaveValue("");
+        expect(within(dialog).queryByRole("button", { name: "Clear" })).not.toBeInTheDocument();
+        expect(getCalls().at(-1)).toBe("/creator-profile/me/posts");
+        queryClient.clear();
+      });
+
+      it("searches only partnership posts in the partnerships picker, with its own no-match text", async () => {
+        const { queryClient } = setup();
+        const dialog = await openPicker("partnership");
+        await searchFor(dialog, "falscara");
+        await waitFor(() => expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(1));
+        expect(getCalls().at(-1)).toBe("/creator-profile/me/posts?partnership_only=true&q=falscara");
+        await searchFor(dialog, "zephyr");
+        expect(await within(dialog).findByTestId("picker-no-match")).toHaveTextContent('No partnership post caption contains "zephyr".');
+        await closePicker(dialog);
+        const again = await openPicker("link");
+        await searchFor(again, "nothing at all");
+        expect(await within(again).findByTestId("picker-no-match")).toHaveTextContent('No post caption contains "nothing at all".');
+        queryClient.clear();
+      });
+
+      it("keeps the search while ticking and adding a post, treats blank as everything, and resets on reopen", async () => {
+        const { queryClient } = setup();
+        const dialog = await openPicker("link");
+        await searchFor(dialog, "caption");
+        await waitFor(() => expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(3));
+        fireEvent.click(within(dialog).getAllByRole("checkbox")[0]);
+        expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(3);
+        expect(searchInput(dialog)).toHaveValue("caption");
+        const added = savedPost(9, { caption_preview: "Caption nine" });
+        vi.spyOn(api, "post").mockImplementation(async () => { savedPosts = [added, ...savedPosts]; return added; });
+        fireEvent.change(within(dialog).getByPlaceholderText("https://www.instagram.com/p/…"), { target: { value: "https://www.instagram.com/p/P9/" } });
+        fireEvent.click(within(dialog).getByRole("button", { name: "Add post" }));
+        await within(dialog).findByText("Post added.");
+        expect(getCalls().at(-1)).toBe("/creator-profile/me/posts?q=caption");
+        expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(4);
+        await searchFor(dialog, "   ");
+        await waitFor(() => expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(6));
+        await searchFor(dialog, "caption 2");
+        await waitFor(() => expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(1));
+        await closePicker(dialog);
+        const again = await openPicker("link");
+        expect(searchInput(again)).toHaveValue("");
+        expect(within(again).queryByRole("button", { name: "Clear" })).not.toBeInTheDocument();
+        expect(within(again).getAllByTestId("picker-row")).toHaveLength(6);
+        queryClient.clear();
+      });
     });
 
     it("closes the picker with ×, Escape and a click outside", async () => {

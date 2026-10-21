@@ -26,6 +26,7 @@ const COPY = {
     note: "Showing all your saved posts.",
     hint: "Up to 3 posts that show your connection to this brand. Pick from your posts or add a new post link.",
     empty: "No saved posts yet. Add a post link below.",
+    noMatch: "No post caption contains",
   },
   partnership: {
     button: "+ Choose from your partnership posts",
@@ -33,11 +34,13 @@ const COPY = {
     note: "Showing the posts you marked as paid partnerships.",
     hint: "Up to 3. Pick the posts you marked as paid partnerships, add a post link, or describe a partnership in a few words.",
     empty: "No post is marked as a paid partnership yet. Add a post link below, describe a partnership, or switch the toggle on in \"Your recent Instagram posts\" on your profile page.",
+    noMatch: "No partnership post caption contains",
   },
 } as const;
 
 const btnGhost = "rounded-xl border border-border px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 const inputCls = "w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all";
+const MAX_QUERY = 100;
 const errorText = (cause: unknown, fallback: string) => cause instanceof Error && cause.message ? cause.message : fallback;
 
 /** The chosen entries as chips, the "choose" button and the hint for one field. */
@@ -87,13 +90,17 @@ export function PostPickerDialog({ kind, open, onOpenChange, entries, onChoose, 
   const [url, setUrl] = useState("");
   const [adding, setAdding] = useState(false);
   const [description, setDescription] = useState("");
+  const [query, setQuery] = useState("");
+  const [activeQuery, setActiveQuery] = useState("");
+  const [searching, setSearching] = useState(false);
   const request = useRef(0);
   const full = entries.length >= MAX_PICKS;
   const chosenUrls = new Set(entries.flatMap(entry => entry.kind === "post" ? [entry.url] : []));
 
-  const load = async () => {
+  // The server matches the whole caption (any case), so the search always goes through the API.
+  const load = async (q = activeQuery) => {
     const mine = ++request.current;
-    const result = await listCreatorPosts("", partnership);
+    const result = await listCreatorPosts(q, partnership);
     if (!isPostsList(result)) throw new Error("MAVLIT returned an unexpected response. Please try again.");
     if (mine === request.current) setList(result);
   };
@@ -102,9 +109,11 @@ export function PostPickerDialog({ kind, open, onOpenChange, entries, onChoose, 
     if (!open) return;
     setMessage(null);
     setList(null);
+    setQuery("");
+    setActiveQuery("");
     setLoading(true);
     let active = true;
-    load().catch(cause => { if (active) setMessage({ kind: "error", text: errorText(cause, "Could not load your posts.") }); })
+    load("").catch(cause => { if (active) setMessage({ kind: "error", text: errorText(cause, "Could not load your posts.") }); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; request.current++; };
   }, [open, partnership]);
@@ -125,6 +134,22 @@ export function PostPickerDialog({ kind, open, onOpenChange, entries, onChoose, 
       setMessage({ kind: "error", text: errorText(cause, "Could not add this post.") });
     } finally {
       setAdding(false);
+    }
+  };
+
+  const search = async (text: string) => {
+    const q = text.trim().slice(0, MAX_QUERY);
+    if (searching) return;
+    setMessage(null);
+    setSearching(true);
+    try {
+      await load(q);
+      setActiveQuery(q);
+      setQuery(q);
+    } catch (cause) {
+      setMessage({ kind: "error", text: errorText(cause, "Could not search your posts.") });
+    } finally {
+      setSearching(false);
     }
   };
 
@@ -156,9 +181,21 @@ export function PostPickerDialog({ kind, open, onOpenChange, entries, onChoose, 
             </DialogPrimitive.Close>
           </div>
 
+          <form role="search" className="flex gap-2 border-b border-border px-5 py-3"
+            onSubmit={e => { e.preventDefault(); void search(query); }}>
+            <input type="search" value={query} onChange={e => setQuery(e.target.value)} maxLength={MAX_QUERY}
+              aria-label="Search your posts by caption" placeholder="Search your posts by caption…" className={inputCls} />
+            <button type="submit" className={`${btnGhost} shrink-0`} disabled={searching}>Search</button>
+            {activeQuery && (
+              <button type="button" className={`${btnGhost} shrink-0`} disabled={searching} onClick={() => void search("")}>Clear</button>
+            )}
+          </form>
+
           <div className="min-h-0 flex-1 overflow-y-auto" data-testid="picker-list">
             {loading && <p role="status" className="p-5 text-sm text-muted-foreground">Loading your posts…</p>}
-            {!loading && list && shownPosts.length === 0 && <p className="p-5 text-sm text-muted-foreground" data-testid="picker-empty">{copy.empty}</p>}
+            {!loading && list && shownPosts.length === 0 && (activeQuery
+              ? <p className="p-5 text-sm text-muted-foreground" data-testid="picker-no-match">{copy.noMatch} "{activeQuery}".</p>
+              : <p className="p-5 text-sm text-muted-foreground" data-testid="picker-empty">{copy.empty}</p>)}
             <ul className="divide-y divide-border">
               {shownPosts.map(post => {
                 const checked = chosenUrls.has(post.post_url);

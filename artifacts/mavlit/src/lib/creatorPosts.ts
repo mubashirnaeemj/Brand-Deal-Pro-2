@@ -30,7 +30,7 @@ export const isPostsList = (value: unknown): value is CreatorPostsList =>
 
 /** `query` is matched by the server against each post's whole caption. */
 export const listCreatorPosts = (query = "", partnershipOnly = false) => {
-  const params = [query && `q=${encodeURIComponent(query)}`, partnershipOnly && "partnership_only=true"].filter(Boolean);
+  const params = [partnershipOnly && "partnership_only=true", query && `q=${encodeURIComponent(query)}`].filter(Boolean);
   return api.get<CreatorPostsList>(params.length ? `${BASE}?${params.join("&")}` : BASE);
 };
 export const setPostPartnership = (id: CreatorPost["id"], isPartnership: boolean) =>

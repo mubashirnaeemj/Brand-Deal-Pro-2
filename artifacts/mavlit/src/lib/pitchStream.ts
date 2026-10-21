@@ -17,6 +17,7 @@ export async function generatePitch(
   body: PitchRequest,
   onDelta: (text: string) => void,
   signal?: AbortSignal,
+  onStatus?: (text: string) => void,
 ): Promise<ApiPitch> {
   let response: Response;
   try {
@@ -53,6 +54,8 @@ export async function generatePitch(
         if (event.type === "error") {
           throw new Error(typeof event.detail === "string" && event.detail ? event.detail : "Pitch generation failed. Please try again.");
         }
+        // Progress notes (e.g. "Reading the Instagram posts you linked…") precede the first delta.
+        if (event.type === "status" && typeof event.text === "string" && event.text.trim()) onStatus?.(event.text);
         if (event.type === "delta") {
           if (typeof event.text !== "string") throw new Error("MAVLIT returned an invalid pitch stream. Please try again.");
           onDelta(event.text);

@@ -23,6 +23,8 @@ router.use(async (req, res): Promise<void> => {
   target.search = new URL(req.originalUrl, "http://localhost").search;
 
   const streaming = req.method === "POST" && req.path === "/pitches/stream";
+  // A pitch can take ~2 minutes when MAVLIT first scrapes a linked Instagram post.
+  const slowPitch = streaming || (req.method === "POST" && req.path === "/pitches");
   const headers = new Headers({ Accept: streaming ? "text/event-stream" : "application/json" });
   const accessToken = req.cookies?.access_token;
   if (typeof accessToken === "string") headers.set("Cookie", `access_token=${accessToken}`);
@@ -38,7 +40,7 @@ router.use(async (req, res): Promise<void> => {
       headers,
       body: hasBody ? JSON.stringify(req.body ?? {}) : undefined,
       redirect: "manual",
-      signal: AbortSignal.any([disconnected.signal, AbortSignal.timeout(streaming ? 120_000 : 20_000)]),
+      signal: AbortSignal.any([disconnected.signal, AbortSignal.timeout(slowPitch ? 180_000 : 20_000)]),
     });
 
     res.setHeader("Cache-Control", "no-store");

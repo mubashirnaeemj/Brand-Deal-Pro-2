@@ -9,7 +9,7 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PitchDraftEditor from "@/components/PitchDraftEditor";
-import LivePitchDraft from "@/components/LivePitchDraft";
+import LivePitchDraft, { DEFAULT_PITCH_STATUS } from "@/components/LivePitchDraft";
 import { generatePitch } from "@/lib/pitchStream";
 import { api, getAllMatches, type ApiBrand, type ApiPitch } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -155,6 +155,7 @@ function OutboundMode() {
     : EMPTY_OUTBOUND);
   const [generating, setGenerating] = useState(false);
   const [streamText, setStreamText] = useState("");
+  const [streamStatus, setStreamStatus] = useState(DEFAULT_PITCH_STATUS);
   const [draft, setDraft] = useState<ApiPitch | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -212,7 +213,7 @@ function OutboundMode() {
     generationInFlight.current = true;
     const controller = new AbortController();
     streamController.current = controller;
-    setGenerating(true); setError(null); setDraft(null); setStreamText(""); setDirty(false);
+    setGenerating(true); setError(null); setDraft(null); setStreamText(""); setStreamStatus(DEFAULT_PITCH_STATUS); setDirty(false);
     try {
       const body = form.brandSource === "matched" && selectedMatch
         ? {
@@ -231,7 +232,7 @@ function OutboundMode() {
             past_brand_partnership: joinEntries(form.pastDeals),
             content_link: joinEntries(form.contentLinks),
           };
-      const data = await generatePitch(body, (delta) => setStreamText(previous => previous + delta), controller.signal);
+      const data = await generatePitch(body, (delta) => setStreamText(previous => previous + delta), controller.signal, setStreamStatus);
       if (controller.signal.aborted) return;
       setDraft(data);
       setDirty(false);
@@ -338,13 +339,13 @@ function OutboundMode() {
             <Label>Past brand partnerships (optional)</Label>
             <MultiInput values={form.pastDeals} onChange={v => set("pastDeals", v)} placeholder="e.g. Focusrite — or leave blank if none yet"
               maxLength={500} name="Past brand partnership" addLabel="+ Add another partnership" />
-            <p className="mt-1.5 text-xs text-muted-foreground/70 leading-relaxed">Up to 3. Please don't use commas inside one entry.</p>
+            <p className="mt-1.5 text-xs text-muted-foreground/70 leading-relaxed">Up to 3. You can paste an Instagram post link so MAVLIT can read the post (please don't use commas inside one entry).</p>
           </div>
           <div>
             <Label>Link to your most relevant content</Label>
             <MultiInput values={form.contentLinks} onChange={v => set("contentLinks", v)} placeholder="https://instagram.com/p/your-best-post"
               maxLength={500} name="Content link" addLabel="+ Add another link" />
-            <p className="mt-1.5 text-xs text-muted-foreground/70 leading-relaxed">Up to 3. Link to content that shows your connection to this brand.</p>
+            <p className="mt-1.5 text-xs text-muted-foreground/70 leading-relaxed">Up to 3. Paste your Instagram post links. MAVLIT reads each post so your pitch can refer to it.</p>
           </div>
           <div className="flex items-start justify-between gap-4 pt-1 px-4 py-3.5 rounded-xl bg-primary/5 border border-primary/20">
             <div className="flex items-start gap-3 min-w-0">
@@ -376,7 +377,7 @@ function OutboundMode() {
         {/* Email output */}
           {(generating || draft) && (
             <motion.div ref={emailRef} key="pitch-output" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
-              {generating ? <LivePitchDraft text={streamText} /> : draft &&
+              {generating ? <LivePitchDraft text={streamText} status={streamStatus} /> : draft &&
                 <PitchDraftEditor key={draft.id} pitch={draft} onSaved={saved} onSavingChange={setSaving} onDirtyChange={setDirty} />}
             </motion.div>
           )}

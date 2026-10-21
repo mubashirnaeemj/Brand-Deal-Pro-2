@@ -77,7 +77,7 @@ describe("Pitch page generation and review", () => {
     await screen.findByRole("textbox", { name: "Pitch email draft" });
     expect(post).toHaveBeenCalledWith(expect.objectContaining({
       brand_id: 7, is_custom: false, product_reference: "Creator's preferred launch",
-    }), expect.any(Function), expect.any(AbortSignal));
+    }), expect.any(Function), expect.any(AbortSignal), expect.any(Function));
     queryClient.clear();
   });
 
@@ -132,7 +132,7 @@ describe("Pitch page generation and review", () => {
       expect(post).toHaveBeenCalledExactlyOnceWith({
         is_custom: false, brand_id: 7, story: pitch.story,
         product_reference: "A, B", past_brand_partnership: "C", content_link: "https://x.com/1, http://x.com/3",
-      }, expect.any(Function), expect.any(AbortSignal));
+      }, expect.any(Function), expect.any(AbortSignal), expect.any(Function));
       queryClient.clear();
     });
 
@@ -144,7 +144,7 @@ describe("Pitch page generation and review", () => {
       await screen.findByRole("textbox", { name: "Pitch email draft" });
       expect(post).toHaveBeenCalledWith(expect.objectContaining({
         product_reference: null, past_brand_partnership: null, content_link: "https://x.com/1",
-      }), expect.any(Function), expect.any(AbortSignal));
+      }), expect.any(Function), expect.any(AbortSignal), expect.any(Function));
       queryClient.clear();
     });
 
@@ -168,6 +168,30 @@ describe("Pitch page generation and review", () => {
       expect(productInputs()[1]).toHaveValue("Second launch");
       queryClient.clear();
     });
+  });
+
+  it("shows server status events in the status line until the draft starts, then keeps the draft", async () => {
+    const queryClient = mountMatches();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+    let status!: (text: string) => void;
+    let publish!: (text: string) => void;
+    vi.spyOn(pitchStreaming, "generatePitch").mockImplementation((_body, delta, _signal, onStatus) => {
+      publish = delta;
+      status = onStatus!;
+      return new Promise<ApiPitch>(() => {});
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
+    fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
+    fillLink();
+    fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Writing your pitch…");
+    act(() => status("Reading the Instagram posts you linked…"));
+    expect(screen.getByRole("status")).toHaveTextContent("Reading the Instagram posts you linked…");
+    act(() => status("Writing your pitch…"));
+    act(() => publish("Hi"));
+    expect(screen.getByRole("status")).toHaveTextContent("Writing your pitch…");
+    expect(screen.getByPlaceholderText("MAVLIT is writing your pitch…")).toHaveValue("Hi");
+    queryClient.clear();
   });
 
   it("shows the saved final email on its Pipeline card", () => {
@@ -215,7 +239,7 @@ describe("Pitch page generation and review", () => {
     expect(post).toHaveBeenCalledExactlyOnceWith({
       is_custom: true, custom_brand_name: pitch.brand_name, story: pitch.story,
       product_reference: null, past_brand_partnership: null, content_link: "https://example.com/post",
-    }, expect.any(Function), expect.any(AbortSignal));
+    }, expect.any(Function), expect.any(AbortSignal), expect.any(Function));
     expect(patch).toHaveBeenCalledExactlyOnceWith("/pitches/43", { pitch_text: edited });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["pitches"] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["dashboard"] });

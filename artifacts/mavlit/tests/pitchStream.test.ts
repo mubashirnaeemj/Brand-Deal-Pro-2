@@ -36,6 +36,18 @@ describe("pitch SSE transport", () => {
     expect(headers.get("Accept")).toBe("text/event-stream");
   });
 
+  it("reports status events before the first delta and ignores unknown event types", async () => {
+    mockChunks([encode(
+      event({ type: "status", text: "Reading the Instagram posts you linked…" }) +
+      event({ type: "status", text: "Writing your pitch…" }) +
+      event({ type: "mystery", text: "ignored" }) +
+      event({ type: "delta", text: "Hi" }) + done,
+    )]);
+    const order: string[] = [];
+    await generatePitch(body, (text) => order.push(`delta:${text}`), undefined, (text) => order.push(`status:${text}`));
+    expect(order).toEqual(["status:Reading the Instagram posts you linked…", "status:Writing your pitch…", "delta:Hi"]);
+  });
+
   it("delivers a delta before the final event arrives", async () => {
     let controller!: ReadableStreamDefaultController<Uint8Array>;
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(new ReadableStream<Uint8Array>({

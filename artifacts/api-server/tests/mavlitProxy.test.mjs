@@ -29,13 +29,13 @@ async function withProxy(upstream, run) {
   app.use("/api/mavlit", router);
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
-  const send = (path = "/api/mavlit/pitches/stream") => new Promise((resolve, reject) => {
+  const send = (path = "/api/mavlit/pitches/stream", method = "POST") => new Promise((resolve, reject) => {
     const req = request({
-      host: "127.0.0.1", port: server.address().port, path, method: "POST",
+      host: "127.0.0.1", port: server.address().port, path, method,
       headers: { "Content-Type": "application/json", Cookie: "access_token=synthetic-fixture" },
     }, resolve);
     req.on("error", reject);
-    req.end(JSON.stringify({ is_custom: false, brand_id: 7, story: "Synthetic story" }));
+    req.end(method === "POST" ? JSON.stringify({ is_custom: false, brand_id: 7, story: "Synthetic story" }) : undefined);
   });
   try { await run(send); }
   finally {
@@ -102,5 +102,38 @@ test("browser disconnect aborts the upstream stream", async () => {
       await new Promise(resolve => setTimeout(resolve, 10));
     }
     assert.equal(upstreamSignal.aborted, true);
+  });
+});
+
+test("post thumbnails are requested as images and may be cached privately by the browser", async () => {
+  let upstreamCall;
+  const image = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0]);
+  await withProxy(async (url, options) => {
+    upstreamCall = { url: String(url), options };
+    return new Response(image, { headers: { "Content-Type": "image/jpeg", "Cache-Control": "public, max-age=86400" } });
+  }, async send => {
+    const response = await send("/api/mavlit/creator-profile/me/posts/12/thumbnail", "GET");
+    const chunks = [];
+    for await (const chunk of response) chunks.push(chunk);
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.headers["content-type"], "image/jpeg");
+    assert.equal(response.headers["cache-control"], "private, max-age=86400");
+    assert.deepEqual([...Buffer.concat(chunks)], [...image]);
+    assert.equal(upstreamCall.url, "https://api.mavlit.com/creator-profile/me/posts/12/thumbnail");
+    assert.match(upstreamCall.options.headers.get("Accept"), /^image\//);
+  });
+});
+
+test("other responses, including thumbnail errors, are never cached", async () => {
+  await withProxy(async () => new Response("{}", { status: 404, headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=60" } }), async send => {
+    const response = await send("/api/mavlit/creator-profile/me/posts/12/thumbnail", "GET");
+    for await (const _ of response); // drain
+    assert.equal(response.statusCode, 404);
+    assert.equal(response.headers["cache-control"], "no-store");
+  });
+  await withProxy(async () => new Response("{}", { headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=60" } }), async send => {
+    const response = await send("/api/mavlit/creator-profile/me", "GET");
+    for await (const _ of response); // drain
+    assert.equal(response.headers["cache-control"], "no-store");
   });
 });

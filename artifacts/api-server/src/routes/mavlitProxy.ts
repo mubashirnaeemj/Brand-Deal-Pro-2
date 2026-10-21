@@ -25,7 +25,9 @@ router.use(async (req, res): Promise<void> => {
   const streaming = req.method === "POST" && req.path === "/pitches/stream";
   // A pitch or a new profile post can take ~2 minutes when MAVLIT first scrapes an Instagram post.
   const slowPitch = streaming || (req.method === "POST" && ["/pitches", "/creator-profile/me/posts"].includes(req.path));
-  const headers = new Headers({ Accept: streaming ? "text/event-stream" : "application/json" });
+  // Post thumbnails are images that MAVLIT caches; let the browser keep them too.
+  const thumbnail = req.method === "GET" && /^\/creator-profile\/me\/posts\/[^/]+\/thumbnail$/.test(req.path);
+  const headers = new Headers({ Accept: streaming ? "text/event-stream" : thumbnail ? "image/*,*/*;q=0.8" : "application/json" });
   const accessToken = req.cookies?.access_token;
   if (typeof accessToken === "string") headers.set("Cookie", `access_token=${accessToken}`);
   const hasBody = !["GET", "HEAD", "DELETE"].includes(req.method);
@@ -43,7 +45,9 @@ router.use(async (req, res): Promise<void> => {
       signal: AbortSignal.any([disconnected.signal, AbortSignal.timeout(slowPitch ? 180_000 : 20_000)]),
     });
 
-    res.setHeader("Cache-Control", "no-store");
+    const upstreamCache = upstream.headers.get("cache-control");
+    // Cookie-authenticated pictures stay private to this browser.
+    res.setHeader("Cache-Control", thumbnail && upstream.ok && upstreamCache ? upstreamCache.replace(/\bpublic\b/i, "private") : "no-store");
     const contentType = upstream.headers.get("content-type");
     if (contentType) res.setHeader("Content-Type", contentType);
     const cookies = upstream.headers.getSetCookie();

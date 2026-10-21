@@ -1,6 +1,6 @@
 import { profileWriteBody } from "./audience";
 
-const API_BASE = "/api/mavlit";
+export const API_BASE = "/api/mavlit";
 
 type ApiErrorBody = { detail?: unknown; message?: unknown; error?: unknown };
 

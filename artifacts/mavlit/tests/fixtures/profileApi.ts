@@ -5,12 +5,12 @@ type ProfileRecord = CreatorProfile & Record<string, unknown>;
 /** `full_caption` is what the server searches; clients only ever receive `caption_preview`. */
 export type FixturePost = {
   full_caption?: string;
-  id: number; post_url: string; caption_preview: string | null; post_type: string | null; timestamp: string | null;
+  id: number; post_url: string; thumbnail_url?: string | null; caption_preview: string | null; post_type: string | null; timestamp: string | null;
   likes_count: number | null; comments_count: number | null; views_count: number | null; is_partnership_post: boolean;
 };
 const MIN_KEEP = 10;
 export const fixturePost = (id: number, extra: Partial<FixturePost> = {}): FixturePost => ({
-  id, post_url: `https://www.instagram.com/p/POST${id}/`, caption_preview: `Caption ${id}`, post_type: "Reel",
+  id, post_url: `https://www.instagram.com/p/POST${id}/`, thumbnail_url: `/creator-profile/me/posts/${id}/thumbnail`, caption_preview: `Caption ${id}`, post_type: "Reel",
   timestamp: "2026-10-01T10:00:00Z", likes_count: 1234, comments_count: 56, views_count: 78000, is_partnership_post: false, ...extra,
 });
 

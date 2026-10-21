@@ -57,6 +57,30 @@ describe("recent Instagram posts on the profile page", () => {
     }
   });
 
+  it("shows each post's picture from the MAVLIT thumbnail address, left of the details, and a grey box when there is none or it fails", async () => {
+    await mount([
+      fixturePost(1), fixturePost(2, { thumbnail_url: null }), fixturePost(3, { thumbnail_url: "https://scontent.cdninstagram.com/v/t51/x.jpg" }),
+      ...posts(10).slice(3),
+    ]);
+    await openDialog();
+    const [first, second, third, fourth] = rows();
+    const img = first.querySelector("img")!;
+    expect(img).toHaveAttribute("src", "/api/mavlit/creator-profile/me/posts/1/thumbnail");
+    expect(img).toHaveAttribute("alt", "");
+    expect(img).toHaveAttribute("loading", "lazy");
+    expect(img).toHaveStyle({ width: "84px", height: "84px" });
+    expect(img.compareDocumentPosition(within(first).getByText("Caption 1")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(second).getByTestId("post-thumbnail-empty")).toHaveTextContent("No picture");
+    expect(within(second).getByTestId("post-thumbnail-empty")).toHaveStyle({ width: "84px", height: "84px" });
+    // Instagram's own addresses are blocked in browsers, so they are never used.
+    expect(third.querySelector("img")).toBeNull();
+    expect(within(third).getByTestId("post-thumbnail-empty")).toBeInTheDocument();
+    expect(document.querySelector('img[src*="instagram"]')).toBeNull();
+    fireEvent.error(fourth.querySelector("img")!);
+    expect(within(fourth).getByTestId("post-thumbnail-empty")).toHaveTextContent("No picture");
+    expect(fourth.querySelector("img")).toBeNull();
+  });
+
   it("opens a post from its View post button, stacked above Delete, in a new tab without noopener leaks", async () => {
     const user = userEvent.setup();
     await mount(posts(10));

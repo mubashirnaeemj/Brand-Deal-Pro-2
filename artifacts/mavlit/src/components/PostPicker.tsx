@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Loader2, X } from "lucide-react";
+import PostThumbnail from "@/components/PostThumbnail";
 import {
   addCreatorPost, formatCount, isPostsList, listCreatorPosts, openPost, postedAtLabel, type CreatorPost, type CreatorPostsList,
 } from "@/lib/creatorPosts";
@@ -217,6 +218,7 @@ export function PostPickerDialog({ kind, open, onOpenChange, entries, onChoose, 
                 return (
                   <li key={post.id} data-testid="picker-row" onClick={() => toggle(post)}
                     className={`flex cursor-pointer items-center gap-4 p-4 transition-colors hover:bg-white/5 ${checked ? "bg-primary/5" : ""} ${blocked ? "opacity-50" : ""}`}>
+                    <PostThumbnail url={post.thumbnail_url} size={72} />
                     <div className="min-w-0 flex-1 space-y-1.5">
                       <p className="truncate text-xs text-muted-foreground/70" data-testid="picker-post-url">{post.post_url}</p>
                       <p className="line-clamp-2 text-sm text-white/80">{post.caption_preview?.trim() || "(no caption)"}</p>

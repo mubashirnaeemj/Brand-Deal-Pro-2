@@ -60,7 +60,7 @@ const findBrand = async (text = "@freshbrand", fakeTimers = false) => {
 // The creator's saved Instagram posts, as the API returns them.
 const savedPost = (id: number, extra: { full_caption?: string } & Record<string, unknown> = {}) => ({
   full_caption: undefined as string | undefined,
-  id, post_url: `https://www.instagram.com/p/P${id}/`, caption_preview: `Caption ${id}`, likes_count: 1234,
+  id, post_url: `https://www.instagram.com/p/P${id}/`, thumbnail_url: `/creator-profile/me/posts/${id}/thumbnail`, caption_preview: `Caption ${id}`, likes_count: 1234,
   comments_count: 56, views_count: 78000, is_partnership_post: false, ...extra,
 });
 let savedPosts: ReturnType<typeof savedPost>[] = [];
@@ -493,6 +493,30 @@ describe("Pitch page generation and review", () => {
       expect(dialog).toHaveTextContent("3 of 3 chosen.");
       fireEvent.click(rowsNow()[0]);
       expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
+      queryClient.clear();
+    });
+
+    it.each(["link", "partnership"] as const)("shows each post's picture left of its details in the %s picker, with a grey fallback", async (kind) => {
+      savedPosts = [savedPost(4, { is_partnership_post: true }), savedPost(5, { is_partnership_post: true, thumbnail_url: null }), savedPost(6, { is_partnership_post: true })];
+      const { queryClient } = setup();
+      const dialog = await openPicker(kind);
+      const [first, second, third] = within(dialog).getAllByTestId("picker-row");
+      const img = first.querySelector("img")!;
+      expect(img).toHaveAttribute("src", "/api/mavlit/creator-profile/me/posts/4/thumbnail");
+      expect(img).toHaveAttribute("alt", "");
+      expect(img).toHaveAttribute("loading", "lazy");
+      expect(img).toHaveStyle({ width: "72px", height: "72px" });
+      // picture, details, then the checkbox
+      const details = within(first).getByTestId("picker-post-url");
+      const box = within(first).getByRole("checkbox");
+      expect(img.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(details.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(second).getByTestId("post-thumbnail-empty")).toHaveTextContent("No picture");
+      fireEvent.error(third.querySelector("img")!);
+      expect(within(third).getByTestId("post-thumbnail-empty")).toBeInTheDocument();
+      // Clicking the picture is part of the box: it ticks the post.
+      fireEvent.click(img);
+      expect(box).toBeChecked();
       queryClient.clear();
     });
 

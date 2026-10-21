@@ -499,12 +499,17 @@ describe("Pitch page generation and review", () => {
     it.each(["link", "partnership"] as const)("shows each post's picture left of its details in the %s picker, with a grey fallback", async (kind) => {
       savedPosts = [savedPost(4, { is_partnership_post: true }), savedPost(5, { is_partnership_post: true, thumbnail_url: null }), savedPost(6, { is_partnership_post: true })];
       const { queryClient } = setup();
+      const fetchPicture = vi.fn(async (input: RequestInfo | URL) => String(input).includes("/posts/6/")
+        ? new Response("{}", { status: 404 }) : new Response(new Blob(["jpeg"], { type: "image/jpeg" })));
+      vi.stubGlobal("fetch", fetchPicture);
       const dialog = await openPicker(kind);
       const [first, second, third] = within(dialog).getAllByTestId("picker-row");
+      await waitFor(() => expect(first.querySelector("img")).not.toBeNull());
       const img = first.querySelector("img")!;
-      expect(img).toHaveAttribute("src", "/api/mavlit/creator-profile/me/posts/4/thumbnail");
+      expect(img.getAttribute("src")).toMatch(/^blob:picture-/);
+      expect(fetchPicture).toHaveBeenCalledWith("/api/mavlit/creator-profile/me/posts/4/thumbnail", expect.objectContaining({ credentials: "include" }));
+      expect(fetchPicture).not.toHaveBeenCalledWith(expect.stringContaining("/posts/5/"), expect.anything());
       expect(img).toHaveAttribute("alt", "");
-      expect(img).toHaveAttribute("loading", "lazy");
       expect(img).toHaveStyle({ width: "72px", height: "72px" });
       // picture, details, then the checkbox
       const details = within(first).getByTestId("picker-post-url");
@@ -512,8 +517,7 @@ describe("Pitch page generation and review", () => {
       expect(img.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(details.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(within(second).getByTestId("post-thumbnail-empty")).toHaveTextContent("No picture");
-      fireEvent.error(third.querySelector("img")!);
-      expect(within(third).getByTestId("post-thumbnail-empty")).toBeInTheDocument();
+      await waitFor(() => expect(within(third).getByTestId("post-thumbnail-empty")).toBeInTheDocument());
       // Clicking the picture is part of the box: it ticks the post.
       fireEvent.click(img);
       expect(box).toBeChecked();

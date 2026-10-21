@@ -57,28 +57,53 @@ describe("recent Instagram posts on the profile page", () => {
     }
   });
 
-  it("shows each post's picture from the MAVLIT thumbnail address, left of the details, and a grey box when there is none or it fails", async () => {
+  it("loads each picture with the sign-in cookie into a blob, left of the details, with a grey box when there is none", async () => {
     await mount([
       fixturePost(1), fixturePost(2, { thumbnail_url: null }), fixturePost(3, { thumbnail_url: "https://scontent.cdninstagram.com/v/t51/x.jpg" }),
-      ...posts(10).slice(3),
+      fixturePost(4), ...posts(10).slice(4),
     ]);
+    fixture.failPicture(4);
     await openDialog();
     const [first, second, third, fourth] = rows();
+    await waitFor(() => expect(first.querySelector("img")).not.toBeNull());
     const img = first.querySelector("img")!;
-    expect(img).toHaveAttribute("src", "/api/mavlit/creator-profile/me/posts/1/thumbnail");
+    expect(img.getAttribute("src")).toMatch(/^blob:picture-/);
     expect(img).toHaveAttribute("alt", "");
-    expect(img).toHaveAttribute("loading", "lazy");
     expect(img).toHaveStyle({ width: "84px", height: "84px" });
     expect(img.compareDocumentPosition(within(first).getByText("Caption 1")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const pictureRequests = fixture.requests.filter((r) => r.path.endsWith("/thumbnail"));
+    expect(pictureRequests.map((r) => r.path)).toContain("/api/mavlit/creator-profile/me/posts/1/thumbnail");
+    expect(pictureRequests.every((r) => r.credentials === "include")).toBe(true);
     expect(within(second).getByTestId("post-thumbnail-empty")).toHaveTextContent("No picture");
     expect(within(second).getByTestId("post-thumbnail-empty")).toHaveStyle({ width: "84px", height: "84px" });
-    // Instagram's own addresses are blocked in browsers, so they are never used.
+    // Instagram's own addresses are blocked in browsers: never requested, never shown.
     expect(third.querySelector("img")).toBeNull();
     expect(within(third).getByTestId("post-thumbnail-empty")).toBeInTheDocument();
-    expect(document.querySelector('img[src*="instagram"]')).toBeNull();
-    fireEvent.error(fourth.querySelector("img")!);
-    expect(within(fourth).getByTestId("post-thumbnail-empty")).toHaveTextContent("No picture");
+    expect(pictureRequests.some((r) => r.path.includes("cdninstagram"))).toBe(false);
+    // A 404 from the server shows the grey box.
+    await waitFor(() => expect(within(fourth).getByTestId("post-thumbnail-empty")).toHaveTextContent("No picture"));
     expect(fourth.querySelector("img")).toBeNull();
+  });
+
+  it("only loads a picture once its row scrolls into view and releases it when the row goes", async () => {
+    const observers: { callback: IntersectionObserverCallback; node: Element }[] = [];
+    vi.stubGlobal("IntersectionObserver", class {
+      constructor(callback: IntersectionObserverCallback) { this.callback = callback; }
+      callback: IntersectionObserverCallback;
+      observe(node: Element) { observers.push({ callback: this.callback, node }); }
+      disconnect() {}
+      unobserve() {}
+    });
+    await mount(posts(14));
+    await openDialog();
+    expect(fixture.requests.some((r) => r.path.endsWith("/thumbnail"))).toBe(false);
+    const first = observers.find(({ node }) => rows()[0].contains(node))!;
+    await act(async () => first.callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver));
+    await waitFor(() => expect(rows()[0].querySelector("img")).not.toBeNull());
+    expect(fixture.requests.filter((r) => r.path.endsWith("/thumbnail"))).toHaveLength(1);
+    const blobUrl = rows()[0].querySelector("img")!.getAttribute("src");
+    cleanup();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(blobUrl);
   });
 
   it("opens a post from its View post button, stacked above Delete, in a new tab without noopener leaks", async () => {

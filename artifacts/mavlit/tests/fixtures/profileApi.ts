@@ -24,6 +24,7 @@ export function installProfileApi(initial: CreatorProfile) {
   let generationEnabled = false;
   let posts: FixturePost[] = [];
   let nextPostId = 1000;
+  const missingPictures = new Set<number>();
   const publicPost = ({ full_caption: _caption, ...post }: FixturePost) => post;
   const postsList = (q = "") => {
     const needle = q.toLowerCase();
@@ -51,6 +52,13 @@ export function installProfileApi(initial: CreatorProfile) {
       };
       // The real endpoint need not echo platform or return a description yet.
       return reply({ status: "queued", job_id: `fixture-${platform}-audience-job` });
+    }
+    const thumbnail = url.pathname.match(/^\/api\/mavlit\/creator-profile\/me\/posts\/(\d+)\/thumbnail$/);
+    if (thumbnail && method === "GET") {
+      const post = posts.find((candidate) => candidate.id === Number(thumbnail[1]));
+      return !post || missingPictures.has(post.id)
+        ? reply({ detail: "No picture" }, 404)
+        : new Response(new Blob(["jpeg"], { type: "image/jpeg" }), { status: 200, headers: { "Content-Type": "image/jpeg" } });
     }
     const postRoute = url.pathname.match(/^\/api\/mavlit\/creator-profile\/me\/posts(?:\/(\d+))?$/);
     if (postRoute && url.origin === window.location.origin) {
@@ -103,6 +111,7 @@ export function installProfileApi(initial: CreatorProfile) {
     get writes() { return requests.filter((request) => request.method === "PUT"); },
     get persisted() { return structuredClone(persisted); },
     replaceOnServer(profile: CreatorProfile) { persisted = structuredClone(profile) as ProfileRecord; },
+    failPicture(id: number) { missingPictures.add(id); },
     setPosts(next: FixturePost[]) { posts = structuredClone(next); },
     get posts() { return structuredClone(posts); },
     failGet(message: string | null) { getFailure = message; },

@@ -1,4 +1,4 @@
-import { api, API_BASE } from "./api";
+import { api } from "./api";
 
 export interface CreatorPost {
   id: string | number;
@@ -52,11 +52,11 @@ export function postedAtLabel(timestamp: string | null | undefined): string {
 }
 
 /**
- * The thumbnail address to put in an <img>. Only MAVLIT's own path is used (through the same-origin proxy):
- * Instagram and its CDN refuse to be embedded, so anything else counts as "no picture".
+ * MAVLIT's own thumbnail path, or null. Instagram and its CDN refuse to be embedded, so any other
+ * address counts as "no picture".
  */
-export const thumbnailSrc = (thumbnailUrl: string | null | undefined): string | null =>
-  thumbnailUrl && thumbnailUrl.startsWith("/") && !thumbnailUrl.startsWith("//") ? `${API_BASE}${thumbnailUrl}` : null;
+export const thumbnailPath = (thumbnailUrl: string | null | undefined): string | null =>
+  thumbnailUrl && thumbnailUrl.startsWith("/") && !thumbnailUrl.startsWith("//") ? thumbnailUrl : null;
 
 export const openPost = (url: string | null | undefined) => {
   if (url) window.open(url, "_blank", "noopener,noreferrer");

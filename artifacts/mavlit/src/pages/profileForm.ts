@@ -24,7 +24,7 @@ export type ProfileForm = {
   brandPreferences: string;
   pitchStylePreferences: string;
   primaryPlatforms: PlatformKey[];
-  instagram: PlatformDetails & { username: string; followers: string };
+  instagram: PlatformDetails & { username: string; followers: string; highestViews: string };
   youtube: PlatformDetails & { channelName: string; subscribers: string };
 };
 
@@ -44,6 +44,7 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
     instagram: {
       username: text(profile.instagram_handle),
       followers: numberText(profile.instagram_followers ?? (firstPlatform === "instagram" ? profile.follower_count : null)),
+      highestViews: numberText(profile.instagram_highest_views),
       primaryNiches: parsePrimaryNiches(profile.instagram_primary_niche ?? profile.content_niche),
       subNiches: normalizeSubNiches(profile.instagram_sub_niches ?? profile.sub_niches ?? []),
       excludedCategories: profile.instagram_excluded_categories ?? profile.excluded_categories ?? [],
@@ -76,7 +77,7 @@ export function validateProfile(form: ProfileForm, profile: CreatorProfile): str
   if (form.age.trim() && (!Number.isInteger(Number(form.age)) || Number(form.age) < 13 || Number(form.age) > 120)) {
     return "Age must be a whole number between 13 and 120.";
   }
-  for (const [value, label] of [[form.instagram.followers, "Follower count"], ...(form.primaryPlatforms.includes("youtube") ? [[form.youtube.subscribers, "Subscriber count"]] : [])]) {
+  for (const [value, label] of [[form.instagram.followers, "Follower count"], [form.instagram.highestViews, "Highest Instagram reel / post views"], ...(form.primaryPlatforms.includes("youtube") ? [[form.youtube.subscribers, "Subscriber count"]] : [])]) {
     if (value.trim() && (!Number.isInteger(Number(value)) || Number(value) < 0)) return `${label} must be a non-negative whole number.`;
   }
   for (const platform of ["instagram", "youtube"] as const) {
@@ -117,6 +118,7 @@ function profileValues(form: ProfileForm, profile: CreatorProfile): Partial<Crea
     primary_platform: formatPlatforms(form.primaryPlatforms),
     instagram_handle: instagramHandle || null,
     instagram_followers: optionalNumber(form.instagram.followers),
+    instagram_highest_views: optionalNumber(form.instagram.highestViews),
     follower_count: optionalNumber(form.primaryPlatforms[0] === "youtube" ? form.youtube.subscribers : form.instagram.followers),
     instagram_primary_niche: formatPrimaryNiches(form.instagram.primaryNiches),
     content_niche: formatPrimaryNiches(form.instagram.primaryNiches),

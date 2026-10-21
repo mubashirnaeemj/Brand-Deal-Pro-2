@@ -158,6 +158,14 @@ export default function ProfileWizard(p: ProfileWizardProps) {
                   disabled={p.saving}
                   onChange={(e) => setIg({ followers: e.target.value })} />
               </label>}
+              {showAllFields && <label className={labelCls}>Highest Instagram reel / post views
+                <input data-testid="input-highest-views" type="number" min={0} step={1} className={`${INPUT_CLASS} mt-1.5`} value={ig.highestViews}
+                  disabled={p.saving} placeholder="120000"
+                  onChange={(e) => setIg({ highestViews: e.target.value })} />
+                <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">
+                  The most views on any of your reels or videos. MAVLIT fills it in when it generates your description.
+                </span>
+              </label>}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">

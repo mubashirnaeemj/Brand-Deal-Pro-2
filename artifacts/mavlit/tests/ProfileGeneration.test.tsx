@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import ProfileSettings from "@/pages/ProfileSettings";
 import OnboardingPage from "@/pages/OnboardingPage";
 import { useAuth } from "@/contexts/AuthContext";
+import { applyProfileGeneration } from "@/pages/profileWizardModel";
+import { profileToForm } from "@/pages/profileForm";
 import { renderProfile } from "./renderProfile";
 import { creatorProfile } from "./fixtures/creatorProfile";
 import { installProfileApi } from "./fixtures/profileApi";
@@ -91,6 +93,36 @@ describe("Instagram wizard generation", () => {
     details();
     expect(screen.getByTestId("input-followers")).toHaveValue(10001);
     expect(screen.getByLabelText("instagram audience age range")).toHaveValue("25-44");
+  });
+
+  it("fills highest views from the completed job, sends it in the PUT, and keeps it after reload", async () => {
+    const rendered = await mount();
+    finish({ instagram_highest_views: 250000 });
+    await tick(1500);
+    await tick(450);
+    expect(screen.getByTestId("input-highest-views")).toHaveValue(250000);
+    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    await settle();
+    expect(fixture.writes.at(-1)!.body).toMatchObject({ instagram_highest_views: 250000 });
+    expect(fixture.persisted).toMatchObject({ instagram_highest_views: 250000 });
+    rendered.unmount();
+    renderProfile(<ProfileSettings />);
+    await settle();
+    details();
+    expect(screen.getByTestId("input-highest-views")).toHaveValue(250000);
+  });
+
+  it("keeps the typed highest views when the generated value is null, and does not need it to start", async () => {
+    await mount();
+    expect(screen.queryByTestId("input-highest-views")).not.toBeInTheDocument();
+    finish({ instagram_highest_views: null });
+    await tick(1500);
+    await tick(450);
+    expect(screen.getByTestId("input-highest-views")).toHaveValue(null);
+    fireEvent.change(screen.getByTestId("input-highest-views"), { target: { value: "7000" } });
+    const typed = profileToForm(creatorProfile({ instagram_highest_views: 7000, instagram_description_mode: "generate" }));
+    expect(applyProfileGeneration(typed, creatorProfile({ instagram_highest_views: null }), "instagram").instagram.highestViews).toBe("7000");
+    expect(applyProfileGeneration(typed, creatorProfile({ instagram_highest_views: 9000 }), "instagram").instagram.highestViews).toBe("9000");
   });
 
   it("shows only username and primary niches with both Generate and disabled Save Profile", async () => {

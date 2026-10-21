@@ -82,6 +82,34 @@ describe("three-page Instagram profile", () => {
     expect(window.location.pathname + window.location.search).toBe("/brand-matches?version=v3");
   });
 
+  it("saves the highest Instagram views as a number, sends null when cleared, and restores it on reload", async () => {
+    const rendered = await mount(creatorProfile({ instagram_highest_views: 5000 }));
+    await details();
+    expect(screen.getByTestId("input-highest-views")).toHaveValue(5000);
+    fireEvent.change(screen.getByTestId("input-highest-views"), { target: { value: "120000" } });
+    await save();
+    expect(fixture.writes[0].body).toMatchObject({ instagram_highest_views: 120000 });
+    rendered.unmount();
+    renderProfile(<ProfileSettings />);
+    await screen.findByTestId("profile-wizard");
+    await details();
+    expect(screen.getByTestId("input-highest-views")).toHaveValue(120000);
+    fireEvent.change(screen.getByTestId("input-highest-views"), { target: { value: "" } });
+    await save();
+    expect(fixture.writes.at(-1)!.body).toMatchObject({ instagram_highest_views: null });
+  });
+
+  it("rejects negative or fractional highest views", async () => {
+    await mount();
+    await details();
+    for (const bad of ["-1", "1.5"]) {
+      fireEvent.change(screen.getByTestId("input-highest-views"), { target: { value: bad } });
+      fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+      expect(await screen.findByTestId("text-error")).toHaveTextContent("Highest Instagram reel / post views must be a non-negative whole number.");
+    }
+    expect(fixture.writes).toHaveLength(0);
+  });
+
   it("preserves all hidden YouTube fields, unknown fresh fields, and fresh untouched audience data", async () => {
     await mount();
     await details();

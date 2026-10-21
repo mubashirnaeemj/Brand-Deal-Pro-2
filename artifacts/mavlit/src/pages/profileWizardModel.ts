@@ -34,7 +34,11 @@ export function applyProfileGeneration(form: ProfileForm, profile: CreatorProfil
       subNiches: generated.subNiches,
       audienceAgeRange: generated.audienceAgeRange,
       audienceDescription: generated.audienceDescription,
-      ...(platform === "instagram" ? { followers: profileToForm(profile).instagram.followers } : {}),
+      ...(platform === "instagram" ? {
+        followers: profileToForm(profile).instagram.followers,
+        // Scraped posts may carry no view counts; keep the creator's own entry then.
+        highestViews: profileToForm(profile).instagram.highestViews || form.instagram.highestViews,
+      } : {}),
     } };
   }
   const audience = fillEmptyAudience(current, profile, platform);

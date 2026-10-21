@@ -63,6 +63,7 @@ export interface CreatorProfile {
   substack_url: string | null;
   substack_subscribers: number | null;
   instagram_followers: number | null;
+  instagram_highest_views?: number | null;
   youtube_channel_name: string | null;
   youtube_subscribers: number | null;
   instagram_following: number | null;

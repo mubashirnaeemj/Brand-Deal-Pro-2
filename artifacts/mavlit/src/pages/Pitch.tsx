@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useLocation, useSearch } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, Copy, Check, ChevronDown, AlertTriangle, Lightbulb,
-  User, ArrowRight, Building2, CheckCircle2,
+  User, ArrowRight, Building2, CheckCircle2, X,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -35,14 +35,16 @@ interface OutboundForm {
   selectedBrand: string;
   customBrand: string;
   story: string;
-  recentProductLaunch: string;
-  pastDeals: string;
-  contentLink: string;
+  recentProductLaunch: string[];
+  pastDeals: string[];
+  contentLinks: string[];
 }
+
+const MAX_ENTRIES = 3;
 
 const EMPTY_OUTBOUND: OutboundForm = {
   brandSource: "matched", selectedBrand: "", customBrand: "",
-  story: "", recentProductLaunch: "", pastDeals: "", contentLink: "",
+  story: "", recentProductLaunch: [""], pastDeals: [""], contentLinks: [""],
 };
 
 // ── Shared UI ──────────────────────────────────────────────────────────────────
@@ -51,10 +53,12 @@ function Label({ children }: { children: React.ReactNode }) {
   return <label className="block text-sm font-semibold text-white/80 mb-1.5">{children}</label>;
 }
 
-function Input({ value, onChange, placeholder, readOnly }: { value: string; onChange?: (v: string) => void; placeholder?: string; readOnly?: boolean }) {
+function Input({ value, onChange, placeholder, readOnly, maxLength, ariaLabel }: { value: string; onChange?: (v: string) => void; placeholder?: string; readOnly?: boolean; maxLength?: number; ariaLabel?: string }) {
   return (
     <input
       value={value}
+      maxLength={maxLength}
+      aria-label={ariaLabel}
       onChange={onChange ? e => onChange(e.target.value) : undefined}
       readOnly={readOnly}
       placeholder={placeholder}
@@ -62,6 +66,52 @@ function Input({ value, onChange, placeholder, readOnly }: { value: string; onCh
     />
   );
 }
+
+/** Up to MAX_ENTRIES text inputs; the caller joins the filled ones into one string. */
+function MultiInput({ values, onChange, placeholder, maxLength, name, addLabel }: {
+  values: string[]; onChange: (values: string[]) => void; placeholder: string; maxLength: number; name: string; addLabel: string;
+}) {
+  const inputs = useRef<(HTMLInputElement | null)[]>([]);
+  const focusIndex = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (focusIndex.current !== null) inputs.current[focusIndex.current]?.focus();
+    focusIndex.current = null;
+  });
+  const update = (index: number, value: string) => onChange(values.map((v, i) => i === index ? value : v));
+  return (
+    <div className="space-y-2">
+      {values.map((value, index) => (
+        <div key={index} className="flex items-center gap-2">
+          <input
+            ref={el => { inputs.current[index] = el; }}
+            value={value}
+            maxLength={maxLength}
+            aria-label={`${name} ${index + 1}`}
+            placeholder={placeholder}
+            onChange={e => update(index, e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all"
+          />
+          {index > 0 && (
+            <button type="button" aria-label={`Remove ${name.toLowerCase()} ${index + 1}`}
+              onClick={() => onChange(values.filter((_, i) => i !== index))}
+              className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-white hover:border-white/30 transition-all">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      ))}
+      {values.length < MAX_ENTRIES && (
+        <button type="button" onClick={() => { focusIndex.current = values.length; onChange([...values, ""]); }}
+          className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
+          {addLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
+const joinEntries = (values: string[]) => values.map(v => v.trim()).filter(Boolean).join(", ") || null;
+const withFirst = (values: string[], first: string) => [first, ...values.slice(1)];
 
 function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
   return (
@@ -123,7 +173,7 @@ function OutboundMode() {
     if (prefilledMatch) {
       setFormState(previous => previous.brandSource === "found" && previous.customBrand === prefillBrand
         ? { ...previous, brandSource: "matched", selectedBrand: String(prefilledMatch.brand_raw_id), customBrand: "",
-            recentProductLaunch: productReferenceEdited.current ? previous.recentProductLaunch : prefilledMatch.latest_product?.trim() || "" }
+            recentProductLaunch: productReferenceEdited.current ? previous.recentProductLaunch : withFirst(previous.recentProductLaunch, prefilledMatch.latest_product?.trim() || "") }
         : previous);
     }
   }, [matches, prefillBrand]);
@@ -134,9 +184,9 @@ function OutboundMode() {
     setFormState(p => ({
       ...p, [k]: v,
       ...(k === "brandSource" ? {
-        recentProductLaunch: v === "matched"
+        recentProductLaunch: [v === "matched"
           ? matches?.find(b => String(b.brand_raw_id) === p.selectedBrand)?.latest_product?.trim() || ""
-          : "",
+          : ""],
       } : {}),
     }));
   };
@@ -155,6 +205,9 @@ function OutboundMode() {
 
   const generate = async () => {
     if (!canGenerate || saving || generationInFlight.current) return;
+    const links = form.contentLinks.map(v => v.trim()).filter(Boolean);
+    if (!links.length) { setError("Add a link to your most relevant content."); return; }
+    if (links.some(link => !/^https?:\/\//i.test(link))) { setError("Every content link must start with http:// or https://"); return; }
     if (dirty && !window.confirm("Generate a new pitch and discard your unsaved email edits? The previous generated draft remains in Pipeline.")) return;
     generationInFlight.current = true;
     const controller = new AbortController();
@@ -166,17 +219,17 @@ function OutboundMode() {
             is_custom: false,
             brand_id: selectedMatch.brand_raw_id,
             story: form.story,
-            product_reference: form.recentProductLaunch || undefined,
-            past_brand_partnership: form.pastDeals || undefined,
-            content_link: form.contentLink || undefined,
+            product_reference: joinEntries(form.recentProductLaunch),
+            past_brand_partnership: joinEntries(form.pastDeals),
+            content_link: joinEntries(form.contentLinks),
           }
         : {
             is_custom: true,
             custom_brand_name: brandName,
             story: form.story,
-            product_reference: form.recentProductLaunch || undefined,
-            past_brand_partnership: form.pastDeals || undefined,
-            content_link: form.contentLink || undefined,
+            product_reference: joinEntries(form.recentProductLaunch),
+            past_brand_partnership: joinEntries(form.pastDeals),
+            content_link: joinEntries(form.contentLinks),
           };
       const data = await generatePitch(body, (delta) => setStreamText(previous => previous + delta), controller.signal);
       if (controller.signal.aborted) return;
@@ -236,7 +289,7 @@ function OutboundMode() {
                       <button key={b.brand_raw_id} onClick={() => {
                           productReferenceEdited.current = false;
                           setFormState(p => ({ ...p, selectedBrand: selected ? "" : String(b.brand_raw_id),
-                            recentProductLaunch: selected ? "" : b.latest_product?.trim() || "" }));
+                            recentProductLaunch: selected ? [""] : withFirst(p.recentProductLaunch, b.latest_product?.trim() || "") }));
                         }}
                         className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${selected ? "border-primary bg-primary/10 text-white" : "border-border text-muted-foreground hover:border-primary/40 hover:text-white"}`}>
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-primary/15">
@@ -272,19 +325,26 @@ function OutboundMode() {
           {brandName && (
             <div>
               <Label>Reference a recent product launch <span className="font-normal text-muted-foreground/50">— optional</span></Label>
-              <Input
-                value={form.recentProductLaunch}
+              <MultiInput
+                values={form.recentProductLaunch}
                 onChange={v => set("recentProductLaunch", v)}
                 placeholder="Enter a product launch, or leave blank to skip"
+                maxLength={300} name="Product launch" addLabel="+ Add another product launch"
               />
-              <p className="mt-1.5 text-xs text-muted-foreground/60 leading-relaxed">We prefill the brand’s latest product when available. Edit or clear it anytime. If filled in, it’ll be woven into your pitch as a natural reason for the timing.</p>
+              <p className="mt-1.5 text-xs text-muted-foreground/60 leading-relaxed">Up to 3. Please don't use commas inside one entry. We prefill the brand’s latest product when available. Edit or clear it anytime. If filled in, it’ll be woven into your pitch as a natural reason for the timing.</p>
             </div>
           )}
-          <div><Label>Past brand partnerships (optional)</Label><Input value={form.pastDeals} onChange={v => set("pastDeals", v)} placeholder="e.g. Focusrite, Splice, Roland — or leave blank if none yet" /></div>
+          <div>
+            <Label>Past brand partnerships (optional)</Label>
+            <MultiInput values={form.pastDeals} onChange={v => set("pastDeals", v)} placeholder="e.g. Focusrite — or leave blank if none yet"
+              maxLength={500} name="Past brand partnership" addLabel="+ Add another partnership" />
+            <p className="mt-1.5 text-xs text-muted-foreground/70 leading-relaxed">Up to 3. Please don't use commas inside one entry.</p>
+          </div>
           <div>
             <Label>Link to your most relevant content</Label>
-            <Input value={form.contentLink} onChange={v => set("contentLink", v)} placeholder="https://instagram.com/p/your-best-post" />
-            <p className="mt-1.5 text-xs text-muted-foreground/70 leading-relaxed">Link to content that shows your connection to this brand.</p>
+            <MultiInput values={form.contentLinks} onChange={v => set("contentLinks", v)} placeholder="https://instagram.com/p/your-best-post"
+              maxLength={500} name="Content link" addLabel="+ Add another link" />
+            <p className="mt-1.5 text-xs text-muted-foreground/70 leading-relaxed">Up to 3. Link to content that shows your connection to this brand.</p>
           </div>
           <div className="flex items-start justify-between gap-4 pt-1 px-4 py-3.5 rounded-xl bg-primary/5 border border-primary/20">
             <div className="flex items-start gap-3 min-w-0">

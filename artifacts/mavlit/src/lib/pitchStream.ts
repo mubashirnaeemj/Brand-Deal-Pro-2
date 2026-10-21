@@ -5,9 +5,9 @@ export interface PitchRequest {
   brand_id?: number;
   custom_brand_name?: string;
   story: string;
-  product_reference?: string;
-  past_brand_partnership?: string;
-  content_link?: string;
+  product_reference?: string | null;
+  past_brand_partnership?: string | null;
+  content_link?: string | null;
 }
 
 export const INCOMPLETE_PITCH = "The connection ended before your pitch was finished. Please try again.";

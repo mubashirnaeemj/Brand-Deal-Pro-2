@@ -20,6 +20,10 @@ const pitch: ApiPitch = {
   is_manual: false, sent_at: null, agreed_rate: null, created_at: "2026-10-20T10:00:00Z",
 };
 
+const LINK_PLACEHOLDER = "https://instagram.com/p/your-best-post";
+const fillLink = (value = "https://example.com/post") =>
+  fireEvent.change(screen.getByPlaceholderText(LINK_PLACEHOLDER), { target: { value } });
+
 describe("Pitch page generation and review", () => {
   const matches: ApiMatch[] = [
     { brand_raw_id: 7, brand_name: "Launch Brand", latest_product: "  Latest Studio Mic  ", niche: "Music",
@@ -68,6 +72,7 @@ describe("Pitch page generation and review", () => {
     fireEvent.change(screen.getByPlaceholderText("Enter a product launch, or leave blank to skip"),
       { target: { value: "Creator's preferred launch" } });
     fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
+    fillLink();
     fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
     await screen.findByRole("textbox", { name: "Pitch email draft" });
     expect(post).toHaveBeenCalledWith(expect.objectContaining({
@@ -84,6 +89,85 @@ describe("Pitch page generation and review", () => {
       { target: { value: "Custom Brand" } });
     expect(screen.getByPlaceholderText("Enter a product launch, or leave blank to skip")).toHaveValue("");
     queryClient.clear();
+  });
+
+  describe("multiple product launches, partnerships and links", () => {
+    const productInputs = () => screen.getAllByPlaceholderText("Enter a product launch, or leave blank to skip");
+    const linkInputs = () => screen.getAllByPlaceholderText(LINK_PLACEHOLDER);
+    const addLink = () => screen.queryByRole("button", { name: "+ Add another link" });
+    function setup() {
+      const queryClient = mountMatches();
+      Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+      const post = vi.spyOn(pitchStreaming, "generatePitch").mockResolvedValue({ ...pitch, brand_id: 7, is_custom: false });
+      fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
+      fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
+      return { queryClient, post };
+    }
+
+    it("caps each field at three inputs, focuses the new input, and restores the add button after a removal", () => {
+      const { queryClient } = setup();
+      for (let i = 0; i < 2; i++) fireEvent.click(addLink()!);
+      expect(linkInputs()).toHaveLength(3);
+      expect(linkInputs()[2]).toHaveFocus();
+      expect(addLink()).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove content link 1" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Remove content link 2" }));
+      expect(linkInputs()).toHaveLength(2);
+      expect(addLink()).toBeInTheDocument();
+      queryClient.clear();
+    });
+
+    it("sends each field as one comma-separated string of the trimmed, non-empty values", async () => {
+      const { queryClient, post } = setup();
+      fireEvent.click(screen.getByRole("button", { name: "+ Add another product launch" }));
+      fireEvent.change(productInputs()[0], { target: { value: " A " } });
+      fireEvent.change(productInputs()[1], { target: { value: "B" } });
+      fireEvent.change(screen.getByPlaceholderText(/Focusrite — or leave blank/), { target: { value: "C" } });
+      fireEvent.click(addLink()!);
+      fireEvent.click(addLink()!);
+      fireEvent.change(linkInputs()[0], { target: { value: "https://x.com/1" } });
+      fireEvent.change(linkInputs()[2], { target: { value: " http://x.com/3 " } });
+      fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
+      await screen.findByRole("textbox", { name: "Pitch email draft" });
+      expect(post).toHaveBeenCalledExactlyOnceWith({
+        is_custom: false, brand_id: 7, story: pitch.story,
+        product_reference: "A, B", past_brand_partnership: "C", content_link: "https://x.com/1, http://x.com/3",
+      }, expect.any(Function), expect.any(AbortSignal));
+      queryClient.clear();
+    });
+
+    it("sends empty optional fields as null", async () => {
+      const { queryClient, post } = setup();
+      fireEvent.change(productInputs()[0], { target: { value: "  " } });
+      fillLink("https://x.com/1");
+      fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
+      await screen.findByRole("textbox", { name: "Pitch email draft" });
+      expect(post).toHaveBeenCalledWith(expect.objectContaining({
+        product_reference: null, past_brand_partnership: null, content_link: "https://x.com/1",
+      }), expect.any(Function), expect.any(AbortSignal));
+      queryClient.clear();
+    });
+
+    it("blocks the request when no link is given or a link lacks http(s)://", () => {
+      const { queryClient, post } = setup();
+      fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("Add a link to your most relevant content.");
+      fillLink("x.com/1");
+      fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("Every content link must start with http:// or https://");
+      expect(post).not.toHaveBeenCalled();
+      queryClient.clear();
+    });
+
+    it("prefills only the first product launch and keeps additional entries when the brand changes", () => {
+      const { queryClient } = setup();
+      fireEvent.click(screen.getByRole("button", { name: "+ Add another product launch" }));
+      fireEvent.change(productInputs()[1], { target: { value: "Second launch" } });
+      fireEvent.click(screen.getByRole("button", { name: /Another Brand/ }));
+      expect(productInputs()[0]).toHaveValue("New Audio Interface");
+      expect(productInputs()[1]).toHaveValue("Second launch");
+      queryClient.clear();
+    });
   });
 
   it("shows the saved final email on its Pipeline card", () => {
@@ -115,6 +199,7 @@ describe("Pitch page generation and review", () => {
     fireEvent.change(await screen.findByPlaceholderText("e.g. Focusrite, Rode, Ableton"),
       { target: { value: pitch.brand_name } });
     fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
+    fillLink();
     expect(generate).toBeEnabled();
     fireEvent.click(generate);
     await screen.findByRole("button", { name: "Save changes" });
@@ -129,7 +214,7 @@ describe("Pitch page generation and review", () => {
     expect(screen.getByRole("link", { name: "View in Pipeline" })).toHaveAttribute("href", "/deals");
     expect(post).toHaveBeenCalledExactlyOnceWith({
       is_custom: true, custom_brand_name: pitch.brand_name, story: pitch.story,
-      product_reference: undefined, past_brand_partnership: undefined, content_link: undefined,
+      product_reference: null, past_brand_partnership: null, content_link: "https://example.com/post",
     }, expect.any(Function), expect.any(AbortSignal));
     expect(patch).toHaveBeenCalledExactlyOnceWith("/pitches/43", { pitch_text: edited });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["pitches"] });
@@ -149,6 +234,7 @@ describe("Pitch page generation and review", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
     fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
+    fillLink();
     fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
     const live = screen.getByPlaceholderText("MAVLIT is writing your pitch…");
     expect(live).toHaveValue("");
@@ -188,6 +274,7 @@ describe("Pitch page generation and review", () => {
       });
       fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
       fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
+      fillLink();
       fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
       act(() => publish("Never leave this partial email behind"));
       expect(screen.getByRole("textbox", { name: "Pitch email draft" })).toHaveValue("Never leave this partial email behind");

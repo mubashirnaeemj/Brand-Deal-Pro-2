@@ -65,6 +65,24 @@ describe("recent Instagram posts on the profile page", () => {
     expect(row).toHaveTextContent("Likes – · Comments 56 · Views –");
   });
 
+  it("shows when each post was published in the viewer's time zone, or a dash when unknown", async () => {
+    const expected = new Date("2026-10-20T15:04:00.000Z").toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    await mount([
+      fixturePost(1, { timestamp: "2026-10-20T15:04:00.000Z" }),
+      fixturePost(2, { timestamp: null }),
+      fixturePost(3, { timestamp: "not a date" }),
+      ...posts(10).slice(3),
+    ]);
+    await openDialog();
+    const [first, second, third] = rows();
+    expect(within(first).getByTestId("post-posted-at")).toHaveTextContent(`Posted ${expected}`);
+    // between the caption and the numbers
+    expect(first.textContent).toMatch(/Caption 1Posted .+Likes 1,234/);
+    expect(within(second).getByTestId("post-posted-at")).toHaveTextContent("Posted –");
+    expect(within(third).getByTestId("post-posted-at")).toHaveTextContent("Posted –");
+    expect(document.body).not.toHaveTextContent("Invalid Date");
+  });
+
   it("closes with the × button, Escape and a click on the overlay", async () => {
     const user = userEvent.setup();
     await mount();
@@ -173,5 +191,112 @@ describe("recent Instagram posts on the profile page", () => {
     await user.type(input, "https://example.com{Enter}");
     expect(await screen.findByRole("alert")).toHaveTextContent("That is not an Instagram post link.");
     expect(rows()).toHaveLength(11);
+  });
+});
+
+describe("searching the recent posts by caption", () => {
+  const longCaption = `${"Behind the scenes of my studio setup. ".repeat(4)}Finally unboxing the Zephyr pedal`;
+  const captioned = (count: number) => posts(count).map((post) => {
+    if (post.id === 3) return { ...post, caption_preview: longCaption.slice(0, 40), full_caption: longCaption };
+    if (post.id === 5 || post.id === 7) return { ...post, caption_preview: `Guitar day ${post.id}`, full_caption: `Guitar day ${post.id}` };
+    return post;
+  });
+  const searchFor = async (user: ReturnType<typeof userEvent.setup>, text: string) => {
+    await user.clear(screen.getByRole("searchbox"));
+    await user.type(screen.getByRole("searchbox"), `${text}{Enter}`);
+  };
+  const lastQuery = () => fixture.requests.filter((r) => r.method === "GET" && r.path.endsWith("/posts")).at(-1)?.search;
+
+  it("lists only the matching posts and counts them in the note, ignoring case", async () => {
+    const user = userEvent.setup();
+    await mount(captioned(12));
+    const dialog = await openDialog();
+    expect(screen.queryByRole("button", { name: "Clear" })).not.toBeInTheDocument();
+    await searchFor(user, "GUITAR");
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    expect(lastQuery()).toBe("?q=GUITAR");
+    expect(dialog).toHaveTextContent("2 of your posts match your search. You have 12 posts. A post can be deleted while more than 10 remain.");
+    expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
+  });
+
+  it("finds a word at the end of a long caption through the API, not by filtering the preview", async () => {
+    const user = userEvent.setup();
+    await mount(captioned(12));
+    await openDialog();
+    expect(screen.queryByText(/Zephyr/)).not.toBeInTheDocument();
+    await searchFor(user, "zephyr pedal");
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    expect(rows()[0]).toHaveTextContent("POST3/");
+    expect(lastQuery()).toBe("?q=zephyr%20pedal");
+  });
+
+  it("shows a no-match message, and Clear brings back all posts with an empty search", async () => {
+    const user = userEvent.setup();
+    await mount(captioned(12));
+    const dialog = await openDialog();
+    await searchFor(user, "nothing here");
+    expect(await screen.findByTestId("posts-no-match")).toHaveTextContent('No post caption contains "nothing here".');
+    expect(screen.queryAllByTestId("post-row")).toHaveLength(0);
+    expect(screen.getByTestId("recent-posts-card")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+    await waitFor(() => expect(rows()).toHaveLength(12));
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+    expect(screen.queryByRole("button", { name: "Clear" })).not.toBeInTheDocument();
+    expect(dialog).not.toHaveTextContent("match your search");
+  });
+
+  it("treats a blank search as showing every post and starts empty when reopened", async () => {
+    const user = userEvent.setup();
+    await mount(captioned(12));
+    await openDialog();
+    await searchFor(user, "guitar");
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await openDialog();
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+    await waitFor(() => expect(rows()).toHaveLength(12));
+    await searchFor(user, "guitar");
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    await searchFor(user, "   ");
+    await waitFor(() => expect(rows()).toHaveLength(12));
+    expect(lastQuery()).toBe("");
+  });
+
+  it("keeps Delete enabled by the total: 12 posts with 2 matches, but not 10 posts", async () => {
+    const user = userEvent.setup();
+    const rendered = await mount(captioned(12));
+    await openDialog();
+    await searchFor(user, "guitar");
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    for (const button of deleteButtons()) expect(button).toBeEnabled();
+    rendered.unmount();
+    cleanup();
+    await mount(captioned(10));
+    await openDialog();
+    await searchFor(user, "guitar");
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    for (const button of deleteButtons()) expect(button).toBeDisabled();
+  });
+
+  it("keeps the search active after toggling, deleting and adding a post", async () => {
+    const user = userEvent.setup();
+    await mount(captioned(12));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const dialog = await openDialog();
+    await searchFor(user, "guitar");
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    await user.click(within(rows()[0]).getByRole("switch"));
+    await waitFor(() => expect(fixture.requests.at(-1)?.method).toBe("PATCH"));
+    expect(rows()).toHaveLength(2);
+    await user.click(deleteButtons()[0]);
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    expect(lastQuery()).toBe("?q=guitar");
+    expect(dialog).toHaveTextContent("1 of your posts match your search. You have 11 posts.");
+    await user.type(screen.getByPlaceholderText("https://www.instagram.com/p/…"), "https://www.instagram.com/p/OTHER/{Enter}");
+    await screen.findByText("Post added.");
+    expect(lastQuery()).toBe("?q=guitar");
+    expect(rows()).toHaveLength(1);
+    expect(dialog).toHaveTextContent("1 of your posts match your search. You have 12 posts.");
   });
 });

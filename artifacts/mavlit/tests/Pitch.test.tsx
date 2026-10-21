@@ -1,6 +1,6 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Pitch from "@/pages/Pitch";
 import Pipeline from "@/pages/Pipeline";
 import { api, ApiRequestError, type ApiMatch, type ApiPitch } from "@/lib/api";
@@ -38,9 +38,43 @@ const findBrand = async (text = "@freshbrand", fakeTimers = false) => {
   fireEvent.change(input, { target: { value: text } });
   fireEvent.click(screen.getByRole("button", { name: "Find this brand" }));
 };
-const LINK_PLACEHOLDER = "https://instagram.com/p/your-best-post";
-const fillLink = (value = "https://example.com/post") =>
-  fireEvent.change(screen.getByPlaceholderText(LINK_PLACEHOLDER), { target: { value } });
+
+// The creator's saved Instagram posts, as the API returns them.
+const savedPost = (id: number, extra: Record<string, unknown> = {}) => ({
+  id, post_url: `https://www.instagram.com/p/P${id}/`, caption_preview: `Caption ${id}`, likes_count: 1234,
+  comments_count: 56, views_count: 78000, is_partnership_post: false, ...extra,
+});
+let savedPosts: ReturnType<typeof savedPost>[] = [];
+beforeEach(() => {
+  savedPosts = [savedPost(1), savedPost(2), savedPost(3), savedPost(4, { is_partnership_post: true }), savedPost(5, { is_partnership_post: true })];
+});
+const postsResponse = (path: string) => {
+  const posts = savedPosts.filter(post => !path.includes("partnership_only=true") || post.is_partnership_post);
+  return { total: savedPosts.length, shown: posts.length, min_keep: 10, can_delete: false, posts };
+};
+/** api.get for the Pitch page: saved posts come from `savedPosts`, everything else from `fallback`. */
+const routeGet = (fallback: (path: string) => unknown) => async (path: string) =>
+  path.startsWith("/creator-profile/me/posts") ? postsResponse(path) : fallback(path);
+const pickerButton = (kind: "link" | "partnership") => screen.getByRole("button", {
+  name: kind === "link" ? /^(\+ Choose your posts|\+ Choose more|Change my choice)$/ : /^(\+ Choose from your partnership posts|\+ Choose more|Change my choice)$/,
+});
+const openPicker = async (kind: "link" | "partnership") => {
+  const buttons = screen.getAllByRole("button", { name: /^(\+ Choose your posts|\+ Choose from your partnership posts|\+ Choose more|Change my choice)$/ });
+  fireEvent.click(buttons[kind === "partnership" ? 0 : 1]);
+  const dialog = await screen.findByRole("dialog");
+  await waitFor(() => expect(within(dialog).queryByText("Loading your posts…")).not.toBeInTheDocument());
+  return dialog;
+};
+const closePicker = async (dialog: HTMLElement) => {
+  fireEvent.click(within(dialog).getByRole("button", { name: "Done" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+};
+const chooseContentPosts = async (count = 1) => {
+  const dialog = await openPicker("link");
+  const boxes = within(dialog).getAllByRole("checkbox");
+  for (let i = 0; i < count; i++) fireEvent.click(boxes[i]);
+  await closePicker(dialog);
+};
 
 describe("Pitch page generation and review", () => {
   const matches: ApiMatch[] = [
@@ -52,7 +86,7 @@ describe("Pitch page generation and review", () => {
       total_score: 0.7, dimensions: {}, reasons: [] },
   ];
   function mountMatches(search = "") {
-    vi.spyOn(api, "get").mockResolvedValue({ top_contact: null });
+    vi.spyOn(api, "get").mockImplementation(routeGet(() => ({ top_contact: null })));
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     queryClient.setQueryData(["pitch-matches"], matches);
     window.history.replaceState(null, "", `/pitch${search}`);
@@ -90,7 +124,7 @@ describe("Pitch page generation and review", () => {
     fireEvent.change(screen.getByPlaceholderText("Enter a product launch, or leave blank to skip"),
       { target: { value: "Creator's preferred launch" } });
     fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
-    fillLink();
+    await chooseContentPosts();
     fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
     await screen.findByRole("textbox", { name: "Pitch email draft" });
     expect(post).toHaveBeenCalledWith(expect.objectContaining({
@@ -116,8 +150,8 @@ describe("Pitch page generation and review", () => {
       const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       queryClient.setQueryData(["pitch-matches"], matches);
       const polls = [...poll];
-      const get = vi.spyOn(api, "get").mockImplementation(async (path: string) =>
-        path.startsWith("/own-brands/jobs/") ? polls.shift() ?? polls.at(-1) : { top_contact: null });
+      const get = vi.spyOn(api, "get").mockImplementation(routeGet(path =>
+        path.startsWith("/own-brands/jobs/") ? polls.shift() ?? polls.at(-1) : { top_contact: null }));
       const post = vi.spyOn(api, "post").mockResolvedValue(start);
       window.history.replaceState(null, "", "/pitch");
       render(<QueryClientProvider client={queryClient}><Pitch /></QueryClientProvider>);
@@ -146,6 +180,7 @@ describe("Pitch page generation and review", () => {
       );
       const generate = vi.spyOn(pitchStreaming, "generatePitch").mockResolvedValue({ ...pitch, brand_id: 99, is_custom: false });
       fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
+      await chooseContentPosts();
       await findBrand("@freshbrand", true);
       await tick(0);
       expect(screen.getByRole("status")).toHaveTextContent("MAVLIT is gathering info for this brand… Reading the brand's Instagram posts (this can take a minute)");
@@ -169,13 +204,12 @@ describe("Pitch page generation and review", () => {
       expect(screen.getByPlaceholderText("Enter a product launch, or leave blank to skip")).toHaveValue("Glow Serum");
       await tick(6000);
       expect(pollCalls(get)).toHaveLength(2);
-      fillLink();
       expect(generateButton()).toBeEnabled();
       fireEvent.click(generateButton());
       await tick(0);
       expect(generate).toHaveBeenCalledExactlyOnceWith({
         is_custom: false, brand_id: 99, story: pitch.story,
-        product_reference: "Glow Serum", past_brand_partnership: null, content_link: "https://example.com/post",
+        product_reference: "Glow Serum", past_brand_partnership: null, content_link: "https://www.instagram.com/p/P1/",
       }, expect.any(Function), expect.any(AbortSignal), expect.any(Function));
       queryClient.clear();
     });
@@ -234,10 +268,9 @@ describe("Pitch page generation and review", () => {
     });
   });
 
-  describe("multiple product launches, partnerships and links", () => {
+  describe("product launches, partnership posts and content posts", () => {
     const productInputs = () => screen.getAllByPlaceholderText("Enter a product launch, or leave blank to skip");
-    const linkInputs = () => screen.getAllByPlaceholderText(LINK_PLACEHOLDER);
-    const addLink = () => screen.queryByRole("button", { name: "+ Add another link" });
+    const chips = (kind: "link" | "partnership") => screen.queryAllByTestId(`${kind}-chip`);
     function setup() {
       const queryClient = mountMatches();
       Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
@@ -246,59 +279,202 @@ describe("Pitch page generation and review", () => {
       fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
       return { queryClient, post };
     }
+    const generateNow = () => fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
 
-    it("caps each field at three inputs, focuses the new input, and restores the add button after a removal", () => {
+    it("shows no typed link or partnership inputs, only the choose buttons and hints", () => {
       const { queryClient } = setup();
-      for (let i = 0; i < 2; i++) fireEvent.click(addLink()!);
-      expect(linkInputs()).toHaveLength(3);
-      expect(linkInputs()[2]).toHaveFocus();
-      expect(addLink()).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Remove content link 1" })).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: "Remove content link 2" }));
-      expect(linkInputs()).toHaveLength(2);
-      expect(addLink()).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("https://instagram.com/p/your-best-post")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "+ Add another link" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "+ Choose your posts" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "+ Choose from your partnership posts" })).toBeInTheDocument();
+      expect(screen.getByText("Up to 3 posts that show your connection to this brand. Pick from your posts or add a new post link.")).toBeInTheDocument();
+      expect(screen.getByText("Up to 3. Pick the posts you marked as paid partnerships, add a post link, or describe a partnership in a few words.")).toBeInTheDocument();
       queryClient.clear();
     });
 
-    it("sends each field as one comma-separated string of the trimmed, non-empty values", async () => {
+    it("lists all saved posts in a blurred picker, caps the choice at three and frees a slot after removing a chip", async () => {
+      savedPosts = [1, 2, 3, 4, 5].map(id => savedPost(id));
+      const { queryClient } = setup();
+      const dialog = await openPicker("link");
+      expect(screen.getByTestId("picker-overlay").style.backdropFilter).toBe("blur(6px)");
+      expect(document.body).toHaveAttribute("data-scroll-locked");
+      expect(dialog).toHaveTextContent("Choose the posts that show your connection to the brand");
+      expect(dialog).toHaveTextContent("Showing all your saved posts. 0 of 3 chosen.");
+      expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(5);
+      expect(within(dialog).getAllByTestId("picker-row")[0]).toHaveTextContent("Likes 1,234 · Comments 56 · Views 78,000");
+      const boxes = within(dialog).getAllByRole("checkbox");
+      for (const box of boxes.slice(0, 3)) fireEvent.click(box);
+      expect(dialog).toHaveTextContent("3 of 3 chosen. You can choose up to 3.");
+      expect(boxes[3]).toBeDisabled();
+      expect(boxes[4]).toBeDisabled();
+      expect(boxes[0]).toBeEnabled();
+      await closePicker(dialog);
+      expect(chips("link")).toHaveLength(3);
+      expect(chips("link")[0]).toHaveTextContent("Caption 1");
+      expect(chips("link")[0]).toHaveTextContent("post");
+      expect(screen.getByRole("button", { name: "Change my choice" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Remove https://www.instagram.com/p/P2/" }));
+      expect(chips("link")).toHaveLength(2);
+      const again = await openPicker("link");
+      expect(within(again).getAllByRole("checkbox")[3]).toBeEnabled();
+      fireEvent.click(within(again).getAllByRole("checkbox")[3]);
+      await closePicker(again);
+      expect(chips("link")).toHaveLength(3);
+      queryClient.clear();
+    });
+
+    it("shows when each post was published between the caption and the numbers, or a dash when unknown", async () => {
+      savedPosts = [savedPost(1, { timestamp: "2026-10-20T15:04:00.000Z" }), savedPost(2, { timestamp: null }), savedPost(3, { timestamp: "garbage" })];
+      const { queryClient } = setup();
+      const dialog = await openPicker("link");
+      const expected = new Date("2026-10-20T15:04:00.000Z").toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+      const [first, second, third] = within(dialog).getAllByTestId("picker-row");
+      expect(within(first).getByTestId("picker-posted-at")).toHaveTextContent(`Posted ${expected}`);
+      expect(first.textContent).toMatch(/Caption 1Posted .+Likes 1,234/);
+      expect(within(second).getByTestId("picker-posted-at")).toHaveTextContent("Posted –");
+      expect(within(third).getByTestId("picker-posted-at")).toHaveTextContent("Posted –");
+      expect(dialog).not.toHaveTextContent("Invalid Date");
+      queryClient.clear();
+    });
+
+    it("closes the picker with ×, Escape and a click outside", async () => {
+      const { queryClient } = setup();
+      for (const close of [
+        () => fireEvent.click(screen.getByRole("button", { name: "Close" })),
+        () => fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" }),
+        () => fireEvent.pointerDown(screen.getByTestId("picker-overlay")),
+      ]) {
+        await openPicker("link");
+        close();
+        await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      }
+      queryClient.clear();
+    });
+
+    it("adds a post from the link picker as not a partnership, shows progress, then lists and chooses it", async () => {
+      const { queryClient } = setup();
+      const added = savedPost(9, { caption_preview: "Brand new post" });
+      let release!: () => void;
+      const gate = new Promise<void>(resolve => { release = resolve; });
+      const create = vi.spyOn(api, "post").mockImplementation(async () => { await gate; savedPosts = [added, ...savedPosts]; return added; });
+      const dialog = await openPicker("link");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Add post" }));
+      expect(within(dialog).getByRole("alert")).toHaveTextContent("Paste the link of an Instagram post.");
+      expect(create).not.toHaveBeenCalled();
+      const input = within(dialog).getByPlaceholderText("https://www.instagram.com/p/…");
+      fireEvent.change(input, { target: { value: "https://www.instagram.com/p/P9/" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(within(dialog).getByRole("button", { name: "Reading the post…" })).toBeDisabled();
+      expect(dialog).toHaveTextContent("MAVLIT is reading this post. This can take up to a minute.");
+      await act(async () => { release(); });
+      expect(await within(dialog).findByText("Post added.")).toBeInTheDocument();
+      expect(create).toHaveBeenCalledExactlyOnceWith("/creator-profile/me/posts", { post_url: "https://www.instagram.com/p/P9/", is_partnership_post: false });
+      expect(input).toHaveValue("");
+      expect(within(dialog).getAllByTestId("picker-row")[0]).toHaveTextContent("Brand new post");
+      expect(within(dialog).getAllByRole("checkbox")[0]).toBeChecked();
+      expect(dialog).toHaveTextContent("1 of 3 chosen.");
+      await closePicker(dialog);
+      expect(chips("link")[0]).toHaveTextContent("Brand new post");
+      queryClient.clear();
+    });
+
+    it("shows the server's error when a post cannot be added", async () => {
+      const { queryClient } = setup();
+      vi.spyOn(api, "post").mockRejectedValue(new ApiRequestError("The post could not be read: it is private.", 422));
+      const dialog = await openPicker("link");
+      fireEvent.change(within(dialog).getByPlaceholderText("https://www.instagram.com/p/…"), { target: { value: "https://www.instagram.com/p/PRIV/" } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Add post" }));
+      expect(await within(dialog).findByRole("alert")).toHaveTextContent("The post could not be read: it is private.");
+      expect(within(dialog).getByRole("button", { name: "Add post" })).toBeEnabled();
+      queryClient.clear();
+    });
+
+    it("shows empty-list texts for both pickers", async () => {
+      savedPosts = [];
+      const { queryClient } = setup();
+      let dialog = await openPicker("link");
+      expect(within(dialog).getByTestId("picker-empty")).toHaveTextContent("No saved posts yet. Add a post link below.");
+      await closePicker(dialog);
+      dialog = await openPicker("partnership");
+      expect(within(dialog).getByTestId("picker-empty")).toHaveTextContent(
+        'No post is marked as a paid partnership yet. Add a post link below, describe a partnership, or switch the toggle on in "Your recent Instagram posts" on your profile page.');
+      queryClient.clear();
+    });
+
+    it("lists only paid partnership posts, adds a post as a partnership, and turns a description into a chip", async () => {
+      const { queryClient } = setup();
+      const get = vi.mocked(api.get);
+      const dialog = await openPicker("partnership");
+      expect(get).toHaveBeenCalledWith("/creator-profile/me/posts?partnership_only=true");
+      expect(dialog).toHaveTextContent("Choose your past brand partnership posts");
+      expect(dialog).toHaveTextContent("Showing the posts you marked as paid partnerships. 0 of 3 chosen.");
+      expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(2);
+      const added = savedPost(9, { caption_preview: "Lashes collab", is_partnership_post: true });
+      const create = vi.spyOn(api, "post").mockImplementation(async () => { savedPosts = [added, ...savedPosts]; return added; });
+      fireEvent.change(within(dialog).getByPlaceholderText("https://www.instagram.com/p/…"), { target: { value: "https://www.instagram.com/p/P9/" } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Add post" }));
+      await within(dialog).findByText("Post added.");
+      expect(create).toHaveBeenCalledWith("/creator-profile/me/posts", { post_url: "https://www.instagram.com/p/P9/", is_partnership_post: true });
+      expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(3);
+      fireEvent.change(within(dialog).getByPlaceholderText("e.g. Falscara lashes, 2025 campaign"), { target: { value: "Falscara lashes,  2025 campaign" } });
+      fireEvent.keyDown(within(dialog).getByPlaceholderText("e.g. Falscara lashes, 2025 campaign"), { key: "Enter" });
+      expect(dialog).toHaveTextContent("2 of 3 chosen.");
+      await closePicker(dialog);
+      expect(chips("partnership")).toHaveLength(2);
+      expect(chips("partnership")[1]).toHaveTextContent("Falscara lashes 2025 campaign");
+      expect(chips("partnership")[1]).toHaveTextContent("described");
+      queryClient.clear();
+    });
+
+    it("counts described partnerships toward the limit of three", async () => {
+      const { queryClient } = setup();
+      const dialog = await openPicker("partnership");
+      const field = within(dialog).getByPlaceholderText("e.g. Falscara lashes, 2025 campaign");
+      for (const text of ["One", "Two", "Three"]) {
+        fireEvent.change(field, { target: { value: text } });
+        fireEvent.click(within(dialog).getByRole("button", { name: "Add" }));
+      }
+      expect(dialog).toHaveTextContent("3 of 3 chosen. You can choose up to 3.");
+      for (const box of within(dialog).getAllByRole("checkbox")) expect(box).toBeDisabled();
+      fireEvent.change(field, { target: { value: "Four" } });
+      expect(within(dialog).getByRole("button", { name: "Add" })).toBeDisabled();
+      await closePicker(dialog);
+      expect(chips("partnership")).toHaveLength(3);
+      queryClient.clear();
+    });
+
+    it("sends the chosen post URLs and described text, comma-separated", async () => {
       const { queryClient, post } = setup();
       fireEvent.click(screen.getByRole("button", { name: "+ Add another product launch" }));
       fireEvent.change(productInputs()[0], { target: { value: " A " } });
       fireEvent.change(productInputs()[1], { target: { value: "B" } });
-      fireEvent.change(screen.getByPlaceholderText(/Focusrite — or leave blank/), { target: { value: "C" } });
-      fireEvent.click(addLink()!);
-      fireEvent.click(addLink()!);
-      fireEvent.change(linkInputs()[0], { target: { value: "https://x.com/1" } });
-      fireEvent.change(linkInputs()[2], { target: { value: " http://x.com/3 " } });
-      fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
+      await chooseContentPosts(2);
+      let dialog = await openPicker("partnership");
+      fireEvent.click(within(dialog).getAllByRole("checkbox")[0]);
+      fireEvent.change(within(dialog).getByPlaceholderText("e.g. Falscara lashes, 2025 campaign"), { target: { value: "Lash brand 2025" } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Add" }));
+      await closePicker(dialog);
+      generateNow();
       await screen.findByRole("textbox", { name: "Pitch email draft" });
       expect(post).toHaveBeenCalledExactlyOnceWith({
-        is_custom: false, brand_id: 7, story: pitch.story,
-        product_reference: "A, B", past_brand_partnership: "C", content_link: "https://x.com/1, http://x.com/3",
+        is_custom: false, brand_id: 7, story: pitch.story, product_reference: "A, B",
+        past_brand_partnership: "https://www.instagram.com/p/P4/, Lash brand 2025",
+        content_link: "https://www.instagram.com/p/P1/, https://www.instagram.com/p/P2/",
       }, expect.any(Function), expect.any(AbortSignal), expect.any(Function));
       queryClient.clear();
     });
 
-    it("sends empty optional fields as null", async () => {
+    it("sends no partnership as null and blocks the request until a content post is chosen", async () => {
       const { queryClient, post } = setup();
-      fireEvent.change(productInputs()[0], { target: { value: "  " } });
-      fillLink("https://x.com/1");
-      fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
+      generateNow();
+      expect(screen.getByRole("alert")).toHaveTextContent("Choose at least one post that shows your connection to this brand.");
+      expect(post).not.toHaveBeenCalled();
+      await chooseContentPosts();
+      generateNow();
       await screen.findByRole("textbox", { name: "Pitch email draft" });
       expect(post).toHaveBeenCalledWith(expect.objectContaining({
-        product_reference: null, past_brand_partnership: null, content_link: "https://x.com/1",
+        product_reference: "Latest Studio Mic", past_brand_partnership: null, content_link: "https://www.instagram.com/p/P1/",
       }), expect.any(Function), expect.any(AbortSignal), expect.any(Function));
-      queryClient.clear();
-    });
-
-    it("blocks the request when no link is given or a link lacks http(s)://", () => {
-      const { queryClient, post } = setup();
-      fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
-      expect(screen.getByRole("alert")).toHaveTextContent("Add a link to your most relevant content.");
-      fillLink("x.com/1");
-      fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
-      expect(screen.getByRole("alert")).toHaveTextContent("Every content link must start with http:// or https://");
-      expect(post).not.toHaveBeenCalled();
       queryClient.clear();
     });
 
@@ -325,7 +501,7 @@ describe("Pitch page generation and review", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
     fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
-    fillLink();
+    await chooseContentPosts();
     fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
     expect(screen.getByRole("status")).toHaveTextContent("Writing your pitch…");
     act(() => status("Reading the Instagram posts you linked…"));
@@ -350,7 +526,7 @@ describe("Pitch page generation and review", () => {
   });
 
   it("generates with visible brand/story inputs, edits, and confirms same-row saving without leaving the page", async () => {
-    vi.spyOn(api, "get").mockResolvedValue({ matches: [], total: 0 });
+    vi.spyOn(api, "get").mockImplementation(routeGet(() => ({ matches: [], total: 0 })));
     vi.spyOn(api, "post").mockResolvedValue(job({ status: "ready", brand: { ...ownBrand, name: pitch.brand_name, latest_product: null } }));
     const post = vi.spyOn(pitchStreaming, "generatePitch").mockResolvedValue(pitch);
     const edited = "Subject: My edits\n\nFinal email";
@@ -366,7 +542,7 @@ describe("Pitch page generation and review", () => {
     await findBrand("@freshbrand");
     await screen.findByTestId("own-brand-card");
     fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
-    fillLink();
+    await chooseContentPosts();
     expect(generate).toBeEnabled();
     fireEvent.click(generate);
     await screen.findByRole("button", { name: "Save changes" });
@@ -381,7 +557,7 @@ describe("Pitch page generation and review", () => {
     expect(screen.getByRole("link", { name: "View in Pipeline" })).toHaveAttribute("href", "/deals");
     expect(post).toHaveBeenCalledExactlyOnceWith({
       is_custom: false, brand_id: 99, story: pitch.story,
-      product_reference: null, past_brand_partnership: null, content_link: "https://example.com/post",
+      product_reference: null, past_brand_partnership: null, content_link: "https://www.instagram.com/p/P1/",
     }, expect.any(Function), expect.any(AbortSignal), expect.any(Function));
     expect(patch).toHaveBeenCalledExactlyOnceWith("/pitches/43", { pitch_text: edited });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["pitches"] });
@@ -401,7 +577,7 @@ describe("Pitch page generation and review", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
     fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
-    fillLink();
+    await chooseContentPosts();
     fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
     const live = screen.getByPlaceholderText("MAVLIT is writing your pitch…");
     expect(live).toHaveValue("");
@@ -441,7 +617,7 @@ describe("Pitch page generation and review", () => {
       });
       fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
       fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
-      fillLink();
+      await chooseContentPosts();
       fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
       act(() => publish("Never leave this partial email behind"));
       expect(screen.getByRole("textbox", { name: "Pitch email draft" })).toHaveValue("Never leave this partial email behind");

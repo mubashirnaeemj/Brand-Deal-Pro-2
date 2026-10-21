@@ -9,6 +9,7 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PitchDraftEditor from "@/components/PitchDraftEditor";
+import { PickedField, PostPickerDialog, joinPicked, pickedPost, MAX_PICKS, type PickedEntry, type PickerKind } from "@/components/PostPicker";
 import OwnBrandLookupField from "@/components/OwnBrandLookup";
 import { useOwnBrandLookup, brandDisplayName } from "@/hooks/useOwnBrandLookup";
 import LivePitchDraft, { DEFAULT_PITCH_STATUS } from "@/components/LivePitchDraft";
@@ -37,15 +38,15 @@ interface OutboundForm {
   selectedBrand: string;
   story: string;
   recentProductLaunch: string[];
-  pastDeals: string[];
-  contentLinks: string[];
+  pastPartnerships: PickedEntry[];
+  contentPosts: PickedEntry[];
 }
 
 const MAX_ENTRIES = 3;
 
 const EMPTY_OUTBOUND: OutboundForm = {
   brandSource: "matched", selectedBrand: "",
-  story: "", recentProductLaunch: [""], pastDeals: [""], contentLinks: [""],
+  story: "", recentProductLaunch: [""], pastPartnerships: [], contentPosts: [],
 };
 
 // ── Shared UI ──────────────────────────────────────────────────────────────────
@@ -155,6 +156,7 @@ function OutboundMode() {
   const [form, setFormState] = useState<OutboundForm>(() => prefillBrand
     ? { ...EMPTY_OUTBOUND, brandSource: "found" }
     : EMPTY_OUTBOUND);
+  const [picker, setPicker] = useState<PickerKind | null>(null);
   const lookup = useOwnBrandLookup();
   const ownInput = useRef(lookup.input);
   ownInput.current = lookup.input;
@@ -221,9 +223,7 @@ function OutboundMode() {
 
   const generate = async () => {
     if (!canGenerate || saving || generationInFlight.current) return;
-    const links = form.contentLinks.map(v => v.trim()).filter(Boolean);
-    if (!links.length) { setError("Add a link to your most relevant content."); return; }
-    if (links.some(link => !/^https?:\/\//i.test(link))) { setError("Every content link must start with http:// or https://"); return; }
+    if (!form.contentPosts.length) { setError("Choose at least one post that shows your connection to this brand."); return; }
     if (dirty && !window.confirm("Generate a new pitch and discard your unsaved email edits? The previous generated draft remains in Pipeline.")) return;
     generationInFlight.current = true;
     const controller = new AbortController();
@@ -235,8 +235,8 @@ function OutboundMode() {
         brand_id: brandId!,
         story: form.story,
         product_reference: joinEntries(form.recentProductLaunch),
-        past_brand_partnership: joinEntries(form.pastDeals),
-        content_link: joinEntries(form.contentLinks),
+        past_brand_partnership: joinPicked(form.pastPartnerships),
+        content_link: joinPicked(form.contentPosts),
       };
       const data = await generatePitch(body, (delta) => setStreamText(previous => previous + delta), controller.signal, setStreamStatus);
       if (controller.signal.aborted) return;
@@ -342,16 +342,24 @@ function OutboundMode() {
           )}
           <div>
             <Label>Past brand partnerships (optional)</Label>
-            <MultiInput values={form.pastDeals} onChange={v => set("pastDeals", v)} placeholder="e.g. Focusrite — or leave blank if none yet"
-              maxLength={500} name="Past brand partnership" addLabel="+ Add another partnership" />
-            <p className="mt-1.5 text-xs text-muted-foreground/70 leading-relaxed">Up to 3. You can paste an Instagram post link so MAVLIT can read the post (please don't use commas inside one entry).</p>
+            <PickedField kind="partnership" entries={form.pastPartnerships} onOpen={() => setPicker("partnership")}
+              onRemove={index => set("pastPartnerships", form.pastPartnerships.filter((_, i) => i !== index))} />
           </div>
           <div>
             <Label>Link to your most relevant content</Label>
-            <MultiInput values={form.contentLinks} onChange={v => set("contentLinks", v)} placeholder="https://instagram.com/p/your-best-post"
-              maxLength={500} name="Content link" addLabel="+ Add another link" />
-            <p className="mt-1.5 text-xs text-muted-foreground/70 leading-relaxed">Up to 3. Paste your Instagram post links. MAVLIT reads each post so your pitch can refer to it.</p>
+            <PickedField kind="link" entries={form.contentPosts} onOpen={() => setPicker("link")}
+              onRemove={index => set("contentPosts", form.contentPosts.filter((_, i) => i !== index))} />
           </div>
+          <PostPickerDialog kind="link" open={picker === "link"} onOpenChange={open => setPicker(open ? "link" : null)}
+            entries={form.contentPosts}
+            onChoose={post => { setError(null); setFormState(p => p.contentPosts.length >= MAX_PICKS ? p : { ...p, contentPosts: [...p.contentPosts, pickedPost(post)] }); }}
+            onUnchoose={url => setFormState(p => ({ ...p, contentPosts: p.contentPosts.filter(e => e.kind !== "post" || e.url !== url) }))} />
+          <PostPickerDialog kind="partnership" open={picker === "partnership"} onOpenChange={open => setPicker(open ? "partnership" : null)}
+            entries={form.pastPartnerships}
+            onChoose={post => setFormState(p => p.pastPartnerships.length >= MAX_PICKS ? p : { ...p, pastPartnerships: [...p.pastPartnerships, pickedPost(post)] })}
+            onUnchoose={url => setFormState(p => ({ ...p, pastPartnerships: p.pastPartnerships.filter(e => e.kind !== "post" || e.url !== url) }))}
+            onDescribe={text => setFormState(p => p.pastPartnerships.length >= MAX_PICKS || p.pastPartnerships.some(e => e.kind === "described" && e.text === text)
+              ? p : { ...p, pastPartnerships: [...p.pastPartnerships, { kind: "described", text }] })} />
           <div className="flex items-start justify-between gap-4 pt-1 px-4 py-3.5 rounded-xl bg-primary/5 border border-primary/20">
             <div className="flex items-start gap-3 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 mt-0.5"><User size={13} className="text-primary" /></div>

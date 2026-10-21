@@ -2,7 +2,6 @@ import express, { type Express } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
-import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import mavlitProxy from "./routes/mavlitProxy";
@@ -34,7 +33,6 @@ app.use(cookieParser());
 app.use(express.json({ limit: "32kb" }));
 app.use(express.urlencoded({ extended: true, limit: "32kb" }));
 app.use("/api/mavlit", mavlitProxy);
-app.use(authMiddleware);
 
 app.use("/api", router);
 

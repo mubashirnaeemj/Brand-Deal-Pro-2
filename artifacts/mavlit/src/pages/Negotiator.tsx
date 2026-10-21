@@ -192,44 +192,9 @@ export default function Negotiator() {
     setAdvice(null);
     setAdviceError(null);
 
-    try {
-      const res = await fetch("/api/negotiator/advise", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandName, followerCount, brandResponse, contactSeniority, noResponse }),
-      });
-
-      if (!res.ok) throw new Error("Server error");
-
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("No stream");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let full = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const parsed = JSON.parse(line.slice(6));
-            if (parsed.done) break;
-            if (parsed.error) throw new Error(parsed.error);
-            if (parsed.content) { full += parsed.content; setAdvice(full); }
-          } catch {}
-        }
-      }
-    } catch {
-      setAdviceError("Something went wrong. Please try again.");
-    } finally {
-      setAdvising(false);
-    }
+    // Placeholder: the AI advice service is not connected yet.
+    setAdviceError("This feature isn't available yet.");
+    setAdvising(false);
   };
 
   const copyAdvice = async () => {

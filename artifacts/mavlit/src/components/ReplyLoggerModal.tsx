@@ -35,21 +35,9 @@ export default function ReplyLoggerModal({ brandName, dealId, onClose, onDismiss
 
   const analyze = async () => {
     if (!message.trim()) return;
-    setAnalyzing(true); setResult(null); setError(null);
-    try {
-      const res = await fetch("/api/pitch/analyze-reply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, brandName }),
-      });
-      if (!res.ok) throw new Error("Server error");
-      const data = await res.json() as AnalysisResult;
-      setResult(data);
-    } catch {
-      setError("Something went wrong analyzing the reply. Please try again.");
-    } finally {
-      setAnalyzing(false);
-    }
+    // Placeholder: the AI reply analysis is not connected yet.
+    setResult(null);
+    setError("This feature isn't available yet.");
   };
 
   const handleCounterOffer = () => {

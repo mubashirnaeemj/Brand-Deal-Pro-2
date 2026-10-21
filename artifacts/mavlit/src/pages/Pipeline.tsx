@@ -201,26 +201,6 @@ function OutputBox({ text }: { text: string }) {
   );
 }
 
-async function readStream(endpoint: string, body: Record<string, unknown>, onChunk: (t: string) => void) {
-  const res = await fetch(endpoint, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!res.ok) throw new Error("Server error");
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error("No stream");
-  const decoder = new TextDecoder();
-  let buf = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const lines = buf.split("\n");
-    buf = lines.pop() ?? "";
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      try { const p = JSON.parse(line.slice(6)); if (p.done) return; if (p.error) throw new Error(p.error); if (p.content) onChunk(p.content); } catch { /* skip */ }
-    }
-  }
-}
-
 // ── Brand icon/initial helper ──────────────────────────────────────────────────
 
 function BrandAvatar({ brand }: { brand: string }) {
@@ -934,21 +914,9 @@ function ContractAdvice({ contactType, dealContext }: { contactType?: "agency" |
 
   const analyze = async () => {
     if (!text.trim()) return;
-    setGen(true); setOutput(null); setError(null);
-    try {
-      let full = "";
-      await readStream("/api/pipeline/contract-advice", {
-        contractText: text,
-        contactType,
-        dealPlatform:    dealContext.platform    || undefined,
-        dealDeliverable: dealContext.deliverable || undefined,
-        dealExclusivity: dealContext.exclusivity
-          ? dealContext.exclusivity + (dealContext.exclusivityMonths ? ` (${dealContext.exclusivityMonths} months)` : "")
-          : undefined,
-        dealUsage: dealContext.usage || undefined,
-      }, chunk => { full += chunk; setOutput(full); });
-    } catch { setError("Something went wrong. Please try again."); }
-    finally { setGen(false); }
+    // Placeholder: the AI contract review is not connected yet.
+    setOutput(null);
+    setError("This feature isn't available yet.");
   };
 
   return (

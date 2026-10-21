@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Loader2, Sparkles, PenLine, Check } from "lucide-react";
 import { isDescriptionPending, type DescriptionStatus } from "@/contexts/AuthContext";
 import type { ProfileForm } from "@/pages/profileForm";
@@ -27,6 +28,8 @@ export interface ProfileWizardProps {
   error: string | null;
   pollError: string | null;
   saved: boolean;
+  /** Rendered at the end of the last step, just above the action buttons. */
+  postsCard?: ReactNode;
 }
 
 const STEPS = ["Creator", "Method", "Instagram"];
@@ -215,6 +218,8 @@ export default function ProfileWizard(p: ProfileWizardProps) {
           </>
         )}
       </section>
+
+      {step === 3 && !showProgress && p.postsCard}
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <button type="button" className={btnGhost} onClick={p.onExit} disabled={p.saving} data-testid="button-exit">Exit</button>

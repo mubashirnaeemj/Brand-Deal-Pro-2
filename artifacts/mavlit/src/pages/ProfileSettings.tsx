@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import Navbar from "@/components/Navbar";
 import { formatPrimaryNiches, NICHE_OPTIONS, parsePlatforms, samePrimaryNiches } from "@/components/onboarding/types";
@@ -6,6 +6,8 @@ import { isDescriptionPending, isProfileComplete, type CreatorProfile, type Desc
 import { api } from "@/lib/api";
 import { fillEmptyAudience, audienceAgeRangeError, audienceError, formatAudienceAgeRange } from "@/lib/audience";
 import ProfileWizard from "@/components/profile/ProfileWizard";
+import RecentPostsCard from "@/components/profile/RecentPostsCard";
+import { isPostsList, listCreatorPosts, type CreatorPostsList } from "@/lib/creatorPosts";
 import { profilePatch, profileToForm, validateProfile, type ProfileForm } from "./profileForm";
 import { applyProfileGeneration, creatorInfoError, generationKey, profileGenerationKey, restoreWizardForm, serializeWizardDraft, type ProfileStep } from "./profileWizardModel";
 import { useProfileGenerationProgress } from "./useProfileGenerationProgress";
@@ -25,6 +27,16 @@ export default function ProfileSettings() {
   const [step, setStep] = useState<ProfileStep>(1);
   const [generatedFor, setGeneratedFor] = useState<string | null>(null);
   const generationStarting = useRef(false);
+  const [posts, setPosts] = useState<CreatorPostsList | null>(null);
+  const postsRequest = useRef(0);
+  // The card is a convenience: when the list cannot be read it stays as it was.
+  const refreshPosts = useCallback(async () => {
+    const request = ++postsRequest.current;
+    try {
+      const list = await listCreatorPosts();
+      if (request === postsRequest.current && isPostsList(list)) setPosts(list);
+    } catch { /* keep the last known list */ }
+  }, []);
   // After a successful generation, creators may correct any field, including
   // username and niche, without having those edits hidden or forcing a new job.
   const generationComplete = !!form && profile?.instagram_description_status === "completed" && generatedFor !== null;
@@ -85,12 +97,20 @@ export default function ProfileSettings() {
   }, [form, profile, user, step, generatedFor, generationProgress.startedAt, saved]);
 
   useEffect(() => { document.title = "Your Profile | MAVLIT"; }, []);
+  useEffect(() => { void refreshPosts(); }, [refreshPosts, retry]);
 
   const instagramStatus = profile?.instagram_description_status;
   const youtubeStatus = profile?.youtube_description_status;
   const instagramJobId = profile?.instagram_description_job_id;
   const youtubeJobId = profile?.youtube_description_job_id;
   const jobPending = isDescriptionPending(instagramStatus) || isDescriptionPending(youtubeStatus);
+
+  // MAVLIT reads the creator's posts while it generates the description.
+  const previousInstagramStatus = useRef(instagramStatus);
+  useEffect(() => {
+    if (isDescriptionPending(previousInstagramStatus.current) && instagramStatus === "completed") void refreshPosts();
+    previousInstagramStatus.current = instagramStatus;
+  }, [instagramStatus, refreshPosts]);
 
   useEffect(() => {
     if (!jobPending) return;
@@ -159,7 +179,7 @@ export default function ProfileSettings() {
 
   const generated = (platform: "instagram" | "youtube", completed: CreatorProfile) => {
     setForm((current) => current ? applyProfileGeneration(current, completed, platform) : current);
-    if (platform === "instagram") setGeneratedFor(profileGenerationKey(completed));
+    if (platform === "instagram") { setGeneratedFor(profileGenerationKey(completed)); void refreshPosts(); }
     setSaved(false);
     setError(null);
   };
@@ -432,7 +452,8 @@ export default function ProfileSettings() {
               (form.instagram.descriptionMode === "manual" || generationComplete)}
             generationComplete={generationComplete} status={instagramStatus}
             generationProgress={generationProgress.progress} showGenerationProgress={generationProgress.showProgress}
-            error={error} pollError={pollError || profile.instagram_description_error || null} saved={saved} />
+            error={error} pollError={pollError || profile.instagram_description_error || null} saved={saved}
+            postsCard={<RecentPostsCard posts={posts} onPostsChange={setPosts} />} />
         )}
       </div>
     </div>

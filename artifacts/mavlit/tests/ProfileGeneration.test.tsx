@@ -7,7 +7,7 @@ import { applyProfileGeneration } from "@/pages/profileWizardModel";
 import { profileToForm } from "@/pages/profileForm";
 import { renderProfile } from "./renderProfile";
 import { creatorProfile } from "./fixtures/creatorProfile";
-import { installProfileApi } from "./fixtures/profileApi";
+import { fixturePost, installProfileApi } from "./fixtures/profileApi";
 
 let fixture: ReturnType<typeof installProfileApi>;
 async function settle() { for (let i = 0; i < 15; i++) await act(async () => { await Promise.resolve(); }); }
@@ -123,6 +123,16 @@ describe("Instagram wizard generation", () => {
     const typed = profileToForm(creatorProfile({ instagram_highest_views: 7000, instagram_description_mode: "generate" }));
     expect(applyProfileGeneration(typed, creatorProfile({ instagram_highest_views: null }), "instagram").instagram.highestViews).toBe("7000");
     expect(applyProfileGeneration(typed, creatorProfile({ instagram_highest_views: 9000 }), "instagram").instagram.highestViews).toBe("9000");
+  });
+
+  it("shows the recent posts card once generation has read the posts", async () => {
+    await mount();
+    expect(screen.queryByTestId("recent-posts-card")).not.toBeInTheDocument();
+    fixture.setPosts(Array.from({ length: 12 }, (_, index) => fixturePost(index + 1)));
+    finish();
+    await tick(1500);
+    await tick(450);
+    expect(screen.getByTestId("recent-posts-card")).toBeInTheDocument();
   });
 
   it("shows only username and primary niches with both Generate and disabled Save Profile", async () => {

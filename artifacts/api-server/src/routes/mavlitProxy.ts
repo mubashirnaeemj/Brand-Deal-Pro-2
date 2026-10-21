@@ -23,8 +23,8 @@ router.use(async (req, res): Promise<void> => {
   target.search = new URL(req.originalUrl, "http://localhost").search;
 
   const streaming = req.method === "POST" && req.path === "/pitches/stream";
-  // A pitch can take ~2 minutes when MAVLIT first scrapes a linked Instagram post.
-  const slowPitch = streaming || (req.method === "POST" && req.path === "/pitches");
+  // A pitch or a new profile post can take ~2 minutes when MAVLIT first scrapes an Instagram post.
+  const slowPitch = streaming || (req.method === "POST" && ["/pitches", "/creator-profile/me/posts"].includes(req.path));
   const headers = new Headers({ Accept: streaming ? "text/event-stream" : "application/json" });
   const accessToken = req.cookies?.access_token;
   if (typeof accessToken === "string") headers.set("Cookie", `access_token=${accessToken}`);

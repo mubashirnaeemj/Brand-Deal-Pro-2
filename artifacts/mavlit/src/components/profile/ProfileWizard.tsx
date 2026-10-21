@@ -163,7 +163,7 @@ export default function ProfileWizard(p: ProfileWizardProps) {
                   disabled={p.saving} placeholder="120000"
                   onChange={(e) => setIg({ highestViews: e.target.value })} />
                 <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">
-                  The most views on any of your reels or videos. MAVLIT fills it in when it generates your description.
+                  The most views on any of your reels or videos.
                 </span>
               </label>}
             </div>

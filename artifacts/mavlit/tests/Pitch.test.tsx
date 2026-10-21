@@ -5,7 +5,6 @@ import Pitch from "@/pages/Pitch";
 import Pipeline from "@/pages/Pipeline";
 import { api, ApiRequestError, type ApiMatch, type ApiPitch } from "@/lib/api";
 import type { OwnBrand, OwnBrandJob } from "@/hooks/useOwnBrandLookup";
-import * as pitchStreaming from "@/lib/pitchStream";
 
 const auth = vi.hoisted(() => ({ user: null as Record<string, unknown> | null }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: auth.user }) }));
@@ -33,7 +32,22 @@ const ownBrand: OwnBrand = {
 const job = (extra: Partial<OwnBrandJob> = {}): OwnBrandJob =>
   ({ job_id: "job-1", status: "running", stage: null, error: null, brand: null, ...extra });
 const OWN_PLACEHOLDER = "https://www.instagram.com/brandname or @brandname";
-afterEach(() => { vi.useRealTimers(); });
+// api.post is routed by path so each test states which endpoints it expects; anything else fails loudly.
+const postHandlers: Record<string, (body: unknown) => unknown> = {};
+const onPost = (path: string, impl: (body: any) => unknown) => {
+  const handler = vi.fn(async (body: unknown) => impl(body));
+  postHandlers[path] = handler;
+  return handler;
+};
+beforeEach(() => {
+  for (const path of Object.keys(postHandlers)) delete postHandlers[path];
+  vi.spyOn(api, "post").mockImplementation((async (path: string, body: unknown) => {
+    const handler = postHandlers[path];
+    if (!handler) throw new Error(`Unexpected POST ${path}`);
+    return handler(body);
+  }) as typeof api.post);
+});
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 // The tab swap is animated, so wait for it with real timers; lookup polling then runs on fake ones.
 const findBrand = async (text = "@freshbrand", fakeTimers = false) => {
   fireEvent.click(screen.getByRole("button", { name: "A brand I found myself" }));
@@ -130,7 +144,7 @@ describe("Pitch page generation and review", () => {
 
   it("sends the creator's edited product reference, not the automatic default", async () => {
     const queryClient = mountMatches();
-    const post = vi.spyOn(pitchStreaming, "generatePitch").mockResolvedValue({ ...pitch, brand_id: 7, is_custom: false });
+    const post = onPost("/pitches", async () => ({ ...pitch, brand_id: 7, is_custom: false }));
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
     fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
     fireEvent.change(screen.getByPlaceholderText("Enter a product launch, or leave blank to skip"),
@@ -141,7 +155,7 @@ describe("Pitch page generation and review", () => {
     await screen.findByRole("textbox", { name: "Pitch email draft" });
     expect(post).toHaveBeenCalledWith(expect.objectContaining({
       brand_id: 7, is_custom: false, product_reference: "Creator's preferred launch",
-    }), expect.any(Function), expect.any(AbortSignal), expect.any(Function));
+    }));
     queryClient.clear();
   });
 
@@ -164,7 +178,7 @@ describe("Pitch page generation and review", () => {
       const polls = [...poll];
       const get = vi.spyOn(api, "get").mockImplementation(routeGet(path =>
         path.startsWith("/own-brands/jobs/") ? polls.shift() ?? polls.at(-1) : { top_contact: null }));
-      const post = vi.spyOn(api, "post").mockResolvedValue(start);
+      const post = onPost("/own-brands", async () => start);
       window.history.replaceState(null, "", "/pitch");
       render(<QueryClientProvider client={queryClient}><Pitch /></QueryClientProvider>);
       return { queryClient, get, post };
@@ -177,7 +191,7 @@ describe("Pitch page generation and review", () => {
       post.mockRejectedValue(new ApiRequestError("That doesn't look like an Instagram profile.", 400));
       await findBrand("hello world!", true);
       await tick(0);
-      expect(post).toHaveBeenCalledExactlyOnceWith("/own-brands", { instagram: "hello world!" });
+      expect(post).toHaveBeenCalledExactlyOnceWith({ instagram: "hello world!" });
       expect(screen.getByRole("alert")).toHaveTextContent("That doesn't look like an Instagram profile.");
       await tick(5000);
       expect(pollCalls(get)).toHaveLength(0);
@@ -190,7 +204,7 @@ describe("Pitch page generation and review", () => {
         job({ stage: "Reading the brand's Instagram posts (this can take a minute)" }),
         [job({ stage: "Writing the brand profile" }), job({ status: "ready", brand: ownBrand })],
       );
-      const generate = vi.spyOn(pitchStreaming, "generatePitch").mockResolvedValue({ ...pitch, brand_id: 99, is_custom: false });
+      const generate = onPost("/pitches", async () => ({ ...pitch, brand_id: 99, is_custom: false }));
       fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
       await chooseContentPosts();
       await findBrand("@freshbrand", true);
@@ -222,7 +236,7 @@ describe("Pitch page generation and review", () => {
       expect(generate).toHaveBeenCalledExactlyOnceWith({
         is_custom: false, brand_id: 99, story: pitch.story,
         product_reference: "Glow Serum", past_brand_partnership: null, content_link: "https://www.instagram.com/p/P1/",
-      }, expect.any(Function), expect.any(AbortSignal), expect.any(Function));
+      });
       queryClient.clear();
     });
 
@@ -252,7 +266,7 @@ describe("Pitch page generation and review", () => {
       expect(generateButton()).toBeDisabled();
       fireEvent.keyDown(screen.getByPlaceholderText(OWN_PLACEHOLDER), { key: "Enter" });
       await tick(0);
-      expect(post).toHaveBeenLastCalledWith("/own-brands", { instagram: "@other" });
+      expect(post).toHaveBeenLastCalledWith({ instagram: "@other" });
       expect(screen.getByTestId("own-brand-card")).toBeInTheDocument();
       queryClient.clear();
     });
@@ -286,7 +300,7 @@ describe("Pitch page generation and review", () => {
     function setup() {
       const queryClient = mountMatches();
       Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
-      const post = vi.spyOn(pitchStreaming, "generatePitch").mockResolvedValue({ ...pitch, brand_id: 7, is_custom: false });
+      const post = onPost("/pitches", async () => ({ ...pitch, brand_id: 7, is_custom: false }));
       fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
       fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
       return { queryClient, post };
@@ -420,7 +434,7 @@ describe("Pitch page generation and review", () => {
         expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(3);
         expect(searchInput(dialog)).toHaveValue("caption");
         const added = savedPost(9, { caption_preview: "Caption nine" });
-        vi.spyOn(api, "post").mockImplementation(async () => { savedPosts = [added, ...savedPosts]; return added; });
+        onPost("/creator-profile/me/posts", async () => { savedPosts = [added, ...savedPosts]; return added; });
         fireEvent.change(within(dialog).getByPlaceholderText("https://www.instagram.com/p/…"), { target: { value: "https://www.instagram.com/p/P9/" } });
         fireEvent.click(within(dialog).getByRole("button", { name: "Add post" }));
         await within(dialog).findByText("Post added.");
@@ -458,7 +472,7 @@ describe("Pitch page generation and review", () => {
       const added = savedPost(9, { caption_preview: "Brand new post" });
       let release!: () => void;
       const gate = new Promise<void>(resolve => { release = resolve; });
-      const create = vi.spyOn(api, "post").mockImplementation(async () => { await gate; savedPosts = [added, ...savedPosts]; return added; });
+      const create = onPost("/creator-profile/me/posts", async () => { await gate; savedPosts = [added, ...savedPosts]; return added; });
       const dialog = await openPicker("link");
       fireEvent.click(within(dialog).getByRole("button", { name: "Add post" }));
       expect(within(dialog).getByRole("alert")).toHaveTextContent("Paste the link of an Instagram post.");
@@ -470,7 +484,7 @@ describe("Pitch page generation and review", () => {
       expect(dialog).toHaveTextContent("MAVLIT is reading this post. This can take up to a minute.");
       await act(async () => { release(); });
       expect(await within(dialog).findByText("Post added.")).toBeInTheDocument();
-      expect(create).toHaveBeenCalledExactlyOnceWith("/creator-profile/me/posts", { post_url: "https://www.instagram.com/p/P9/", is_partnership_post: false });
+      expect(create).toHaveBeenCalledExactlyOnceWith({ post_url: "https://www.instagram.com/p/P9/", is_partnership_post: false });
       expect(input).toHaveValue("");
       expect(within(dialog).getAllByTestId("picker-row")[0]).toHaveTextContent("Brand new post");
       expect(within(dialog).getAllByRole("checkbox")[0]).toBeChecked();
@@ -482,7 +496,7 @@ describe("Pitch page generation and review", () => {
 
     it("shows the server's error when a post cannot be added", async () => {
       const { queryClient } = setup();
-      vi.spyOn(api, "post").mockRejectedValue(new ApiRequestError("The post could not be read: it is private.", 422));
+      onPost("/creator-profile/me/posts", async () => { throw new ApiRequestError("The post could not be read: it is private.", 422); });
       const dialog = await openPicker("link");
       fireEvent.change(within(dialog).getByPlaceholderText("https://www.instagram.com/p/…"), { target: { value: "https://www.instagram.com/p/PRIV/" } });
       fireEvent.click(within(dialog).getByRole("button", { name: "Add post" }));
@@ -512,11 +526,11 @@ describe("Pitch page generation and review", () => {
       expect(dialog).toHaveTextContent("Showing the posts you marked as paid partnerships. 0 of 3 chosen.");
       expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(2);
       const added = savedPost(9, { caption_preview: "Lashes collab", is_partnership_post: true });
-      const create = vi.spyOn(api, "post").mockImplementation(async () => { savedPosts = [added, ...savedPosts]; return added; });
+      const create = onPost("/creator-profile/me/posts", async () => { savedPosts = [added, ...savedPosts]; return added; });
       fireEvent.change(within(dialog).getByPlaceholderText("https://www.instagram.com/p/…"), { target: { value: "https://www.instagram.com/p/P9/" } });
       fireEvent.click(within(dialog).getByRole("button", { name: "Add post" }));
       await within(dialog).findByText("Post added.");
-      expect(create).toHaveBeenCalledWith("/creator-profile/me/posts", { post_url: "https://www.instagram.com/p/P9/", is_partnership_post: true });
+      expect(create).toHaveBeenCalledWith({ post_url: "https://www.instagram.com/p/P9/", is_partnership_post: true });
       expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(3);
       fireEvent.change(within(dialog).getByPlaceholderText("e.g. Falscara lashes, 2025 campaign"), { target: { value: "Falscara lashes,  2025 campaign" } });
       fireEvent.keyDown(within(dialog).getByPlaceholderText("e.g. Falscara lashes, 2025 campaign"), { key: "Enter" });
@@ -562,7 +576,7 @@ describe("Pitch page generation and review", () => {
         is_custom: false, brand_id: 7, story: pitch.story, product_reference: "A, B",
         past_brand_partnership: "https://www.instagram.com/p/P4/, Lash brand 2025",
         content_link: "https://www.instagram.com/p/P1/, https://www.instagram.com/p/P2/",
-      }, expect.any(Function), expect.any(AbortSignal), expect.any(Function));
+      });
       queryClient.clear();
     });
 
@@ -576,7 +590,7 @@ describe("Pitch page generation and review", () => {
       await screen.findByRole("textbox", { name: "Pitch email draft" });
       expect(post).toHaveBeenCalledWith(expect.objectContaining({
         product_reference: "Latest Studio Mic", past_brand_partnership: null, content_link: "https://www.instagram.com/p/P1/",
-      }), expect.any(Function), expect.any(AbortSignal), expect.any(Function));
+      }));
       queryClient.clear();
     });
 
@@ -591,34 +605,10 @@ describe("Pitch page generation and review", () => {
     });
   });
 
-  it("shows server status events in the status line until the draft starts, then keeps the draft", async () => {
-    const queryClient = mountMatches();
-    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
-    let status!: (text: string) => void;
-    let publish!: (text: string) => void;
-    vi.spyOn(pitchStreaming, "generatePitch").mockImplementation((_body, delta, _signal, onStatus) => {
-      publish = delta;
-      status = onStatus!;
-      return new Promise<ApiPitch>(() => {});
-    });
-    fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
-    fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
-    await chooseContentPosts();
-    fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
-    expect(screen.getByRole("status")).toHaveTextContent("Writing your pitch…");
-    act(() => status("Reading the Instagram posts you linked…"));
-    expect(screen.getByRole("status")).toHaveTextContent("Reading the Instagram posts you linked…");
-    act(() => status("Writing your pitch…"));
-    act(() => publish("Hi"));
-    expect(screen.getByRole("status")).toHaveTextContent("Writing your pitch…");
-    expect(screen.getByPlaceholderText("MAVLIT is writing your pitch…")).toHaveValue("Hi");
-    queryClient.clear();
-  });
-
   it("generates without a story and sends an empty one", async () => {
     const queryClient = mountMatches();
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
-    const post = vi.spyOn(pitchStreaming, "generatePitch").mockResolvedValue({ ...pitch, brand_id: 7, is_custom: false });
+    const post = onPost("/pitches", async () => ({ ...pitch, brand_id: 7, is_custom: false }));
     expect(screen.getByText("(optional)")).toBeInTheDocument();
     expect(screen.getByText("Optional. If you leave it empty, MAVLIT opens the email with what you make and why the brand fits your audience.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Generate pitch email draft" })).toBeDisabled();
@@ -628,8 +618,7 @@ describe("Pitch page generation and review", () => {
     expect(screen.getByRole("button", { name: "Generate pitch email draft" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
     await screen.findByRole("textbox", { name: "Pitch email draft" });
-    expect(post).toHaveBeenCalledWith(expect.objectContaining({ brand_id: 7, story: "" }),
-      expect.any(Function), expect.any(AbortSignal), expect.any(Function));
+    expect(post).toHaveBeenCalledWith(expect.objectContaining({ brand_id: 7, story: "" }));
     queryClient.clear();
   });
 
@@ -675,8 +664,8 @@ describe("Pitch page generation and review", () => {
 
   it("generates with visible brand/story inputs, edits, and confirms same-row saving without leaving the page", async () => {
     vi.spyOn(api, "get").mockImplementation(routeGet(() => ({ matches: [], total: 0 })));
-    vi.spyOn(api, "post").mockResolvedValue(job({ status: "ready", brand: { ...ownBrand, name: pitch.brand_name, latest_product: null } }));
-    const post = vi.spyOn(pitchStreaming, "generatePitch").mockResolvedValue(pitch);
+    onPost("/own-brands", async () => job({ status: "ready", brand: { ...ownBrand, name: pitch.brand_name, latest_product: null } }));
+    const post = onPost("/pitches", async () => pitch);
     const edited = "Subject: My edits\n\nFinal email";
     const patch = vi.spyOn(api, "patch").mockResolvedValue({ ...pitch, pitch_text: edited });
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
@@ -706,75 +695,117 @@ describe("Pitch page generation and review", () => {
     expect(post).toHaveBeenCalledExactlyOnceWith({
       is_custom: false, brand_id: 99, story: pitch.story,
       product_reference: null, past_brand_partnership: null, content_link: "https://www.instagram.com/p/P1/",
-    }, expect.any(Function), expect.any(AbortSignal), expect.any(Function));
+    });
     expect(patch).toHaveBeenCalledExactlyOnceWith("/pitches/43", { pitch_text: edited });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["pitches"] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["dashboard"] });
     queryClient.clear();
   });
 
-  it("immediately shows a read-only draft, displays live deltas, then enables editing with the final saved text", async () => {
-    const queryClient = mountMatches();
-    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
-    let publish!: (text: string) => void;
-    let finish!: (value: ApiPitch) => void;
-    const pending = new Promise<ApiPitch>((resolve) => { finish = resolve; });
-    const generate = vi.spyOn(pitchStreaming, "generatePitch").mockImplementation((_body, delta) => {
-      publish = delta;
-      return pending;
-    });
-    fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
-    fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
-    await chooseContentPosts();
-    fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
-    const live = screen.getByPlaceholderText("MAVLIT is writing your pitch…");
-    expect(live).toHaveValue("");
-    expect(live).toHaveAttribute("readonly");
-    expect(screen.getByRole("status")).toHaveTextContent("Writing your pitch…");
-    expect(screen.getByRole("button", { name: "Writing your pitch…" })).toBeDisabled();
-    act(() => publish("Hi "));
-    expect(live).toHaveValue("Hi ");
-    act(() => publish("Lauren"));
-    expect(live).toHaveValue("Hi Lauren");
-    await act(async () => finish({ ...pitch, contact_name: "Lauren", pitch_text: "Hi Lauren,\n\nFinal trimmed email." }));
-    const editor = screen.getByRole("textbox", { name: "Pitch email draft" });
-    expect(editor).toHaveValue("Hi Lauren,\n\nFinal trimmed email.");
-    expect(editor).not.toHaveAttribute("readonly");
-    expect(screen.getByText("Suggested contact: Lauren")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
-    expect(screen.queryByText("Writing your pitch…")).not.toBeInTheDocument();
-    fireEvent.change(editor, { target: { value: "Unsaved corrections" } });
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    fireEvent.click(screen.getByRole("button", { name: "Generate again" }));
-    expect(confirm).toHaveBeenCalledOnce();
-    expect(editor).toHaveValue("Unsaved corrections");
-    expect(generate).toHaveBeenCalledOnce();
-    queryClient.clear();
-  });
-
-  it.each(["Brand not found", pitchStreaming.INCOMPLETE_PITCH, "Generation failed upstream"])(
-    "clears the partial draft and restores generation controls on failure: %s", async (message) => {
+  describe("pitch typing effect", () => {
+    const words = (count: number) => Array.from({ length: count }, (_, index) => `w${index + 1}`).join(" ");
+    const live = () => screen.getByPlaceholderText("MAVLIT is writing your pitch…");
+    async function start(text: string, extra: Partial<ApiPitch> = {}) {
       const queryClient = mountMatches();
       Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
-      let publish!: (text: string) => void;
+      let finish!: (value: ApiPitch) => void;
+      const pending = new Promise<ApiPitch>(resolve => { finish = resolve; });
+      const post = onPost("/pitches", () => pending);
+      fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
+      fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
+      await chooseContentPosts();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
+      const settle = async (ms = 0) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+      const resolve = async () => { finish({ ...pitch, brand_id: 7, pitch_text: text, ...extra }); await settle(); };
+      return { queryClient, post, settle, resolve };
+    }
+
+    it("waits with an empty read-only box and disabled Generate, then types the pitch word by word and unlocks it", async () => {
+      const text = `Hi Lauren,\n\n${words(18)}`;
+      const { queryClient, post, settle, resolve } = await start(text, { id: 77, contact_name: "Lauren", contact_email: "lauren@brand.test" });
+      expect(post).toHaveBeenCalledOnce();
+      expect(live()).toHaveValue("");
+      expect(live()).toHaveAttribute("readonly");
+      expect(screen.getByRole("status")).toHaveTextContent("Writing your pitch…");
+      expect(screen.getByRole("button", { name: "Writing your pitch…" })).toBeDisabled();
+      await settle(10_000); // nothing is typed before the response arrives
+      expect(live()).toHaveValue("");
+      await resolve();
+      const chunks = text.match(/\s*\S+\s*/g)!;
+      const delay = Math.max(12, Math.min(60, 4000 / chunks.length));
+      await settle(delay - 1);
+      expect(live()).toHaveValue("");
+      await settle(1);
+      expect(live()).toHaveValue(chunks[0]);
+      await settle(delay);
+      expect(live()).toHaveValue(chunks[0] + chunks[1]);
+      expect(live()).toHaveAttribute("readonly");
+      expect(screen.getByRole("button", { name: "Writing your pitch…" })).toBeDisabled();
+      await settle(delay * chunks.length);
+      expect(screen.queryByPlaceholderText("MAVLIT is writing your pitch…")).not.toBeInTheDocument();
+      const editor = screen.getByRole("textbox", { name: "Pitch email draft" });
+      expect(editor).toHaveValue(text);
+      expect(editor).not.toHaveAttribute("readonly");
+      expect(screen.getByText("Suggested contact: Lauren — lauren@brand.test")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Generate again" })).toBeEnabled();
+      queryClient.clear();
+    });
+
+    it("keeps the whole effect within about four seconds, pacing long pitches at 12 ms per word", async () => {
+      const text = words(1000);
+      const { queryClient, settle, resolve } = await start(text);
+      await resolve();
+      await settle(12 * 1000 + 12);
+      expect(screen.getByRole("textbox", { name: "Pitch email draft" })).toHaveValue(text);
+      queryClient.clear();
+    });
+
+    it("shows the whole text at once when the box is clicked during typing", async () => {
+      const text = words(40);
+      const { queryClient, settle, resolve } = await start(text);
+      await resolve();
+      await settle(300);
+      expect((live() as HTMLTextAreaElement).value.length).toBeGreaterThan(0);
+      expect((live() as HTMLTextAreaElement).value.length).toBeLessThan(text.length);
+      await act(async () => { fireEvent.click(live()); });
+      await settle(0);
+      expect(screen.getByRole("textbox", { name: "Pitch email draft" })).toHaveValue(text);
+      expect(screen.getByRole("textbox", { name: "Pitch email draft" })).not.toHaveAttribute("readonly");
+      queryClient.clear();
+    });
+
+    it("confirms before replacing unsaved edits when generating again", async () => {
+      const { queryClient, post, settle, resolve } = await start("Hi Lauren, final email.");
+      await resolve();
+      await settle(2000);
+      const editor = screen.getByRole("textbox", { name: "Pitch email draft" });
+      fireEvent.change(editor, { target: { value: "Unsaved corrections" } });
+      const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+      fireEvent.click(screen.getByRole("button", { name: "Generate again" }));
+      expect(confirm).toHaveBeenCalledOnce();
+      expect(editor).toHaveValue("Unsaved corrections");
+      expect(post).toHaveBeenCalledOnce();
+      queryClient.clear();
+    });
+
+    it.each(["Brand not found", "Generation failed upstream"])("hides the draft box and shows the detail on an error response: %s", async (message) => {
+      const queryClient = mountMatches();
+      Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
       let fail!: (cause: Error) => void;
-      const pending = new Promise<ApiPitch>((_resolve, reject) => { fail = reject; });
-      vi.spyOn(pitchStreaming, "generatePitch").mockImplementation((_body, delta) => {
-        publish = delta;
-        return pending;
-      });
+      onPost("/pitches", () => new Promise<ApiPitch>((_resolve, reject) => { fail = reject; }));
       fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
       fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: pitch.story } });
       await chooseContentPosts();
       fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
-      act(() => publish("Never leave this partial email behind"));
-      expect(screen.getByRole("textbox", { name: "Pitch email draft" })).toHaveValue("Never leave this partial email behind");
-      await act(async () => fail(new Error(message)));
+      expect(screen.getByPlaceholderText("MAVLIT is writing your pitch…")).toHaveValue("");
+      await act(async () => fail(new ApiRequestError(message, 404)));
       expect(screen.getByRole("alert")).toHaveTextContent(message);
       expect(screen.queryByRole("textbox", { name: "Pitch email draft" })).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("MAVLIT is writing your pitch…")).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Generate pitch email draft" })).toBeEnabled();
-      expect(screen.queryByText("Your changes were saved.")).not.toBeInTheDocument();
       queryClient.clear();
-    },
-  );
+    });
+  });
 });

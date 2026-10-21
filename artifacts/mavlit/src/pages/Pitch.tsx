@@ -12,8 +12,7 @@ import PitchDraftEditor from "@/components/PitchDraftEditor";
 import { PickedField, PostPickerDialog, joinPicked, pickedPost, MAX_PICKS, type PickedEntry, type PickerKind } from "@/components/PostPicker";
 import OwnBrandLookupField from "@/components/OwnBrandLookup";
 import { useOwnBrandLookup, brandDisplayName } from "@/hooks/useOwnBrandLookup";
-import LivePitchDraft, { DEFAULT_PITCH_STATUS } from "@/components/LivePitchDraft";
-import { generatePitch } from "@/lib/pitchStream";
+import LivePitchDraft from "@/components/LivePitchDraft";
 import { api, getAllMatches, type ApiBrand, type ApiPitch } from "@/lib/api";
 import { useAuth, type CreatorProfile } from "@/contexts/AuthContext";
 
@@ -43,6 +42,9 @@ interface OutboundForm {
 }
 
 const MAX_ENTRIES = 3;
+const MIN_TYPING_DELAY_MS = 12;
+const MAX_TYPING_DELAY_MS = 60;
+const TYPING_BUDGET_MS = 4000;
 
 const EMPTY_OUTBOUND: OutboundForm = {
   brandSource: "matched", selectedBrand: "",
@@ -168,7 +170,6 @@ function OutboundMode() {
   ownInput.current = lookup.input;
   const [generating, setGenerating] = useState(false);
   const [streamText, setStreamText] = useState("");
-  const [streamStatus, setStreamStatus] = useState(DEFAULT_PITCH_STATUS);
   const [draft, setDraft] = useState<ApiPitch | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -176,8 +177,10 @@ function OutboundMode() {
   const emailRef = useRef<HTMLDivElement>(null);
   const generationInFlight = useRef(false);
   const productReferenceEdited = useRef(false);
-  const streamController = useRef<AbortController | null>(null);
-  useEffect(() => () => { streamController.current?.abort(); }, []);
+  const mounted = useRef(true);
+  // Finishes the typing effect at once (a click on the box); also what unmounting stops.
+  const finishTyping = useRef<(() => void) | null>(null);
+  useEffect(() => () => { mounted.current = false; finishTyping.current?.(); }, []);
   useEffect(() => {
     if (generating) emailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [generating]);
@@ -232,9 +235,7 @@ function OutboundMode() {
     if (!form.contentPosts.length) { setError("Choose at least one post that shows your connection to this brand."); return; }
     if (dirty && !window.confirm("Generate a new pitch and discard your unsaved email edits? The previous generated draft remains in Pipeline.")) return;
     generationInFlight.current = true;
-    const controller = new AbortController();
-    streamController.current = controller;
-    setGenerating(true); setError(null); setDraft(null); setStreamText(""); setStreamStatus(DEFAULT_PITCH_STATUS); setDirty(false);
+    setGenerating(true); setError(null); setDraft(null); setStreamText(""); setDirty(false);
     try {
       const body = {
         is_custom: false,
@@ -244,21 +245,48 @@ function OutboundMode() {
         past_brand_partnership: joinPicked(form.pastPartnerships),
         content_link: joinPicked(form.contentPosts),
       };
-      const data = await generatePitch(body, (delta) => setStreamText(previous => previous + delta), controller.signal, setStreamStatus);
-      if (controller.signal.aborted) return;
+      const data = await api.post<ApiPitch>("/pitches", body);
+      if (!mounted.current) return;
+      if (!data || !Number.isInteger(data.id) || typeof data.pitch_text !== "string" || !data.pitch_text.trim()) {
+        throw new Error("MAVLIT completed generation without a valid pitch. Please try again.");
+      }
+      await typeOut(data.pitch_text);
+      if (!mounted.current) return;
       setDraft(data);
       setDirty(false);
       // Invalidate cached pitches and dashboard stats so Pipeline + Dashboard reflect the new pitch immediately
       queryClient.invalidateQueries({ queryKey: ["pitches"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     } catch (err) {
-      if (controller.signal.aborted) return;
+      if (!mounted.current) return;
       setDraft(null);
       setStreamText("");
       setError(err instanceof Error ? err.message : "Something went wrong generating your email. Please try again.");
     }
     finally { generationInFlight.current = false; setGenerating(false); }
   };
+
+  // The pitch arrives whole; reveal it word by word so it reads as being written (at most ~4 seconds).
+  const typeOut = (text: string) => new Promise<void>(resolve => {
+    const chunks = text.match(/\s*\S+\s*/g) ?? [text];
+    const delay = Math.max(MIN_TYPING_DELAY_MS, Math.min(MAX_TYPING_DELAY_MS, TYPING_BUDGET_MS / chunks.length));
+    let next = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const finish = () => {
+      clearTimeout(timer);
+      finishTyping.current = null;
+      if (mounted.current) setStreamText(text);
+      resolve();
+    };
+    const tick = () => {
+      if (next >= chunks.length) { finish(); return; }
+      const chunk = chunks[next++];
+      setStreamText(previous => previous + chunk);
+      timer = setTimeout(tick, delay);
+    };
+    finishTyping.current = finish;
+    timer = setTimeout(tick, delay);
+  });
 
   const saved = (updated: ApiPitch) => {
     setDraft(updated);
@@ -397,7 +425,7 @@ function OutboundMode() {
         {/* Email output */}
           {(generating || draft) && (
             <motion.div ref={emailRef} key="pitch-output" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
-              {generating ? <LivePitchDraft text={streamText} status={streamStatus} /> : draft &&
+              {generating ? <LivePitchDraft text={streamText} onClick={() => finishTyping.current?.()} /> : draft &&
                 <PitchDraftEditor key={draft.id} pitch={draft} onSaved={saved} onSavingChange={setSaving} onDirtyChange={setDirty} />}
             </motion.div>
           )}

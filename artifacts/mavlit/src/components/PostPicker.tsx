@@ -41,6 +41,7 @@ const COPY = {
 const btnGhost = "rounded-xl border border-border px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 const inputCls = "w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all";
 const MAX_QUERY = 100;
+const SEARCH_DELAY_MS = 300;
 const errorText = (cause: unknown, fallback: string) => cause instanceof Error && cause.message ? cause.message : fallback;
 
 /** The chosen entries as chips, the "choose" button and the hint for one field. */
@@ -92,8 +93,8 @@ export function PostPickerDialog({ kind, open, onOpenChange, entries, onChoose, 
   const [description, setDescription] = useState("");
   const [query, setQuery] = useState("");
   const [activeQuery, setActiveQuery] = useState("");
-  const [searching, setSearching] = useState(false);
   const request = useRef(0);
+  const searchRequest = useRef(0);
   const full = entries.length >= MAX_PICKS;
   const chosenUrls = new Set(entries.flatMap(entry => entry.kind === "post" ? [entry.url] : []));
 
@@ -102,7 +103,10 @@ export function PostPickerDialog({ kind, open, onOpenChange, entries, onChoose, 
     const mine = ++request.current;
     const result = await listCreatorPosts(q, partnership);
     if (!isPostsList(result)) throw new Error("MAVLIT returned an unexpected response. Please try again.");
-    if (mine === request.current) setList(result);
+    // A newer request owns the list; report whether this one did.
+    if (mine !== request.current) return false;
+    setList(result);
+    return true;
   };
 
   useEffect(() => {
@@ -139,19 +143,22 @@ export function PostPickerDialog({ kind, open, onOpenChange, entries, onChoose, 
 
   const search = async (text: string) => {
     const q = text.trim().slice(0, MAX_QUERY);
-    if (searching) return;
+    const mine = ++searchRequest.current;
     setMessage(null);
-    setSearching(true);
     try {
-      await load(q);
-      setActiveQuery(q);
-      setQuery(q);
+      if (await load(q) && mine === searchRequest.current) setActiveQuery(q);
     } catch (cause) {
-      setMessage({ kind: "error", text: errorText(cause, "Could not search your posts.") });
-    } finally {
-      setSearching(false);
+      if (mine === searchRequest.current) setMessage({ kind: "error", text: errorText(cause, "Could not search your posts.") });
     }
   };
+
+  // Results follow the typing: wait for a short pause, then search.
+  useEffect(() => {
+    const q = query.trim().slice(0, MAX_QUERY);
+    if (!open || q === activeQuery) return;
+    const timer = setTimeout(() => void search(q), SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [open, query, activeQuery]);
 
   const describe = () => {
     const text = description.replace(/,/g, " ").replace(/\s+/g, " ").trim();
@@ -185,9 +192,9 @@ export function PostPickerDialog({ kind, open, onOpenChange, entries, onChoose, 
             onSubmit={e => { e.preventDefault(); void search(query); }}>
             <input type="search" value={query} onChange={e => setQuery(e.target.value)} maxLength={MAX_QUERY}
               aria-label="Search your posts by caption" placeholder="Search your posts by caption…" className={inputCls} />
-            <button type="submit" className={`${btnGhost} shrink-0`} disabled={searching}>Search</button>
+            <button type="submit" className={`${btnGhost} shrink-0`}>Search</button>
             {activeQuery && (
-              <button type="button" className={`${btnGhost} shrink-0`} disabled={searching} onClick={() => void search("")}>Clear</button>
+              <button type="button" className={`${btnGhost} shrink-0`} onClick={() => { setQuery(""); void search(""); }}>Clear</button>
             )}
           </form>
 

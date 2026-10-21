@@ -225,7 +225,7 @@ function OutboundMode() {
   });
   const activeContact = form.brandSource === "matched" ? brandDetail?.top_contact : null;
   // Creator details come from the saved account profile, not hidden legacy inputs.
-  const canGenerate = brandId != null && !lookup.busy && !!form.story.trim();
+  const canGenerate = brandId != null && !lookup.busy;
 
   const generate = async () => {
     if (!canGenerate || saving || generationInFlight.current) return;
@@ -239,7 +239,7 @@ function OutboundMode() {
       const body = {
         is_custom: false,
         brand_id: brandId!,
-        story: form.story,
+        story: form.story.trim() ? form.story : "",
         product_reference: joinEntries(form.recentProductLaunch),
         past_brand_partnership: joinPicked(form.pastPartnerships),
         content_link: joinPicked(form.contentPosts),
@@ -329,10 +329,11 @@ function OutboundMode() {
         <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
           <h2 className="text-lg font-bold text-white">2 — Your story &amp; social proof</h2>
           <div>
-            <Label>Your authentic connection to {brandName || "[brand]"} — the story</Label>
+            <Label>Your authentic connection to {brandName || "[brand]"} — the story <span className="font-normal text-muted-foreground/50">(optional)</span></Label>
             <textarea value={form.story} onChange={e => set("story", e.target.value)} rows={4}
               placeholder={`e.g. I've used ${brandName || "[brand]"} gear since I was 16 learning in my bedroom studio. My audience of 18–34 producers knows I only mention what I actually use.`}
               className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all resize-none" />
+            <p className="mt-1.5 text-xs text-muted-foreground/70 leading-relaxed">Optional. If you leave it empty, MAVLIT opens the email with what you make and why the brand fits your audience.</p>
           </div>
           {brandName && (
             <div>

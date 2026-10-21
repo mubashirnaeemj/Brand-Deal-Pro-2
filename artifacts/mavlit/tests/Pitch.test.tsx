@@ -384,6 +384,18 @@ describe("Pitch page generation and review", () => {
         queryClient.clear();
       });
 
+      it("searches while typing, after a short pause and without pressing Search", async () => {
+        const { queryClient } = setup();
+        const dialog = await openPicker("link");
+        for (const text of ["z", "ze", "zeph", "zephyr"]) fireEvent.change(searchInput(dialog), { target: { value: text } });
+        await waitFor(() => expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(1));
+        expect(getCalls().filter(path => path.includes("q="))).toEqual(["/creator-profile/me/posts?q=zephyr"]);
+        fireEvent.change(searchInput(dialog), { target: { value: "" } });
+        await waitFor(() => expect(within(dialog).getAllByTestId("picker-row")).toHaveLength(5));
+        expect(within(dialog).queryByRole("button", { name: "Clear" })).not.toBeInTheDocument();
+        queryClient.clear();
+      });
+
       it("searches only partnership posts in the partnerships picker, with its own no-match text", async () => {
         const { queryClient } = setup();
         const dialog = await openPicker("partnership");
@@ -600,6 +612,24 @@ describe("Pitch page generation and review", () => {
     act(() => publish("Hi"));
     expect(screen.getByRole("status")).toHaveTextContent("Writing your pitch…");
     expect(screen.getByPlaceholderText("MAVLIT is writing your pitch…")).toHaveValue("Hi");
+    queryClient.clear();
+  });
+
+  it("generates without a story and sends an empty one", async () => {
+    const queryClient = mountMatches();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+    const post = vi.spyOn(pitchStreaming, "generatePitch").mockResolvedValue({ ...pitch, brand_id: 7, is_custom: false });
+    expect(screen.getByText("(optional)")).toBeInTheDocument();
+    expect(screen.getByText("Optional. If you leave it empty, MAVLIT opens the email with what you make and why the brand fits your audience.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate pitch email draft" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Launch Brand/ }));
+    await chooseContentPosts();
+    fireEvent.change(screen.getByPlaceholderText(/gear since I was 16/), { target: { value: "   " } });
+    expect(screen.getByRole("button", { name: "Generate pitch email draft" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Generate pitch email draft" }));
+    await screen.findByRole("textbox", { name: "Pitch email draft" });
+    expect(post).toHaveBeenCalledWith(expect.objectContaining({ brand_id: 7, story: "" }),
+      expect.any(Function), expect.any(AbortSignal), expect.any(Function));
     queryClient.clear();
   });
 

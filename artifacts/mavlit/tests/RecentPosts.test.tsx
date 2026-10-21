@@ -219,6 +219,35 @@ describe("searching the recent posts by caption", () => {
     expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
   });
 
+  it("searches while typing, after a short pause and without pressing Search", async () => {
+    const user = userEvent.setup();
+    await mount(captioned(12));
+    await openDialog();
+    await user.type(screen.getByRole("searchbox"), "guitar");
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    // One request for the finished word, not one per keystroke.
+    const queries = fixture.requests.filter((r) => r.method === "GET" && r.search.startsWith("?q=")).map((r) => r.search);
+    expect(queries).toEqual(["?q=guitar"]);
+    expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
+    await user.clear(screen.getByRole("searchbox"));
+    await waitFor(() => expect(rows()).toHaveLength(12));
+    expect(screen.queryByRole("button", { name: "Clear" })).not.toBeInTheDocument();
+  });
+
+  it("does not search for text typed and abandoned by closing, and starts empty when reopened", async () => {
+    const user = userEvent.setup();
+    await mount(captioned(12));
+    await openDialog();
+    await user.type(screen.getByRole("searchbox"), "guit");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await openDialog();
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    expect(fixture.requests.some((r) => r.search.startsWith("?q="))).toBe(false);
+    expect(rows()).toHaveLength(12);
+  });
+
   it("finds a word at the end of a long caption through the API, not by filtering the preview", async () => {
     const user = userEvent.setup();
     await mount(captioned(12));

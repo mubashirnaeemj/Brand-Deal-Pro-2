@@ -12,6 +12,7 @@ type Message = { kind: "error" | "success"; text: string };
 type Props = { posts: CreatorPostsList | null; onPostsChange: Dispatch<SetStateAction<CreatorPostsList | null>> };
 
 const MAX_QUERY = 100;
+const SEARCH_DELAY_MS = 300;
 const errorText = (cause: unknown, fallback: string) => cause instanceof Error && cause.message ? cause.message : fallback;
 const btnGhost = "rounded-xl border border-border px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
@@ -41,8 +42,8 @@ function PostsDialog({ open, onOpenChange, posts, onPostsChange }: {
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
   const [activeQuery, setActiveQuery] = useState("");
-  const [searching, setSearching] = useState(false);
   const listRequest = useRef(0);
+  const searchRequest = useRef(0);
   useEffect(() => { if (!open) setMessage(null); }, [open]);
 
   // Always asks the API: the server matches the whole caption, the list only carries its start.
@@ -50,31 +51,37 @@ function PostsDialog({ open, onOpenChange, posts, onPostsChange }: {
     const request = ++listRequest.current;
     const updated = await listCreatorPosts(q);
     if (!isPostsList(updated)) throw new Error("MAVLIT returned an unexpected response. Please reload.");
-    if (request === listRequest.current) onPostsChange(updated);
+    // A newer request owns the list; report whether this one did.
+    if (request !== listRequest.current) return false;
+    onPostsChange(updated);
+    return true;
   };
 
   const search = async (text: string) => {
     const q = text.trim().slice(0, MAX_QUERY);
-    if (searching) return;
+    const mine = ++searchRequest.current;
     setMessage(null);
-    setSearching(true);
     try {
-      await reload(q);
-      setActiveQuery(q);
-      setQuery(q);
+      if (await reload(q) && mine === searchRequest.current) setActiveQuery(q);
     } catch (cause) {
-      setMessage({ kind: "error", text: errorText(cause, "Could not search your posts.") });
-    } finally {
-      setSearching(false);
+      if (mine === searchRequest.current) setMessage({ kind: "error", text: errorText(cause, "Could not search your posts.") });
     }
   };
 
+  // Results follow the typing: wait for a short pause, then search.
+  useEffect(() => {
+    const q = query.trim().slice(0, MAX_QUERY);
+    if (!open || q === activeQuery) return;
+    const timer = setTimeout(() => void search(q), SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [open, query, activeQuery]);
+
   // Reopening starts with an empty search and the full list.
   const handleOpenChange = (next: boolean) => {
-    if (!next && activeQuery) {
+    if (!next && (activeQuery || query)) {
       setQuery("");
       setActiveQuery("");
-      void reload("").catch(() => {});
+      if (activeQuery) void reload("").catch(() => {});
     }
     onOpenChange(next);
   };
@@ -166,9 +173,9 @@ function PostsDialog({ open, onOpenChange, posts, onPostsChange }: {
             onSubmit={e => { e.preventDefault(); void search(query); }}>
             <input type="search" value={query} onChange={e => setQuery(e.target.value)} maxLength={MAX_QUERY}
               aria-label="Search your posts by caption" placeholder="Search your posts by caption…" className={INPUT_CLASS} />
-            <button type="submit" className={`${btnGhost} shrink-0`} disabled={searching}>Search</button>
+            <button type="submit" className={`${btnGhost} shrink-0`}>Search</button>
             {activeQuery && (
-              <button type="button" className={`${btnGhost} shrink-0`} disabled={searching} onClick={() => void search("")}>Clear</button>
+              <button type="button" className={`${btnGhost} shrink-0`} onClick={() => { setQuery(""); void search(""); }}>Clear</button>
             )}
           </form>
 

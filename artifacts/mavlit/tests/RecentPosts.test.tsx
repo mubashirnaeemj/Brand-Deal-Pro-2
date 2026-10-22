@@ -29,11 +29,16 @@ const deleteButtons = () => screen.getAllByRole("button", { name: /^Delete / });
 const rows = () => screen.getAllByTestId("post-row");
 
 describe("recent Instagram posts on the profile page", () => {
-  it("does not show the card to a creator without posts", async () => {
+  it("shows the card, empty, to a creator without posts so they can add their own", async () => {
     await mount([]);
     await waitFor(() => expect(fixture.requests.some((r) => r.path.endsWith("/creator-profile/me/posts"))).toBe(true));
-    expect(screen.queryByTestId("recent-posts-card")).not.toBeInTheDocument();
-    expect(screen.queryByText("Your recent Instagram posts")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("recent-posts-card")).toBeInTheDocument();
+    expect(screen.getByText("Your recent Instagram posts")).toBeInTheDocument();
+    await openDialog();
+    expect(screen.getByTestId("posts-empty")).toBeInTheDocument();
+    expect(screen.queryAllByTestId("post-row")).toHaveLength(0);
+    expect(screen.getByRole("textbox", { name: "Instagram post link" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Add post" })).toBeEnabled();
   });
 
   it("shows the card above the Save button and a blurred modal with the post details", async () => {

@@ -19,15 +19,18 @@ const btnGhost = "rounded-xl border border-border px-4 py-2 text-sm font-semibol
 
 const btnView = "rounded-lg border border-primary/50 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
-/** The creator's scraped Instagram posts; shown only when MAVLIT has read some. */
+/** The creator's Instagram posts. Shown whenever the list loaded, also empty, so a new creator can add posts. */
 export default function RecentPostsCard({ posts, onPostsChange }: Props) {
   const [open, setOpen] = useState(false);
-  if (!posts || posts.total <= 0) return null;
+  if (!posts) return null;
+  const empty = posts.total <= 0;
   return (
     <section className="mt-6 rounded-2xl border border-border bg-card p-5 sm:p-6" aria-labelledby="recent-posts-title" data-testid="recent-posts-card">
       <h2 id="recent-posts-title" className="text-lg font-bold text-white">Your recent Instagram posts</h2>
       <p className="mt-1.5 text-sm text-muted-foreground">
-        The posts MAVLIT has read from your Instagram. Mark the ones that were paid partnerships, remove posts you don't want to use, or add a post by its link.
+        {empty
+          ? "MAVLIT hasn't read any posts from your Instagram yet. You can add a post by its link, and mark the ones that were paid partnerships."
+          : "The posts MAVLIT has read from your Instagram. Mark the ones that were paid partnerships, remove posts you don't want to use, or add a post by its link."}
       </p>
       <button type="button" className={`${btnGhost} mt-4`} onClick={() => setOpen(true)}>View your recent Instagram posts</button>
       <PostsDialog open={open} onOpenChange={setOpen} posts={posts} onPostsChange={onPostsChange} />
@@ -149,7 +152,9 @@ function PostsDialog({ open, onOpenChange, posts, onPostsChange }: {
     }
   };
 
-  const usualNote = posts.can_delete
+  const usualNote = posts.total <= 0
+    ? "You have no posts yet. Add a post by its link below."
+    : posts.can_delete
     ? `You have ${posts.total} posts. A post can be deleted while more than ${posts.min_keep} remain.`
     : `You have ${posts.total} posts. At least ${posts.min_keep} posts stay on your profile, so nothing can be deleted until you add more.`;
   const note = activeQuery ? `${posts.shown ?? posts.posts.length} of your posts match your search. ${usualNote}` : usualNote;
@@ -182,6 +187,11 @@ function PostsDialog({ open, onOpenChange, posts, onPostsChange }: {
             )}
           </form>
 
+          {posts.posts.length === 0 && !activeQuery && (
+            <p className="p-5 text-sm text-muted-foreground" data-testid="posts-empty">
+              No posts yet. Paste the link of an Instagram post below to add your first one.
+            </p>
+          )}
           {posts.posts.length === 0 && activeQuery && (
             <p className="p-5 text-sm text-muted-foreground" data-testid="posts-no-match">No post caption contains "{activeQuery}".</p>
           )}

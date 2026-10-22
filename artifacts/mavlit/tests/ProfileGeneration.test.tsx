@@ -125,7 +125,7 @@ describe("Instagram wizard generation", () => {
     expect(applyProfileGeneration(typed, creatorProfile({ instagram_highest_views: 9000 }), "instagram").instagram.highestViews).toBe("9000");
   });
 
-  it("shows the recent posts card once generation has read the posts", async () => {
+  it("shows the recent posts card once generation has finished, with the posts it read", async () => {
     await mount();
     expect(screen.queryByTestId("recent-posts-card")).not.toBeInTheDocument();
     fixture.setPosts(Array.from({ length: 12 }, (_, index) => fixturePost(index + 1)));
@@ -133,6 +133,7 @@ describe("Instagram wizard generation", () => {
     await tick(1500);
     await tick(450);
     expect(screen.getByTestId("recent-posts-card")).toBeInTheDocument();
+    expect(screen.getByTestId("recent-posts-card")).not.toHaveTextContent("hasn't read any posts");
   });
 
   it("shows only username and primary niches with both Generate and disabled Save Profile", async () => {

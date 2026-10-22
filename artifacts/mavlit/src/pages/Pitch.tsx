@@ -324,7 +324,8 @@ function OutboundMode() {
                 {matchesLoading && <p className="text-sm text-muted-foreground py-3">Loading your matches…</p>}
                 {matchesError && <p className="text-sm text-red-400 py-3">Couldn't load matches. <button className="underline" onClick={() => refetchMatches()}>Retry</button> or use “A brand I found myself”.</p>}
                 {!matchesLoading && !matchesError && matches?.length === 0 && <p className="text-sm text-muted-foreground py-3">No matches yet. You can pitch a brand you found yourself.</p>}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
+                {/* Five rows of cards (15 brands on a wide screen) are visible; the rest scroll. */}
+                <div data-testid="matched-brands" className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2 max-h-[340px] overflow-y-auto overscroll-contain pr-1">
                   {matches?.map(b => {
                     const selected = form.selectedBrand === String(b.brand_raw_id);
                     return (

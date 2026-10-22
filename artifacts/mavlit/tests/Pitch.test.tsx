@@ -136,6 +136,25 @@ describe("Pitch page generation and review", () => {
     queryClient.clear();
   });
 
+  it("lists matched brands in a box that scrolls after five rows, without dropping any brand", () => {
+    const many = Array.from({ length: 40 }, (_, index) => ({
+      brand_raw_id: 100 + index, brand_name: `Brand ${index + 1}`, latest_product: null, niche: "Music",
+      total_score: 0.5, dimensions: {}, reasons: [],
+    }));
+    const queryClient = mountMatches();
+    queryClient.setQueryData(["pitch-matches"], many);
+    cleanup();
+    vi.spyOn(api, "get").mockImplementation(routeGet(() => ({ top_contact: null })));
+    window.history.replaceState(null, "", "/pitch");
+    render(<QueryClientProvider client={queryClient}><Pitch /></QueryClientProvider>);
+    const list = screen.getByTestId("matched-brands");
+    expect(list).toHaveClass("max-h-[340px]", "overflow-y-auto");
+    expect(within(list).getAllByRole("button")).toHaveLength(40);
+    fireEvent.click(within(list).getByRole("button", { name: /Brand 40/ }));
+    expect(within(list).getByRole("button", { name: /Brand 40/ })).toHaveClass("border-primary");
+    queryClient.clear();
+  });
+
   it("prefills the latest product when arriving from a brand link", async () => {
     const queryClient = mountMatches("?brand=Launch%20Brand");
     await waitFor(() => expect(screen.getByPlaceholderText("Enter a product launch, or leave blank to skip")).toHaveValue("Latest Studio Mic"));

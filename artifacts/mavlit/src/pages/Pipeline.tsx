@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Headphones, Music, Cpu, Camera, ShoppingBag, Zap,
-  ChevronDown, ChevronUp, Copy, Check, Sparkles, AlertTriangle, Building2, Users, BookOpen, Plus,
+  ChevronDown, ChevronUp, Copy, Check, Sparkles, AlertTriangle, Building2, Users, BookOpen, Plus, Trash2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -352,6 +352,38 @@ function CloseDealModal({
   );
 }
 
+// ── Delete confirmation ────────────────────────────────────────────────────────
+
+function DeletePitchModal({ brand, onConfirm, onCancel, busy, error }: {
+  brand: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  busy: boolean;
+  error: string | null;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="alertdialog" aria-modal="true" aria-labelledby="delete-pitch-title">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={busy ? undefined : onCancel} />
+      <div className="relative w-full max-w-sm bg-card border border-border rounded-2xl p-6 shadow-2xl space-y-5">
+        <div>
+          <h3 id="delete-pitch-title" className="text-white font-bold text-base">Delete this pitch?</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Are you sure you want to delete your pitch to {brand}? The saved email and its status will be removed from your Pipeline. This can't be undone.
+          </p>
+        </div>
+        {error && <p role="alert" className="text-xs text-red-400">{error}</p>}
+        <div className="flex gap-2">
+          <button onClick={onCancel} disabled={busy} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-white">Cancel</button>
+          <button onClick={onConfirm} disabled={busy} data-testid="button-confirm-delete-pitch"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-500/90 disabled:opacity-40">
+            {busy ? "Deleting…" : "Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Add Pitch Modal ────────────────────────────────────────────────────────────
 
 function MarkSentModal({ brand, onConfirm, onCancel, busy, error }: {
@@ -461,15 +493,17 @@ function AddPitchModal({ onAdd, onCancel, busy, error }: {
 // ── My Pitches Tab ─────────────────────────────────────────────────────────────
 
 function MyPitchesTab({
-  pitches, onUpdate, onAdd, onUseDealMaker,
+  pitches, onUpdate, onAdd, onDelete, onUseDealMaker,
 }: {
   pitches: PitchRecord[];
   onUpdate: (id: number, body: PitchUpdateRequest) => Promise<void>;
   onAdd: (brand: string, sentAt: string) => Promise<void>;
+  onDelete: (id: number) => Promise<void>;
   onUseDealMaker: (brand: string) => void;
 }) {
   const [closingId, setClosingId]     = useState<number | null>(null);
   const [sendingId, setSendingId]     = useState<number | null>(null);
+  const [deletingId, setDeletingId]   = useState<number | null>(null);
   const [statusEditId, setStatusEditId] = useState<number | null>(null);
   const [addingPitch, setAddingPitch] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -525,6 +559,18 @@ function MyPitchesTab({
     } finally { setBusy(false); }
   };
 
+  const confirmDelete = async () => {
+    if (deletingId === null) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await onDelete(deletingId);
+      setDeletingId(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Couldn't delete the pitch.");
+    } finally { setBusy(false); }
+  };
+
   const addPitch = async (brand: string, sentAt: string) => {
     setBusy(true);
     setActionError(null);
@@ -538,12 +584,14 @@ function MyPitchesTab({
 
   const closingBrand = pitches.find(p => p.id === closingId)?.brand ?? "";
   const sendingBrand = pitches.find(p => p.id === sendingId)?.brand ?? "";
+  const deletingBrand = pitches.find(p => p.id === deletingId)?.brand ?? "";
 
   return (
     <>
       <AnimatePresence>
         {closingId !== null && <CloseDealModal brand={closingBrand} onConfirm={confirmClose} onCancel={cancelClose} busy={busy} error={actionError} />}
         {sendingId !== null && <MarkSentModal brand={sendingBrand} onConfirm={markSent} onCancel={() => { setSendingId(null); setActionError(null); }} busy={busy} error={actionError} />}
+        {deletingId !== null && <DeletePitchModal brand={deletingBrand} onConfirm={confirmDelete} onCancel={() => { setDeletingId(null); setActionError(null); }} busy={busy} error={actionError} />}
         {addingPitch && <AddPitchModal onAdd={addPitch} onCancel={() => { setAddingPitch(false); setActionError(null); }} busy={busy} error={actionError} />}
       </AnimatePresence>
 
@@ -557,7 +605,7 @@ function MyPitchesTab({
           Add pitch
         </button>
       </div>
-      {actionError && !addingPitch && closingId === null && sendingId === null && <p role="alert" className="text-sm text-red-400 mb-4">{actionError}</p>}
+      {actionError && !addingPitch && closingId === null && sendingId === null && deletingId === null && <p role="alert" className="text-sm text-red-400 mb-4">{actionError}</p>}
 
       {pitches.length === 0 ? (
         <div className="text-center py-20">
@@ -631,6 +679,16 @@ function MyPitchesTab({
                   {formatRate(deal.agreedRate)}
                 </span>
               )}
+              <button
+                onClick={() => { setActionError(null); setDeletingId(deal.id); }}
+                disabled={busy}
+                aria-label={`Delete pitch to ${deal.brand}`}
+                title="Delete this pitch"
+                data-testid={`button-delete-pitch-${deal.id}`}
+                className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:text-red-400 hover:bg-red-500/10 disabled:opacity-40"
+              >
+                <Trash2 size={14} />
+              </button>
               {deal.pitchText && (
                 <details className="basis-full min-w-0 border-t border-border pt-3">
                   <summary className="cursor-pointer text-sm font-semibold text-primary">View saved email</summary>
@@ -1267,6 +1325,15 @@ export default function Pipeline() {
     }
   };
 
+  const deletePitch = async (id: number) => {
+    await api.delete(`/pitches/${id}`);
+    queryClient.setQueryData<ApiPitch[]>(["pitches"], previous => previous?.filter(p => p.id !== id));
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["pitches"] }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+    ]);
+  };
+
   const goToDealMaker = (brand: string) => {
     setDealmakerBrand(brand);
     setTab("dealmaker");
@@ -1334,7 +1401,7 @@ export default function Pipeline() {
                        : <button onClick={() => refetch()} className="underline">Retry</button>}
                    </div>
                 ) : (
-                  <MyPitchesTab pitches={pitches} onUpdate={updatePitch} onAdd={addPitch} onUseDealMaker={goToDealMaker} />
+                  <MyPitchesTab pitches={pitches} onUpdate={updatePitch} onAdd={addPitch} onDelete={deletePitch} onUseDealMaker={goToDealMaker} />
                 )}
               </motion.div>
             )}

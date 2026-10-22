@@ -302,7 +302,7 @@ function OutboundMode() {
 
         {/* Section 1 — Brand */}
         <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
-          <h2 className="text-lg font-bold text-white">1 — Which brand are you pitching?</h2>
+          <h2 className="text-lg font-bold text-white">1  Which brand are you pitching?</h2>
           <div className="flex gap-3">
             {(["matched", "found"] as const).map(src => (
               <button key={src} onClick={() => set("brandSource", src)}
@@ -357,7 +357,7 @@ function OutboundMode() {
 
         {/* Section 2 — Story */}
         <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
-          <h2 className="text-lg font-bold text-white">2 — Your story &amp; social proof</h2>
+          <h2 className="text-lg font-bold text-white">2  Your story &amp; social proof</h2>
           <div>
             <Label>Your authentic connection to {brandName || "[brand]"} — the story <span className="font-normal text-muted-foreground/50">(optional)</span></Label>
             <textarea value={form.story} onChange={e => set("story", e.target.value)} rows={4}

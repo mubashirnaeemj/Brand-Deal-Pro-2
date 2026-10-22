@@ -89,7 +89,7 @@ export default function Dashboard() {
     { label: "Brand Matches",     value: statsLoading ? null : statsError ? "—" : dashStats?.brand_matches,     sub: "In your niche",            icon: Users,       color: "#7c3aed" },
     { label: "Active Deals",      value: statsLoading ? null : statsError ? "—" : dashStats?.active_deals,      sub: "In your pipeline",         icon: Zap,         color: "#0ea5e9" },
     { label: "Saved Brands",      value: statsLoading ? null : statsError ? "—" : dashStats?.saved_brands,      sub: "On your shortlist",        icon: Bookmark,    color: "#10b981" },
-    { label: "Verified Contacts", value: statsLoading ? null : statsError ? "—" : dashStats?.verified_contacts, sub: "Across saved/pitched brands", icon: ShieldCheck, color: "#f59e0b" },
+    { label: "Verified Contacts", value: statsLoading ? null : statsError ? "—" : dashStats?.verified_contacts, sub: "Across your matched brands", icon: ShieldCheck, color: "#f59e0b" },
   ], [dashStats, statsLoading, statsError]);
 
   const recentDeals = (apiPitches ?? []).slice(0, 3);

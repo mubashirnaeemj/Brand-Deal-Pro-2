@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ProfileSettings from "@/pages/ProfileSettings";
@@ -39,6 +39,13 @@ describe("three-page Instagram profile", () => {
     expect(screen.queryByRole("button", { name: "YouTube" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Exit" })).toBeEnabled();
+  });
+
+  it("shows no connector line after the last step in the progress bar", async () => {
+    await mount();
+    const steps = within(screen.getByRole("navigation", { name: "Progress" })).getAllByRole("listitem");
+    expect(steps).toHaveLength(3);
+    expect(steps.map((step) => step.querySelectorAll("span.h-px").length)).toEqual([1, 1, 0]);
   });
 
   it("validates creator information before Continue and shows errors on page one", async () => {
@@ -167,7 +174,9 @@ describe("three-page Instagram profile", () => {
     const input = screen.getByTestId("input-pitch-style-preferences");
     expect(input).toHaveValue("Friendly and brief.");
     expect(input).not.toBeRequired();
-    expect(screen.getByText("Leave empty to use MAVLIT’s default.")).toBeInTheDocument();
+    expect(screen.getAllByText("Leave empty to use MAVLIT’s default.")).toHaveLength(2);
+    expect(screen.getByTestId("input-pitch-style-preferences")).toHaveAccessibleDescription("Leave empty to use MAVLIT’s default.");
+    expect(screen.getByTestId("input-brand-preferences")).toHaveAccessibleDescription("Leave empty to use MAVLIT’s default.");
     fireEvent.change(input, { target: { value: "  Confident, concise, and no emojis.  " } });
     await waitFor(() => expect(JSON.parse(sessionStorage.getItem(draftKey)!)).toMatchObject({
       pitchStylePreferences: "  Confident, concise, and no emojis.  ",

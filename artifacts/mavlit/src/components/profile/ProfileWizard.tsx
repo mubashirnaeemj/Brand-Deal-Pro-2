@@ -64,7 +64,7 @@ export default function ProfileWizard(p: ProfileWizardProps) {
                   {done ? <Check size={14} aria-hidden /> : n}
                 </span>
                 <span className={`hidden text-xs font-semibold sm:inline ${n === step ? "text-white" : "text-muted-foreground"}`}>{s}</span>
-                <span className={`h-px flex-1 ${n < step ? "bg-primary" : "bg-border"}`} aria-hidden />
+                {i < STEPS.length - 1 && <span className={`h-px flex-1 ${n < step ? "bg-primary" : "bg-border"}`} aria-hidden />}
               </li>
             );
           })}
@@ -188,7 +188,11 @@ export default function ProfileWizard(p: ProfileWizardProps) {
             <label className={labelCls}>Brand preferences
               <textarea data-testid="input-brand-preferences" rows={3} maxLength={1000} className={`${INPUT_CLASS} mt-1.5 resize-none`}
                 value={form.brandPreferences} onChange={(e) => onChange({ ...form, brandPreferences: e.target.value })}
+                aria-describedby="brand-preferences-help"
                 placeholder="Brands or partnership styles you want." />
+              <span id="brand-preferences-help" className="mt-1 block text-xs font-normal normal-case tracking-normal">
+                Leave empty to use MAVLIT’s default.
+              </span>
               <span aria-live="polite" className="mt-1 block text-right text-[11px] normal-case tracking-normal">{form.brandPreferences.length}/1000</span>
             </label>
             <label className={labelCls}>Instagram content description

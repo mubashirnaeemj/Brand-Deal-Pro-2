@@ -63,7 +63,7 @@ export default function AiMatchesSection({ version, data, loading, error, refres
     <section data-testid={`section-matches-${version}`}>
       <p className="mb-4 text-xs text-muted-foreground">
         {version === "v3"
-          ? "V3 — AI ranking using your profile, match evidence, and brand preferences. Brands you want rank higher; brands you don't want are shown last, not removed."
+          ? "MAVLIT AI ranking using your profile, match evidence, and brand preferences. Brands you want rank higher."
           : "V2 — AI ranking: an LLM compares your profile (niche, tags, description) with each brand's description and tags."}
       </p>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">

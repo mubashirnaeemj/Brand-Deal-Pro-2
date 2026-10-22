@@ -73,6 +73,8 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
     staleTime: 60_000,
   });
   const contact = detail?.top_contact;
+  const otherContacts = (detail?.other_contacts ?? []).filter(other => other.email);
+  const [showOthers, setShowOthers] = useState(false);
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
@@ -128,6 +130,32 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
                       </div>
                     </>
                   ) : null}
+                  {otherContacts.length > 0 && (
+                    <>
+                      <button type="button" onClick={() => setShowOthers(value => !value)} aria-expanded={showOthers}
+                        className="text-xs font-semibold text-primary hover:underline" data-testid="button-view-more-contacts">
+                        {showOthers ? "Hide other contacts" : `View more (${otherContacts.length})`}
+                      </button>
+                      {showOthers && (
+                        <ul className="space-y-3" data-testid="list-other-contacts">
+                          {otherContacts.map((other, index) => (
+                            <li key={`${other.email}-${index}`} className="rounded-lg border border-border bg-background p-3">
+                              <p className="text-sm font-semibold text-white">{other.name || "Unnamed contact"}</p>
+                              {other.title && <p className="text-xs text-muted-foreground">{other.title}</p>}
+                              <div className="mt-2 flex items-center gap-2">
+                                <span className="flex-1 truncate font-mono text-xs text-muted-foreground">{other.email}</span>
+                                {other.email && <CopyEmailButton email={other.email} />}
+                              </div>
+                              <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+                                {[other.apollo_verified && "Apollo verified", other.hunter_verified && "Hunter verified",
+                                  other.still_at_brand === false && "may have left the brand"].filter(Boolean).join(" · ") || "Not verified"}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  )}
                 </>
               ) : <p className="text-sm text-muted-foreground">Contact details are not available for this brand.</p>}
             </div>

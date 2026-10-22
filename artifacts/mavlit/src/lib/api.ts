@@ -147,6 +147,15 @@ export interface SavedBrand {
   saved_at: string;
 }
 
+export interface ApiContact {
+  name: string | null;
+  email: string | null;
+  title: string | null;
+  apollo_verified?: boolean;
+  hunter_verified?: boolean;
+  still_at_brand?: boolean | null;
+}
+
 export interface ApiBrand {
   brand_id: number;
   name: string;
@@ -162,7 +171,8 @@ export interface ApiBrand {
   meta_ads_active: boolean | null;
   platform_signals: Record<string, "not_available" | "limited" | "moderate" | "strong"> | null;
   sponsorship_activity_score: number | null;
-  top_contact: { name: string; email: string; title: string } | null;
+  top_contact: ApiContact | null;
+  other_contacts?: ApiContact[];
 }
 
 export interface RateIntelligenceResult {

@@ -340,6 +340,39 @@ describe("Matches page V3 integration", () => {
     expect(fixture.calls("POST")).toHaveLength(1);
   });
 
+  it("Contact Intel shows the best contact and lists the other contacts under View more", async () => {
+    const aiFetch = globalThis.fetch;
+    const contact = (name: string, email: string, extra = {}) => ({ name, email, title: "Partnerships", apollo_verified: false, hunter_verified: false, still_at_brand: null, ...extra });
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (new URL(String(input), window.location.origin).pathname === "/api/mavlit/brands/10") {
+        return new Response(JSON.stringify({
+          brand_id: 10, name: "Alpha Audio", top_contact: contact("Top Person", "top@alpha.com", { apollo_verified: true, hunter_verified: true, still_at_brand: true }),
+          other_contacts: [contact("Second Person", "second@alpha.com", { apollo_verified: true, still_at_brand: false }), contact("Third Person", "third@alpha.com")],
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (new URL(String(input), window.location.origin).pathname === "/api/mavlit/matches/me/brands/10/posts") {
+        return new Response(JSON.stringify({ brand_raw_id: 10, brand_name: "Alpha Audio", posts: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return aiFetch(input, init);
+    }));
+    mountMatches();
+    await settle();
+    fireEvent.click(screen.getByTestId("button-ai-brand-10"));
+    await settle();
+    expect(screen.getByText("Top Person")).toBeInTheDocument();
+    expect(screen.queryByText("Second Person")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("button-view-more-contacts"));
+    const others = screen.getByTestId("list-other-contacts");
+    expect(others).toHaveTextContent("Second Person");
+    expect(others).toHaveTextContent("second@alpha.com");
+    expect(others).toHaveTextContent("Apollo verified");
+    expect(others).toHaveTextContent("may have left the brand");
+    expect(others).toHaveTextContent("Third Person");
+    expect(others).toHaveTextContent("Not verified");
+    fireEvent.click(screen.getByTestId("button-view-more-contacts"));
+    expect(screen.queryByTestId("list-other-contacts")).not.toBeInTheDocument();
+  });
+
   it("renders backend order including unwanted brands and restores it after search", async () => {
     mountMatches();
     await settle();

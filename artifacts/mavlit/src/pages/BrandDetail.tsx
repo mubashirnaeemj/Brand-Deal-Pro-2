@@ -561,7 +561,7 @@ export default function BrandDetail() {
         }
       : brand.platformSignals,
     contact: apiBrand.top_contact
-      ? { ...brand.contact, email: apiBrand.top_contact.email }
+      ? { ...brand.contact, email: apiBrand.top_contact.email ?? brand.contact.email }
       : brand.contact,
   } : brand;
 

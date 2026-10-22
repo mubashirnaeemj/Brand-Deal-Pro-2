@@ -13,7 +13,8 @@ import { PickedField, PostPickerDialog, joinPicked, pickedPost, MAX_PICKS, type 
 import OwnBrandLookupField from "@/components/OwnBrandLookup";
 import { useOwnBrandLookup, brandDisplayName } from "@/hooks/useOwnBrandLookup";
 import LivePitchDraft from "@/components/LivePitchDraft";
-import { api, getAllMatches, type ApiBrand, type ApiPitch } from "@/lib/api";
+import { api, type ApiBrand, type ApiPitch } from "@/lib/api";
+import { loadPitchMatches } from "@/lib/aiMatches";
 import { useAuth, type CreatorProfile } from "@/contexts/AuthContext";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -155,7 +156,7 @@ function OutboundMode() {
   const queryClient = useQueryClient();
   const { data: matches, isLoading: matchesLoading, isError: matchesError, refetch: refetchMatches } = useQuery({
     queryKey: ["pitch-matches"],
-    queryFn: getAllMatches,
+    queryFn: loadPitchMatches,
     staleTime: 60_000,
     retry: 1,
   });

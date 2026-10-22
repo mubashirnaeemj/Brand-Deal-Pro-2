@@ -7,6 +7,7 @@ export interface AiRankedMatch {
   brand_name: string;
   niche: string | null;
   website?: string | null;
+  latest_product?: string | null;
   rank: number;
   confidence: number;
   reason: string | null;
@@ -46,4 +47,9 @@ export async function loadAi(version: AiMatchesVersion, signal?: AbortSignal) {
 
 export async function rerankAi(version: AiMatchesVersion) {
   return validateAiMatches(await api.post<AiMatchesResponse>(`/matches/me/${version}/refresh`));
+}
+
+/** The brands of Matches v3, as the pitch page lists them: the same brands as the Brand Matches page. */
+export async function loadPitchMatches(): Promise<AiRankedMatch[]> {
+  return (await loadAi("v3")).matches;
 }

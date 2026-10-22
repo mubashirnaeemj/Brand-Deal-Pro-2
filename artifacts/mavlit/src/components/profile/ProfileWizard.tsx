@@ -54,22 +54,22 @@ export default function ProfileWizard(p: ProfileWizardProps) {
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:py-12" data-testid="profile-wizard">
       <nav aria-label="Progress" className="mb-6">
-        <ol className="flex items-center gap-2">
+        <ol className="flex items-center justify-center gap-2">
           {STEPS.map((s, i) => {
             const n = i + 1;
             const done = n < step;
             return (
-              <li key={s} className="flex flex-1 items-center gap-2" aria-current={n === step ? "step" : undefined}>
+              <li key={s} className="flex items-center gap-2" aria-current={n === step ? "step" : undefined}>
                 <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${n <= step ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`}>
                   {done ? <Check size={14} aria-hidden /> : n}
                 </span>
                 <span className={`hidden text-xs font-semibold sm:inline ${n === step ? "text-white" : "text-muted-foreground"}`}>{s}</span>
-                {i < STEPS.length - 1 && <span className={`h-px flex-1 ${n < step ? "bg-primary" : "bg-border"}`} aria-hidden />}
+                {i < STEPS.length - 1 && <span className={`h-px w-6 sm:w-16 ${n < step ? "bg-primary" : "bg-border"}`} aria-hidden />}
               </li>
             );
           })}
         </ol>
-        <p className="mt-3 text-xs text-muted-foreground">Step {step} of 3</p>
+        <p className="mt-3 text-center text-xs text-muted-foreground">Step {step} of 3</p>
       </nav>
 
       <h1 className="mb-5 text-2xl font-bold text-white sm:text-3xl">{headings[step - 1]}</h1>

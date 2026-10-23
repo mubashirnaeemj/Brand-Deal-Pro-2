@@ -360,6 +360,7 @@ describe("Matches page V3 integration", () => {
     await settle();
     expect(screen.getByText("only@alpha.com")).toBeInTheDocument();
     expect(screen.getByTestId("note-unverified-email")).toHaveTextContent("MAVLIT could not verify this email");
+    expect(screen.queryByTestId("badge-verified-email")).not.toBeInTheDocument();   // never both messages
     expect(screen.queryByTestId("button-view-more-contacts")).not.toBeInTheDocument();
   });
 
@@ -385,6 +386,7 @@ describe("Matches page V3 integration", () => {
     await settle();
     expect(screen.getByText("Top Person")).toBeInTheDocument();
     expect(screen.queryByTestId("note-unverified-email")).not.toBeInTheDocument();   // the top contact is verified
+    expect(screen.getByTestId("badge-verified-email")).toHaveTextContent("Email verified by Apollo and Hunter");
     expect(screen.queryByText("Second Person")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("button-view-more-contacts"));
     const others = screen.getByTestId("list-other-contacts");

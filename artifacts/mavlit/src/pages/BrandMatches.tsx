@@ -69,6 +69,21 @@ const UNVERIFIED_EMAIL_TEXT = "MAVLIT could not verify this email, so it may not
 const isUnverified = (contact: ApiContact) =>
   contact.apollo_verified !== undefined && !contact.apollo_verified && !contact.hunter_verified;
 
+// "Apollo and Hunter" / "Apollo" / "Hunter" for the providers that verified the email, or null.
+const verifiedBy = (contact: ApiContact) =>
+  [contact.apollo_verified && "Apollo", contact.hunter_verified && "Hunter"].filter(Boolean).join(" and ") || null;
+
+function VerifiedBadge({ contact }: { contact: ApiContact }) {
+  const by = verifiedBy(contact);
+  if (!by) return null;
+  return (
+    <p data-testid="badge-verified-email" className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+      <CheckCircle2 size={13} className="shrink-0" aria-hidden />
+      Email verified by {by}
+    </p>
+  );
+}
+
 function UnverifiedNote({ className = "" }: { className?: string }) {
   return (
     <p role="note" data-testid="note-unverified-email"
@@ -143,6 +158,7 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
                       <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border border-border">
                         <span className="text-xs text-muted-foreground font-mono flex-1 truncate">{contact.email}</span>
                       </div>
+                      <VerifiedBadge contact={contact} />
                       {isUnverified(contact) && <UnverifiedNote />}
                     </>
                   ) : null}

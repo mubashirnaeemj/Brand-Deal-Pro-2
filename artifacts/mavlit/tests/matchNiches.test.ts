@@ -1,0 +1,29 @@
+import { describe, expect, it } from "vitest";
+import { filterByNiche, matchNiches } from "@/lib/matchSearch";
+
+const brands = [
+  { name: "a", niche: "Music" }, { name: "b", niche: "Tech" }, { name: "c", niche: "music" },
+  { name: "d", niche: null }, { name: "e", niche: "  " }, { name: "f", niche: "Beauty" },
+];
+
+describe("matchNiches", () => {
+  it("lists only the niches present, counted case-insensitively, sorted, without empty ones", () => {
+    expect(matchNiches(brands)).toEqual([
+      { niche: "Beauty", count: 1 }, { niche: "Music", count: 2 }, { niche: "Tech", count: 1 },
+    ]);
+  });
+  it("is empty when no brand has a niche", () => {
+    expect(matchNiches([{ niche: null }, { niche: "" }])).toEqual([]);
+  });
+});
+
+describe("filterByNiche", () => {
+  it("keeps only the brands of the niche, ignoring case", () => {
+    expect(filterByNiche(brands, "Music").map((brand) => brand.name)).toEqual(["a", "c"]);
+    expect(filterByNiche(brands, "tech").map((brand) => brand.name)).toEqual(["b"]);
+  });
+  it("returns every brand for an empty niche and none for an unknown one", () => {
+    expect(filterByNiche(brands, "")).toHaveLength(brands.length);
+    expect(filterByNiche(brands, "Food")).toEqual([]);
+  });
+});

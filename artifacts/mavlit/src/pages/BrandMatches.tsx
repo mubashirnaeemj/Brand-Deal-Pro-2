@@ -9,6 +9,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BrandPartnershipPosts from "@/components/BrandPartnershipPosts";
 import BrandMatchSearch from "@/components/BrandMatchSearch";
+import BrandMatchNicheFilter from "@/components/BrandMatchNicheFilter";
+import { matchNiches } from "@/lib/matchSearch";
 import MatchScoreBreakdown from "@/components/MatchScoreBreakdown";
 import AiMatchesSection from "@/components/AiMatchesSection";
 import useAiMatches from "@/hooks/useAiMatches";
@@ -247,6 +249,7 @@ export default function BrandMatches() {
   const [, navigate] = useLocation();
   const searchParams = useSearch();
   const [search, setSearch] = useState("");
+  const [nicheChoice, setNicheChoice] = useState("");
   useEffect(() => {
     const requested = new URLSearchParams(searchParams).get("version");
     try { localStorage.setItem("mavlit_matches_version", "v3"); } catch { /* Storage can be unavailable in embedded previews. */ }
@@ -258,6 +261,9 @@ export default function BrandMatches() {
   const progressMessage = useAiRankingMessage(
     v3Matches.refreshing || isAiRanking(v3Matches.data),
   );
+  // A chosen niche that a refreshed ranking no longer contains is dropped, so the page never shows an empty filter.
+  const matchedBrands = v3Matches.data?.matches ?? [];
+  const niche = matchNiches(matchedBrands).some((entry) => entry.niche === nicheChoice) ? nicheChoice : "";
   const [expandedAiReasons, setExpandedAiReasons] = useState<Record<number, boolean>>({});
   const toggleAiReasons = (brandId: number) => {
     setExpandedAiReasons((previous) => ({
@@ -288,14 +294,17 @@ export default function BrandMatches() {
             </p>
           </motion.div>
 
-          <BrandMatchSearch id="matches-search-v3" label="Search brand matches"
-            value={search} onChange={setSearch} />
+          <div className="mb-6 flex flex-wrap items-start gap-3">
+            <BrandMatchSearch id="matches-search-v3" label="Search brand matches" className="min-w-[16rem] max-w-lg flex-1"
+              value={search} onChange={setSearch} />
+            <BrandMatchNicheFilter id="matches-niche-v3" matches={matchedBrands} value={niche} onChange={setNicheChoice} />
+          </div>
           <section id="matches-panel-v3" aria-label="Brand matches">
             <AiMatchesSection version="v3" data={v3Matches.data} loading={v3Matches.loading} error={v3Matches.error}
               refreshing={v3Matches.refreshing} onRefresh={v3Matches.refresh} onOpen={setSelectedAiMatch}
               timedOut={v3Matches.timedOut} onCheckStatus={v3Matches.checkStatus} preferences={user?.brand_preferences}
               progressMessage={progressMessage} expandedByBrand={expandedAiReasons}
-              search={search} onToggleReasons={toggleAiReasons} />
+              search={search} niche={niche} onToggleReasons={toggleAiReasons} />
           </section>
         </div>
       </main>

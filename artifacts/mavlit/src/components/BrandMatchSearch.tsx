@@ -1,10 +1,10 @@
 import { Search, X } from "lucide-react";
 
-export default function BrandMatchSearch({ id, label, value, onChange }: {
-  id: string; label: string; value: string; onChange: (value: string) => void;
+export default function BrandMatchSearch({ id, label, value, onChange, className = "mb-6 max-w-lg" }: {
+  id: string; label: string; value: string; onChange: (value: string) => void; className?: string;
 }) {
   return (
-    <div className="relative mb-6 max-w-lg">
+    <div className={`relative ${className}`}>
       <label htmlFor={id} className="sr-only">{label}</label>
       <Search size={17} aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
       <input id={id} type="search" data-testid="input-match-search" value={value}

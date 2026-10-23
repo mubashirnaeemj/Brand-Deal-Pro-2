@@ -2,7 +2,7 @@ import { RefreshCw, Loader2 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { AiMatchesResponse, AiRankedMatch, AiMatchesVersion } from "@/lib/aiMatches";
 import AiMatchCard from "./AiMatchCard";
-import { filterBrandMatches } from "@/lib/matchSearch";
+import { filterBrandMatches, filterByNiche } from "@/lib/matchSearch";
 import { Link } from "wouter";
 
 interface Props {
@@ -18,6 +18,7 @@ interface Props {
   expandedByBrand: Record<number, boolean>;
   onToggleReasons: (brandId: number) => void;
   search: string;
+  niche?: string;
   timedOut?: boolean;
   preferences?: string | null;
 }
@@ -50,11 +51,11 @@ function formatRanked(value: string | null | undefined) {
 }
 
 export default function AiMatchesSection({ version, data, loading, error, refreshing, onRefresh, onCheckStatus, onOpen,
-  progressMessage, expandedByBrand, onToggleReasons, search, timedOut = false, preferences }: Props) {
+  progressMessage, expandedByBrand, onToggleReasons, search, niche = "", timedOut = false, preferences }: Props) {
   const status = data?.status;
   const pending = status === "queued" || status === "running";
   const matches = data?.matches ?? [];
-  const filtered = filterBrandMatches(matches, search);
+  const filtered = filterBrandMatches(filterByNiche(matches, niche), search);
   const busy = refreshing || pending;
   const ranked = formatRanked(data?.ranked_at);
   const meta = ranked ? `Ranked ${ranked} — ${data?.total ?? matches.length} brands` : "";
@@ -130,9 +131,9 @@ export default function AiMatchesSection({ version, data, loading, error, refres
           )}
           {matches.length > 0 && (
             <>
-              {search.trim() && (
+              {(search.trim() || niche) && (
                 <p role="status" className="mb-4 text-xs text-muted-foreground">
-                  Showing {filtered.length} of {matches.length} brands
+                  Showing {filtered.length} of {matches.length} brands{niche ? ` in ${niche}` : ""}
                 </p>
               )}
               {filtered.length > 0 ? (
@@ -147,8 +148,8 @@ export default function AiMatchesSection({ version, data, loading, error, refres
                 </div>
               ) : (
                 <div className="py-16 text-center text-muted-foreground">
-                  <p>No brands match “{search.trim()}”.</p>
-                  <p className="mt-1 text-sm">Try a different search or clear the search.</p>
+                  <p>{search.trim() ? `No brands match “${search.trim()}”${niche ? ` in ${niche}` : ""}.` : `No matches in ${niche}.`}</p>
+                  <p className="mt-1 text-sm">{search.trim() ? "Try a different search, niche or clear the search." : "Try a different niche."}</p>
                 </div>
               )}
             </>

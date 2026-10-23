@@ -467,6 +467,37 @@ describe("Matches page V3 integration", () => {
     expect(screen.getByRole("link", { name: "Open LinkedIn for Fourth Person" })).toHaveAttribute("href", "https://www.linkedin.com/in/fourth");
   });
 
+  it("filters the matches by niche from a dropdown of the matched brands' niches", async () => {
+    fixture.respond("GET", ranking("completed", { matches: [
+      { brand_raw_id: 10, brand_name: "Alpha Audio", niche: "Music", rank: 1, confidence: 96, reason: "x" },
+      { brand_raw_id: 20, brand_name: "Beta Gadgets", niche: "Tech", rank: 2, confidence: 90, reason: "x" },
+      { brand_raw_id: 30, brand_name: "Gamma Strings", niche: "Music", rank: 3, confidence: 80, reason: "x" },
+      { brand_raw_id: 40, brand_name: "Delta Glow", niche: "Beauty", rank: 4, confidence: 70, reason: "x" },
+    ], total: 4 }));
+    mountMatches();
+    await settle();
+    const select = screen.getByRole("combobox", { name: "Filter brand matches by niche" }) as HTMLSelectElement;
+    expect([...select.options].map((option) => option.textContent)).toEqual(["All niches", "Beauty (1)", "Music (2)", "Tech (1)"]);
+    const names = () => screen.getAllByRole("article").map((card) => card.getAttribute("data-testid"));
+    expect(names()).toEqual(["card-ai-brand-10", "card-ai-brand-20", "card-ai-brand-30", "card-ai-brand-40"]);
+
+    fireEvent.change(select, { target: { value: "Music" } });
+    expect(names()).toEqual(["card-ai-brand-10", "card-ai-brand-30"]);
+    expect(screen.getByText("Showing 2 of 4 brands in Music")).toBeInTheDocument();
+
+    // Works together with the search box.
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search brand matches" }), { target: { value: "gamma" } });
+    expect(names()).toEqual(["card-ai-brand-30"]);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search brand matches" }), { target: { value: "beta" } });
+    expect(screen.getByText(/No brands match “beta” in Music/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear brand search" }));
+
+    fireEvent.change(select, { target: { value: "" } });
+    expect(names()).toHaveLength(4);
+    expect(screen.queryByText(/Showing \d+ of 4 brands/)).not.toBeInTheDocument();
+    expect(fixture.calls("GET")).toHaveLength(1);   // filtering is local; no new request
+  });
+
   it("colours only the niche text of each card by niche", async () => {
     fixture.respond("GET", ranking("completed", { matches: [
       { brand_raw_id: 10, brand_name: "Alpha Audio", niche: "Music", rank: 1, confidence: 96, reason: "x" },

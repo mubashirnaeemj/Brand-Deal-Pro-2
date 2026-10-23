@@ -3,7 +3,7 @@ import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
-  CheckCircle2, Music, Building2, X, Copy, Check,
+  CheckCircle2, Music, Building2, X, Copy, Check, AlertTriangle,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -14,7 +14,7 @@ import AiMatchesSection from "@/components/AiMatchesSection";
 import useAiMatches from "@/hooks/useAiMatches";
 import useAiRankingMessage from "@/hooks/useAiRankingMessage";
 import { isAiRanking, type AiRankedMatch } from "@/lib/aiMatches";
-import { api, type ApiBrand, type ApiMatch } from "@/lib/api";
+import { api, type ApiBrand, type ApiContact, type ApiMatch } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
 const ACCENT = "#7c3aed";
@@ -61,6 +61,21 @@ function CopyEmailButton({ email }: { email: string }) {
       {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
       {copied ? "Copied!" : "Copy email"}
     </button>
+  );
+}
+
+const UNVERIFIED_EMAIL_TEXT = "MAVLIT could not verify this email, so it may not reach this person. Check it before you send.";
+// Both flags come from the API; absent (an older backend) means we do not know, so no warning.
+const isUnverified = (contact: ApiContact) =>
+  contact.apollo_verified !== undefined && !contact.apollo_verified && !contact.hunter_verified;
+
+function UnverifiedNote({ className = "" }: { className?: string }) {
+  return (
+    <p role="note" data-testid="note-unverified-email"
+      className={`flex items-start gap-1.5 text-[11px] leading-snug text-amber-400 ${className}`}>
+      <AlertTriangle size={12} className="mt-px shrink-0" aria-hidden />
+      <span>{UNVERIFIED_EMAIL_TEXT}</span>
+    </p>
   );
 }
 
@@ -128,6 +143,7 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
                       <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background border border-border">
                         <span className="text-xs text-muted-foreground font-mono flex-1 truncate">{contact.email}</span>
                       </div>
+                      {isUnverified(contact) && <UnverifiedNote />}
                     </>
                   ) : null}
                   {otherContacts.length > 0 && (
@@ -137,7 +153,7 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
                         {showOthers ? "Hide other contacts" : `View more (${otherContacts.length})`}
                       </button>
                       {showOthers && (
-                        <ul className="space-y-3" data-testid="list-other-contacts">
+                        <ul className="max-h-64 space-y-3 overflow-y-auto pr-1" data-testid="list-other-contacts">
                           {otherContacts.map((other, index) => (
                             <li key={`${other.email}-${index}`} className="rounded-lg border border-border bg-background p-3">
                               <p className="text-sm font-semibold text-white">{other.name || "Unnamed contact"}</p>
@@ -146,10 +162,11 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
                                 <span className="flex-1 truncate font-mono text-xs text-muted-foreground">{other.email}</span>
                                 {other.email && <CopyEmailButton email={other.email} />}
                               </div>
-                              <p className="mt-1.5 text-[11px] text-muted-foreground/70">
-                                {[other.apollo_verified && "Apollo verified", other.hunter_verified && "Hunter verified",
-                                  other.still_at_brand === false && "may have left the brand"].filter(Boolean).join(" · ") || "Not verified"}
-                              </p>
+                              {isUnverified(other) ? <UnverifiedNote className="mt-1.5" /> : (
+                                <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+                                  {[other.apollo_verified && "Apollo verified", other.hunter_verified && "Hunter verified"].filter(Boolean).join(" · ")}
+                                </p>
+                              )}
                             </li>
                           ))}
                         </ul>

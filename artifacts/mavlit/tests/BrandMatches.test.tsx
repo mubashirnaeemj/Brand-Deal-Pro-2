@@ -340,6 +340,29 @@ describe("Matches page V3 integration", () => {
     expect(fixture.calls("POST")).toHaveLength(1);
   });
 
+  it("Contact Intel warns when the main contact's email is verified by neither Apollo nor Hunter", async () => {
+    const aiFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input), window.location.origin).pathname;
+      if (path === "/api/mavlit/brands/10") {
+        return new Response(JSON.stringify({ brand_id: 10, name: "Alpha Audio", other_contacts: [],
+          top_contact: { name: "Only Person", email: "only@alpha.com", title: "Partnerships", apollo_verified: false, hunter_verified: false, still_at_brand: null } }),
+          { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (path === "/api/mavlit/matches/me/brands/10/posts") {
+        return new Response(JSON.stringify({ brand_raw_id: 10, brand_name: "Alpha Audio", posts: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return aiFetch(input, init);
+    }));
+    mountMatches();
+    await settle();
+    fireEvent.click(screen.getByTestId("button-ai-brand-10"));
+    await settle();
+    expect(screen.getByText("only@alpha.com")).toBeInTheDocument();
+    expect(screen.getByTestId("note-unverified-email")).toHaveTextContent("MAVLIT could not verify this email");
+    expect(screen.queryByTestId("button-view-more-contacts")).not.toBeInTheDocument();
+  });
+
   it("Contact Intel shows the best contact and lists the other contacts under View more", async () => {
     const aiFetch = globalThis.fetch;
     const contact = (name: string, email: string, extra = {}) => ({ name, email, title: "Partnerships", apollo_verified: false, hunter_verified: false, still_at_brand: null, ...extra });
@@ -347,7 +370,8 @@ describe("Matches page V3 integration", () => {
       if (new URL(String(input), window.location.origin).pathname === "/api/mavlit/brands/10") {
         return new Response(JSON.stringify({
           brand_id: 10, name: "Alpha Audio", top_contact: contact("Top Person", "top@alpha.com", { apollo_verified: true, hunter_verified: true, still_at_brand: true }),
-          other_contacts: [contact("Second Person", "second@alpha.com", { apollo_verified: true, still_at_brand: false }), contact("Third Person", "third@alpha.com")],
+          other_contacts: [contact("Second Person", "second@alpha.com", { apollo_verified: true }), contact("Third Person", "third@alpha.com"),
+            ...Array.from({ length: 8 }, (_, i) => contact(`Extra ${i + 1}`, `extra${i + 1}@alpha.com`, { hunter_verified: true }))],
         }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
       if (new URL(String(input), window.location.origin).pathname === "/api/mavlit/matches/me/brands/10/posts") {
@@ -360,15 +384,21 @@ describe("Matches page V3 integration", () => {
     fireEvent.click(screen.getByTestId("button-ai-brand-10"));
     await settle();
     expect(screen.getByText("Top Person")).toBeInTheDocument();
+    expect(screen.queryByTestId("note-unverified-email")).not.toBeInTheDocument();   // the top contact is verified
     expect(screen.queryByText("Second Person")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("button-view-more-contacts"));
     const others = screen.getByTestId("list-other-contacts");
     expect(others).toHaveTextContent("Second Person");
     expect(others).toHaveTextContent("second@alpha.com");
     expect(others).toHaveTextContent("Apollo verified");
-    expect(others).toHaveTextContent("may have left the brand");
     expect(others).toHaveTextContent("Third Person");
-    expect(others).toHaveTextContent("Not verified");
+    // Only the contact verified by neither provider gets the warning.
+    expect(screen.getAllByTestId("note-unverified-email")).toHaveLength(1);
+    expect(others).toHaveTextContent("MAVLIT could not verify this email");
+    // The list scrolls inside a fixed height instead of growing with every contact.
+    expect(others.className).toContain("max-h-64");
+    expect(others.className).toContain("overflow-y-auto");
+    expect(others.querySelectorAll("li")).toHaveLength(10);
     fireEvent.click(screen.getByTestId("button-view-more-contacts"));
     expect(screen.queryByTestId("list-other-contacts")).not.toBeInTheDocument();
   });

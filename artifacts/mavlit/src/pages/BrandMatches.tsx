@@ -65,21 +65,17 @@ function CopyEmailButton({ email }: { email: string }) {
 }
 
 const UNVERIFIED_EMAIL_TEXT = "MAVLIT could not verify this email, so it may not reach this person. Check it before you send.";
-// Both flags come from the API; absent (an older backend) means we do not know, so no warning.
-const isUnverified = (contact: ApiContact) =>
-  contact.apollo_verified !== undefined && !contact.apollo_verified && !contact.hunter_verified;
-
-// "Apollo and Hunter" / "Apollo" / "Hunter" for the providers that verified the email, or null.
-const verifiedBy = (contact: ApiContact) =>
-  [contact.apollo_verified && "Apollo", contact.hunter_verified && "Hunter"].filter(Boolean).join(" and ") || null;
+// MAVLIT calls an email verified only when BOTH Apollo and Hunter confirmed it; any less is "could not verify".
+// Both flags come from the API; absent (an older backend) means we do not know, so nothing is claimed either way.
+const isVerified = (contact: ApiContact) => contact.apollo_verified === true && contact.hunter_verified === true;
+const isUnverified = (contact: ApiContact) => contact.apollo_verified !== undefined && !isVerified(contact);
 
 function VerifiedBadge({ contact }: { contact: ApiContact }) {
-  const by = verifiedBy(contact);
-  if (!by) return null;
+  if (!isVerified(contact)) return null;
   return (
     <p data-testid="badge-verified-email" className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
       <CheckCircle2 size={13} className="shrink-0" aria-hidden />
-      Email verified by {by}
+      Email verified by MAVLIT
     </p>
   );
 }
@@ -179,9 +175,7 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
                                 {other.email && <CopyEmailButton email={other.email} />}
                               </div>
                               {isUnverified(other) ? <UnverifiedNote className="mt-1.5" /> : (
-                                <p className="mt-1.5 text-[11px] text-muted-foreground/70">
-                                  {[other.apollo_verified && "Apollo verified", other.hunter_verified && "Hunter verified"].filter(Boolean).join(" · ")}
-                                </p>
+                                isVerified(other) && <div className="mt-1.5"><VerifiedBadge contact={other} /></div>
                               )}
                             </li>
                           ))}

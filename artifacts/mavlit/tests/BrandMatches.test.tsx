@@ -340,13 +340,17 @@ describe("Matches page V3 integration", () => {
     expect(fixture.calls("POST")).toHaveLength(1);
   });
 
-  it("Contact Intel warns when the main contact's email is verified by neither Apollo nor Hunter", async () => {
+  it.each([
+    ["neither Apollo nor Hunter", false, false],
+    ["Apollo only", true, false],
+    ["Hunter only", false, true],
+  ])("Contact Intel says MAVLIT could not verify a main email verified by %s", async (_label, apollo, hunter) => {
     const aiFetch = globalThis.fetch;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = new URL(String(input), window.location.origin).pathname;
       if (path === "/api/mavlit/brands/10") {
         return new Response(JSON.stringify({ brand_id: 10, name: "Alpha Audio", other_contacts: [],
-          top_contact: { name: "Only Person", email: "only@alpha.com", title: "Partnerships", apollo_verified: false, hunter_verified: false, still_at_brand: null } }),
+          top_contact: { name: "Only Person", email: "only@alpha.com", title: "Partnerships", apollo_verified: apollo, hunter_verified: hunter, still_at_brand: null } }),
           { status: 200, headers: { "Content-Type": "application/json" } });
       }
       if (path === "/api/mavlit/matches/me/brands/10/posts") {
@@ -372,6 +376,7 @@ describe("Matches page V3 integration", () => {
         return new Response(JSON.stringify({
           brand_id: 10, name: "Alpha Audio", top_contact: contact("Top Person", "top@alpha.com", { apollo_verified: true, hunter_verified: true, still_at_brand: true }),
           other_contacts: [contact("Second Person", "second@alpha.com", { apollo_verified: true }), contact("Third Person", "third@alpha.com"),
+            contact("Fourth Person", "fourth@alpha.com", { apollo_verified: true, hunter_verified: true }),
             ...Array.from({ length: 8 }, (_, i) => contact(`Extra ${i + 1}`, `extra${i + 1}@alpha.com`, { hunter_verified: true }))],
         }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
@@ -386,21 +391,23 @@ describe("Matches page V3 integration", () => {
     await settle();
     expect(screen.getByText("Top Person")).toBeInTheDocument();
     expect(screen.queryByTestId("note-unverified-email")).not.toBeInTheDocument();   // the top contact is verified
-    expect(screen.getByTestId("badge-verified-email")).toHaveTextContent("Email verified by Apollo and Hunter");
+    expect(screen.getByTestId("badge-verified-email")).toHaveTextContent("Email verified by MAVLIT");
     expect(screen.queryByText("Second Person")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("button-view-more-contacts"));
     const others = screen.getByTestId("list-other-contacts");
     expect(others).toHaveTextContent("Second Person");
     expect(others).toHaveTextContent("second@alpha.com");
-    expect(others).toHaveTextContent("Apollo verified");
     expect(others).toHaveTextContent("Third Person");
-    // Only the contact verified by neither provider gets the warning.
-    expect(screen.getAllByTestId("note-unverified-email")).toHaveLength(1);
+    // Anything short of "verified by both providers" gets the warning: Second (Apollo only), Third (neither)
+    // and the eight Extra contacts (Hunter only). No provider name is shown to the user.
+    expect(screen.getAllByTestId("note-unverified-email")).toHaveLength(10);
+    expect(screen.getAllByTestId("badge-verified-email")).toHaveLength(2);        // the main contact and Fourth Person
+    expect(others).not.toHaveTextContent(/Apollo|Hunter/);
     expect(others).toHaveTextContent("MAVLIT could not verify this email");
     // The list scrolls inside a fixed height instead of growing with every contact.
     expect(others.className).toContain("max-h-64");
     expect(others.className).toContain("overflow-y-auto");
-    expect(others.querySelectorAll("li")).toHaveLength(10);
+    expect(others.querySelectorAll("li")).toHaveLength(11);
     fireEvent.click(screen.getByTestId("button-view-more-contacts"));
     expect(screen.queryByTestId("list-other-contacts")).not.toBeInTheDocument();
   });

@@ -405,6 +405,45 @@ describe("Matches page V3 integration", () => {
     expect(screen.queryByTestId("list-other-contacts")).not.toBeInTheDocument();
   });
 
+  const stubBrandDetail = () => {
+    const aiFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input), window.location.origin).pathname;
+      const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (path === "/api/mavlit/brands/10") return json({ brand_id: 10, name: "Alpha Audio", top_contact: null, other_contacts: [] });
+      if (path === "/api/mavlit/matches/me/brands/10/posts") return json({ brand_raw_id: 10, brand_name: "Alpha Audio", posts: [] });
+      return aiFetch(input, init);
+    }));
+  };
+
+  it("clicking anywhere on a brand card (text or empty space) opens its details", async () => {
+    stubBrandDetail();
+    mountMatches();
+    await settle();
+    expect(screen.getByTestId("card-ai-brand-10").className).toContain("cursor-pointer");
+    expect(screen.queryByText("Contact Intel")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("text-ai-reason-10"));   // plain text inside the card
+    await settle();
+    expect(screen.getByText("Contact Intel")).toBeInTheDocument();
+  });
+
+  it("links and buttons inside a card keep their own action and do not open the details", async () => {
+    stubBrandDetail();
+    const reasons = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight"];
+    fixture.respond("GET", ranking("completed", { matches: [
+      { brand_raw_id: 10, brand_name: "Alpha Audio", niche: "Music", rank: 1, confidence: 96, reason: "Audio content.", reasons, website: "https://alpha.example" },
+    ], total: 1 }));
+    mountMatches();
+    await settle();
+    fireEvent.click(screen.getByTestId("button-ai-brand-10"));          // the brand name is a link to its website
+    fireEvent.click(screen.getByTestId("button-ai-reasons-10"));        // "Show all reasons"
+    await settle();
+    expect(screen.queryByText("Contact Intel")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "View brand details" }));
+    await settle();
+    expect(screen.getByText("Contact Intel")).toBeInTheDocument();
+  });
+
   it("renders backend order including unwanted brands and restores it after search", async () => {
     mountMatches();
     await settle();

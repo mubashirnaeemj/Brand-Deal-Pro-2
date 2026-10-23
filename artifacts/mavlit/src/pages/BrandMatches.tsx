@@ -134,7 +134,7 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
             {fitConfidence === undefined ? <ScoreRing match={match} size={44} /> : (
               <span className="rounded-full border border-primary/30 bg-primary/15 px-3 py-1 text-xs font-bold text-white cursor-default">{fitConfidence}% fit</span>
             )}
-            <button type="button" onClick={onClose}
+            <button type="button" onClick={onClose} aria-label="Close"
               className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-white hover:bg-white/5">
               <X size={16} />
             </button>

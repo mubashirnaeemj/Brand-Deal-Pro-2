@@ -18,9 +18,16 @@ export default function AiMatchCard({ match, expanded, onToggle, onOpen, version
       if (url.protocol === "https:" || url.protocol === "http:") website = url.href;
     } catch { /* Invalid websites keep the existing brand-details action. */ }
   }
+  // A click anywhere on the card opens the brand details. Links and buttons inside keep their own action
+  // (the brand's website, "Show all reasons", ...), and selecting text to copy it does not open anything.
+  const openFromCard = (event: React.MouseEvent<HTMLElement>) => {
+    if ((event.target as HTMLElement).closest("a, button")) return;
+    if (window.getSelection()?.toString()) return;
+    onOpen();
+  };
   return (
-    <article data-testid={`card-ai-brand-${match.brand_raw_id}`}
-      className="flex flex-col rounded-2xl border border-border bg-card transition-colors duration-300 hover:border-primary/50">
+    <article data-testid={`card-ai-brand-${match.brand_raw_id}`} onClick={openFromCard}
+      className="flex cursor-pointer flex-col rounded-2xl border border-border bg-card transition-colors duration-300 hover:border-primary/50">
       <div className="flex items-center justify-between gap-3 p-6">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <BrandLogo name={match.brand_name} website={match.website} testId={`img-ai-logo-${match.brand_raw_id}`} />

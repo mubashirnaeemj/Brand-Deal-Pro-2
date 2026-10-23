@@ -467,7 +467,7 @@ describe("Matches page V3 integration", () => {
     expect(screen.getByRole("link", { name: "Open LinkedIn for Fourth Person" })).toHaveAttribute("href", "https://www.linkedin.com/in/fourth");
   });
 
-  it("filters the matches by one or several niches chosen from a checkbox dropdown", async () => {
+  it("filters the matches by one or several niche chips, none chosen meaning all", async () => {
     fixture.respond("GET", ranking("completed", { matches: [
       { brand_raw_id: 10, brand_name: "Alpha Audio", niche: "Music", rank: 1, confidence: 96, reason: "x" },
       { brand_raw_id: 20, brand_name: "Beta Gadgets", niche: "Tech", rank: 2, confidence: 90, reason: "x" },
@@ -477,42 +477,62 @@ describe("Matches page V3 integration", () => {
     mountMatches();
     await settle();
     const names = () => screen.getAllByRole("article").map((card) => card.getAttribute("data-testid"));
-    const trigger = () => screen.getByTestId("button-match-niche");
-    expect(trigger()).toHaveTextContent("All niches");
+    const chip = (niche: string) => within(screen.getByTestId("match-niches")).getByRole("button", { name: new RegExp(`^${niche}`) });
+    const chips = () => within(screen.getByTestId("match-niches")).getAllByTestId("chip-niche").map((c) => c.textContent);
+    // Most brands first, then A to Z; each with its brand count. Three niches: no "View more" needed.
+    expect(chips()).toEqual(["Music2", "Beauty1", "Tech1"]);
+    expect(screen.queryByTestId("button-niches-more")).not.toBeInTheDocument();
     expect(names()).toHaveLength(4);
 
-    fireEvent.click(trigger());
-    const boxes = () => within(screen.getByTestId("popover-match-niche")).getAllByRole("checkbox");
-    expect(boxes().map((box) => box.closest("label")?.textContent)).toEqual(["Beauty1", "Music2", "Tech1"]);   // niche name + count
-
-    fireEvent.click(screen.getByRole("checkbox", { name: /Music/ }));
+    fireEvent.click(chip("Music"));
+    expect(chip("Music")).toHaveAttribute("aria-pressed", "true");
     expect(names()).toEqual(["card-ai-brand-10", "card-ai-brand-30"]);
-    expect(trigger()).toHaveTextContent("Music");
     expect(screen.getByText("Showing 2 of 4 brands in Music")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("checkbox", { name: /Tech/ }));   // a second niche widens the list
+    fireEvent.click(chip("Tech"));   // a second niche widens the list
     expect(names()).toEqual(["card-ai-brand-10", "card-ai-brand-20", "card-ai-brand-30"]);
-    expect(trigger()).toHaveTextContent("Music, Tech");
     expect(screen.getByText("Showing 3 of 4 brands in Music, Tech")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("checkbox", { name: /Beauty/ }));
-    expect(trigger()).toHaveTextContent("3 niches");
-
-    fireEvent.click(screen.getByRole("checkbox", { name: /Beauty/ }));   // unchecking removes it again
-    fireEvent.click(screen.getByRole("checkbox", { name: /Tech/ }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /Music/ }));
-    expect(trigger()).toHaveTextContent("All niches");
+    fireEvent.click(chip("Tech"));   // choosing it again removes it
+    fireEvent.click(chip("Music"));
     expect(names()).toHaveLength(4);
+    expect(screen.queryByTestId("button-clear-niches")).not.toBeInTheDocument();
 
     // Together with search, and the Clear button.
-    fireEvent.click(screen.getByRole("checkbox", { name: /Music/ }));
+    fireEvent.click(chip("Music"));
     fireEvent.change(screen.getByRole("searchbox", { name: "Search brand matches" }), { target: { value: "beta" } });
     expect(screen.getByText(/No brands match “beta” in Music/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Clear brand search" }));
     fireEvent.click(screen.getByTestId("button-clear-niches"));
-    expect(trigger()).toHaveTextContent("All niches");
+    expect(chip("Music")).toHaveAttribute("aria-pressed", "false");
     expect(names()).toHaveLength(4);
     expect(fixture.calls("GET")).toHaveLength(1);   // filtering is local; no new request
+  });
+
+  it("shows the four niches with the most brands, and the rest after View more", async () => {
+    const niches = ["Music", "Music", "Music", "Tech", "Tech", "Beauty", "Beauty", "Fitness", "Travel", "Finance"];
+    fixture.respond("GET", ranking("completed", { matches: niches.map((niche, index) => (
+      { brand_raw_id: 100 + index, brand_name: `Brand ${index}`, niche, rank: index + 1, confidence: 90 - index, reason: "x" }
+    )), total: niches.length }));
+    mountMatches();
+    await settle();
+    const group = () => within(screen.getByTestId("match-niches"));
+    const chips = () => group().getAllByTestId("chip-niche").map((c) => c.textContent);
+    // Placed below the intro text, above the refresh row.
+    const intro = screen.getByText(/MAVLIT AI ranking using your profile/);
+    expect(intro.compareDocumentPosition(screen.getByTestId("match-niches")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chips()).toEqual(["Music3", "Beauty2", "Tech2", "Finance1"]);   // ties: A to Z
+    expect(group().getByTestId("button-niches-more")).toHaveTextContent("View more");
+
+    // A chosen niche outside the top four stays visible while collapsed.
+    fireEvent.click(group().getByTestId("button-niches-more"));
+    expect(chips()).toEqual(["Music3", "Beauty2", "Tech2", "Finance1", "Fitness1", "Travel1"]);
+    expect(group().getByTestId("button-niches-more")).toHaveTextContent("View less");
+    fireEvent.click(group().getByRole("button", { name: /^Travel/ }));
+    fireEvent.click(group().getByTestId("button-niches-more"));
+    expect(chips()).toEqual(["Music3", "Beauty2", "Tech2", "Finance1", "Travel1"]);
+    expect(group().getByRole("button", { name: /^Travel/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByRole("article")).toHaveLength(1);
   });
 
   it("colours only the niche text of each card by niche", async () => {

@@ -2,6 +2,7 @@ import { RefreshCw, Loader2 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { AiMatchesResponse, AiRankedMatch, AiMatchesVersion } from "@/lib/aiMatches";
 import AiMatchCard from "./AiMatchCard";
+import BrandMatchNicheChips from "./BrandMatchNicheChips";
 import { filterBrandMatches, filterByNiche } from "@/lib/matchSearch";
 import { Link } from "wouter";
 
@@ -19,6 +20,7 @@ interface Props {
   onToggleReasons: (brandId: number) => void;
   search: string;
   niches?: string[];
+  onNichesChange?: (niches: string[]) => void;
   timedOut?: boolean;
   preferences?: string | null;
 }
@@ -51,7 +53,7 @@ function formatRanked(value: string | null | undefined) {
 }
 
 export default function AiMatchesSection({ version, data, loading, error, refreshing, onRefresh, onCheckStatus, onOpen,
-  progressMessage, expandedByBrand, onToggleReasons, search, niches = [], timedOut = false, preferences }: Props) {
+  progressMessage, expandedByBrand, onToggleReasons, search, niches = [], onNichesChange, timedOut = false, preferences }: Props) {
   const status = data?.status;
   const pending = status === "queued" || status === "running";
   const matches = data?.matches ?? [];
@@ -67,6 +69,7 @@ export default function AiMatchesSection({ version, data, loading, error, refres
           ? "MAVLIT AI ranking using your profile, match evidence, and brand preferences. Brands you want rank higher."
           : "V2 — AI ranking: an LLM compares your profile (niche, tags, description) with each brand's description and tags."}
       </p>
+      {onNichesChange && <BrandMatchNicheChips matches={matches} value={niches} onChange={onNichesChange} />}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm text-muted-foreground" data-testid="text-ai-meta">{meta}</span>
         <button type="button" data-testid="button-ai-rerank" onClick={onRefresh} disabled={busy || loading}

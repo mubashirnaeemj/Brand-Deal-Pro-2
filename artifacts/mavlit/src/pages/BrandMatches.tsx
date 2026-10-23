@@ -9,7 +9,6 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BrandPartnershipPosts from "@/components/BrandPartnershipPosts";
 import BrandMatchSearch from "@/components/BrandMatchSearch";
-import BrandMatchNicheFilter from "@/components/BrandMatchNicheFilter";
 import { matchNiches } from "@/lib/matchSearch";
 import MatchScoreBreakdown from "@/components/MatchScoreBreakdown";
 import AiMatchesSection from "@/components/AiMatchesSection";
@@ -298,14 +297,13 @@ export default function BrandMatches() {
           <div className="mb-6 flex flex-wrap items-start gap-3">
             <BrandMatchSearch id="matches-search-v3" label="Search brand matches" className="min-w-[16rem] max-w-lg flex-1"
               value={search} onChange={setSearch} />
-            <BrandMatchNicheFilter id="matches-niche-v3" matches={matchedBrands} value={niches} onChange={setNicheChoices} />
           </div>
           <section id="matches-panel-v3" aria-label="Brand matches">
             <AiMatchesSection version="v3" data={v3Matches.data} loading={v3Matches.loading} error={v3Matches.error}
               refreshing={v3Matches.refreshing} onRefresh={v3Matches.refresh} onOpen={setSelectedAiMatch}
               timedOut={v3Matches.timedOut} onCheckStatus={v3Matches.checkStatus} preferences={user?.brand_preferences}
               progressMessage={progressMessage} expandedByBrand={expandedAiReasons}
-              search={search} niches={niches} onToggleReasons={toggleAiReasons} />
+              search={search} niches={niches} onNichesChange={setNicheChoices} onToggleReasons={toggleAiReasons} />
           </section>
         </div>
       </main>

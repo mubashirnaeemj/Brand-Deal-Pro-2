@@ -154,6 +154,7 @@ export interface ApiContact {
   apollo_verified?: boolean;
   hunter_verified?: boolean;
   still_at_brand?: boolean | null;
+  linkedin_url?: string | null;
 }
 
 export interface ApiBrand {

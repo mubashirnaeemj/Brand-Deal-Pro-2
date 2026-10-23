@@ -429,6 +429,49 @@ describe("Matches page V3 integration", () => {
     }));
   };
 
+  it("Contact Intel offers Show LinkedIn for contacts that have one, with the link and a copy button", async () => {
+    const aiFetch = globalThis.fetch;
+    const write = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: write }, configurable: true });
+    const contact = (name: string, extra = {}) => ({ name, email: `${name.split(" ")[0].toLowerCase()}@alpha.com`, title: "Partnerships", apollo_verified: true, hunter_verified: true, still_at_brand: true, linkedin_url: null, ...extra });
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input), window.location.origin).pathname;
+      const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (path === "/api/mavlit/brands/10") {
+        return json({ brand_id: 10, name: "Alpha Audio",
+          top_contact: contact("Top Person", { linkedin_url: "http://www.linkedin.com/in/top-person" }),
+          other_contacts: [contact("Second Person"), contact("Third Person", { linkedin_url: "javascript:alert(1)" })] });
+      }
+      if (path === "/api/mavlit/matches/me/brands/10/posts") return json({ brand_raw_id: 10, brand_name: "Alpha Audio", posts: [] });
+      return aiFetch(input, init);
+    }));
+    mountMatches();
+    await settle();
+    fireEvent.click(screen.getByTestId("button-ai-brand-10"));
+    await settle();
+
+    // Main contact: hidden until asked for.
+    expect(screen.queryByTestId("link-linkedin")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show LinkedIn for Top Person" }));
+    const link = screen.getByTestId("link-linkedin");
+    expect(link).toHaveTextContent("http://www.linkedin.com/in/top-person");
+    expect(link).toHaveAttribute("href", "http://www.linkedin.com/in/top-person");
+    expect(link).toHaveAttribute("target", "_blank");
+    fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
+    expect(write).toHaveBeenCalledWith("http://www.linkedin.com/in/top-person");
+    fireEvent.click(screen.getByRole("button", { name: "Hide LinkedIn for Top Person" }));
+    expect(screen.queryByTestId("link-linkedin")).not.toBeInTheDocument();
+
+    // View more: only the contact with a LinkedIn gets the button; a non-http value is never a link.
+    fireEvent.click(screen.getByTestId("button-view-more-contacts"));
+    expect(screen.queryByRole("button", { name: "Show LinkedIn for Second Person" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show LinkedIn for Third Person" }));
+    const unsafe = screen.getByTestId("link-linkedin");
+    expect(unsafe).toHaveTextContent("javascript:alert(1)");
+    expect(unsafe.tagName).toBe("SPAN");
+    expect(unsafe).not.toHaveAttribute("href");
+  });
+
   it("clicking anywhere on a brand card (text or empty space) opens its details", async () => {
     stubBrandDetail();
     mountMatches();

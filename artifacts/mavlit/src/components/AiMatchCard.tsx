@@ -1,6 +1,7 @@
 import type { AiRankedMatch, AiMatchesVersion } from "@/lib/aiMatches";
 import BrandMatchReasons, { CARD_REASON_LIMIT } from "./BrandMatchReasons";
 import BrandLogo from "./BrandLogo";
+import { nicheTextClass } from "@/lib/nicheColors";
 
 export default function AiMatchCard({ match, expanded, onToggle, onOpen, version = "v2" }: {
   match: AiRankedMatch;
@@ -47,7 +48,8 @@ export default function AiMatchCard({ match, expanded, onToggle, onOpen, version
               </button>}
             </div>
             {match.niche && (
-              <span className="mt-1 inline-flex max-w-full truncate rounded-md bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
+              <span data-testid={`text-ai-niche-${match.brand_raw_id}`}
+                className={`mt-1 inline-flex max-w-full truncate rounded-md bg-white/5 px-2 py-0.5 text-xs font-semibold ${nicheTextClass(match.niche)}`}>
                 {match.niche}
               </span>
             )}

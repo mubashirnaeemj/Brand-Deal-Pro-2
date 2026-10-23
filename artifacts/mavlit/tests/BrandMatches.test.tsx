@@ -467,6 +467,23 @@ describe("Matches page V3 integration", () => {
     expect(screen.getByRole("link", { name: "Open LinkedIn for Fourth Person" })).toHaveAttribute("href", "https://www.linkedin.com/in/fourth");
   });
 
+  it("colours only the niche text of each card by niche", async () => {
+    fixture.respond("GET", ranking("completed", { matches: [
+      { brand_raw_id: 10, brand_name: "Alpha Audio", niche: "Music", rank: 1, confidence: 96, reason: "x" },
+      { brand_raw_id: 20, brand_name: "Beta Gadgets", niche: "Tech", rank: 2, confidence: 90, reason: "x" },
+      { brand_raw_id: 30, brand_name: "Gamma Strings", niche: "music", rank: 3, confidence: 80, reason: "x" },
+    ], total: 3 }));
+    mountMatches();
+    await settle();
+    const music = screen.getByTestId("text-ai-niche-10");
+    const tech = screen.getByTestId("text-ai-niche-20");
+    expect(music.className).toContain("text-violet-400");
+    expect(tech.className).toContain("text-sky-400");
+    expect(screen.getByTestId("text-ai-niche-30").className).toContain("text-violet-400");   // same niche, same colour
+    // Only the niche label is coloured; the brand name keeps its colour.
+    expect(screen.getByTestId("button-ai-brand-10").className).toContain("text-white");
+  });
+
   it("clicking anywhere on a brand card (text or empty space) opens its details", async () => {
     stubBrandDetail();
     mountMatches();

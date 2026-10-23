@@ -14,6 +14,7 @@ import AiMatchesSection from "@/components/AiMatchesSection";
 import useAiMatches from "@/hooks/useAiMatches";
 import useAiRankingMessage from "@/hooks/useAiRankingMessage";
 import { isAiRanking, type AiRankedMatch } from "@/lib/aiMatches";
+import { nicheTextClass } from "@/lib/nicheColors";
 import { api, type ApiBrand, type ApiContact, type ApiMatch } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -149,7 +150,7 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
             </div>
             <div>
               <h2 className="text-white font-bold text-base leading-tight">{match.brand_name}</h2>
-              <span className="text-xs" style={{ color: ACCENT }}>{nicheOf(match)}</span>
+              <span className={`text-xs font-semibold ${nicheTextClass(match.niche)}`} data-testid="text-panel-niche">{nicheOf(match)}</span>
             </div>
           </div>
           <div className="flex items-center gap-3">

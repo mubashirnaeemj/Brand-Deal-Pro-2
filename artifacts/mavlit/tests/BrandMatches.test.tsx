@@ -509,29 +509,29 @@ describe("Matches page V3 integration", () => {
     expect(fixture.calls("GET")).toHaveLength(1);   // filtering is local; no new request
   });
 
-  it("shows the four niches with the most brands, and the rest after View more", async () => {
+  it("shows every niche as a chip in the default colour, most brands first, with no View more", async () => {
     const niches = ["Music", "Music", "Music", "Tech", "Tech", "Beauty", "Beauty", "Fitness", "Travel", "Finance"];
     fixture.respond("GET", ranking("completed", { matches: niches.map((niche, index) => (
       { brand_raw_id: 100 + index, brand_name: `Brand ${index}`, niche, rank: index + 1, confidence: 90 - index, reason: "x" }
     )), total: niches.length }));
     mountMatches();
     await settle();
-    const group = () => within(screen.getByTestId("match-niches"));
-    const chips = () => group().getAllByTestId("chip-niche").map((c) => c.textContent);
-    // Placed below the intro text, above the refresh row.
+    const group = within(screen.getByTestId("match-niches"));
+    expect(group.getAllByTestId("chip-niche").map((c) => c.textContent))
+      .toEqual(["Music3", "Beauty2", "Tech2", "Finance1", "Fitness1", "Travel1"]);   // ties: A to Z
+    expect(screen.queryByTestId("button-niches-more")).not.toBeInTheDocument();
+    expect(screen.queryByText("View more")).not.toBeInTheDocument();
+    // Placed below the intro text.
     const intro = screen.getByText(/MAVLIT AI ranking using your profile/);
     expect(intro.compareDocumentPosition(screen.getByTestId("match-niches")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(chips()).toEqual(["Music3", "Beauty2", "Tech2", "Finance1"]);   // ties: A to Z
-    expect(group().getByTestId("button-niches-more")).toHaveTextContent("View more");
-
-    // A chosen niche outside the top four stays visible while collapsed.
-    fireEvent.click(group().getByTestId("button-niches-more"));
-    expect(chips()).toEqual(["Music3", "Beauty2", "Tech2", "Finance1", "Fitness1", "Travel1"]);
-    expect(group().getByTestId("button-niches-more")).toHaveTextContent("View less");
-    fireEvent.click(group().getByRole("button", { name: /^Travel/ }));
-    fireEvent.click(group().getByTestId("button-niches-more"));
-    expect(chips()).toEqual(["Music3", "Beauty2", "Tech2", "Finance1", "Travel1"]);
-    expect(group().getByRole("button", { name: /^Travel/ })).toHaveAttribute("aria-pressed", "true");
+    // The chips use the default text colour; only the brand cards keep the niche colours.
+    for (const chip of group.getAllByTestId("chip-niche")) {
+      expect(chip.innerHTML).not.toMatch(/text-(violet|sky|pink|orange|emerald|fuchsia|amber|lime|yellow|red|cyan|teal|green|slate|indigo|blue|purple|rose)-/);
+      expect(chip).toHaveClass("text-white");
+    }
+    expect(screen.getByTestId("text-ai-niche-100").className).toContain("text-violet-400");
+    fireEvent.click(group.getByRole("button", { name: /^Travel/ }));
+    expect(group.getByRole("button", { name: /^Travel/ })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getAllByRole("article")).toHaveLength(1);
   });
 

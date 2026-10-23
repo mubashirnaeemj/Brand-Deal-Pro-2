@@ -22,8 +22,13 @@ describe("filterByNiche", () => {
     expect(filterByNiche(brands, "Music").map((brand) => brand.name)).toEqual(["a", "c"]);
     expect(filterByNiche(brands, "tech").map((brand) => brand.name)).toEqual(["b"]);
   });
-  it("returns every brand for an empty niche and none for an unknown one", () => {
+  it("keeps the brands of any of several chosen niches", () => {
+    expect(filterByNiche(brands, ["Music", "beauty"]).map((brand) => brand.name)).toEqual(["a", "c", "f"]);
+    expect(filterByNiche(brands, ["Tech", "Food"]).map((brand) => brand.name)).toEqual(["b"]);
+  });
+  it("returns every brand when nothing is chosen and none for an unknown niche", () => {
     expect(filterByNiche(brands, "")).toHaveLength(brands.length);
+    expect(filterByNiche(brands, [])).toHaveLength(brands.length);
     expect(filterByNiche(brands, "Food")).toEqual([]);
   });
 });

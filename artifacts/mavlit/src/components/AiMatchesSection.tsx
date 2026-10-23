@@ -18,7 +18,7 @@ interface Props {
   expandedByBrand: Record<number, boolean>;
   onToggleReasons: (brandId: number) => void;
   search: string;
-  niche?: string;
+  niches?: string[];
   timedOut?: boolean;
   preferences?: string | null;
 }
@@ -51,11 +51,11 @@ function formatRanked(value: string | null | undefined) {
 }
 
 export default function AiMatchesSection({ version, data, loading, error, refreshing, onRefresh, onCheckStatus, onOpen,
-  progressMessage, expandedByBrand, onToggleReasons, search, niche = "", timedOut = false, preferences }: Props) {
+  progressMessage, expandedByBrand, onToggleReasons, search, niches = [], timedOut = false, preferences }: Props) {
   const status = data?.status;
   const pending = status === "queued" || status === "running";
   const matches = data?.matches ?? [];
-  const filtered = filterBrandMatches(filterByNiche(matches, niche), search);
+  const filtered = filterBrandMatches(filterByNiche(matches, niches), search);
   const busy = refreshing || pending;
   const ranked = formatRanked(data?.ranked_at);
   const meta = ranked ? `Ranked ${ranked} — ${data?.total ?? matches.length} brands` : "";
@@ -131,9 +131,9 @@ export default function AiMatchesSection({ version, data, loading, error, refres
           )}
           {matches.length > 0 && (
             <>
-              {(search.trim() || niche) && (
+              {(search.trim() || niches.length > 0) && (
                 <p role="status" className="mb-4 text-xs text-muted-foreground">
-                  Showing {filtered.length} of {matches.length} brands{niche ? ` in ${niche}` : ""}
+                  Showing {filtered.length} of {matches.length} brands{niches.length ? ` in ${niches.join(", ")}` : ""}
                 </p>
               )}
               {filtered.length > 0 ? (
@@ -148,8 +148,8 @@ export default function AiMatchesSection({ version, data, loading, error, refres
                 </div>
               ) : (
                 <div className="py-16 text-center text-muted-foreground">
-                  <p>{search.trim() ? `No brands match “${search.trim()}”${niche ? ` in ${niche}` : ""}.` : `No matches in ${niche}.`}</p>
-                  <p className="mt-1 text-sm">{search.trim() ? "Try a different search, niche or clear the search." : "Try a different niche."}</p>
+                  <p>{search.trim() ? `No brands match “${search.trim()}”${niches.length ? ` in ${niches.join(", ")}` : ""}.` : `No matches in ${niches.join(", ")}.`}</p>
+                  <p className="mt-1 text-sm">{search.trim() ? "Try a different search, other niches or clear the search." : "Try other niches."}</p>
                 </div>
               )}
             </>

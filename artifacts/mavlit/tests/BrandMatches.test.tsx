@@ -467,7 +467,7 @@ describe("Matches page V3 integration", () => {
     expect(screen.getByRole("link", { name: "Open LinkedIn for Fourth Person" })).toHaveAttribute("href", "https://www.linkedin.com/in/fourth");
   });
 
-  it("filters the matches by niche from a dropdown of the matched brands' niches", async () => {
+  it("filters the matches by one or several niches chosen from a checkbox dropdown", async () => {
     fixture.respond("GET", ranking("completed", { matches: [
       { brand_raw_id: 10, brand_name: "Alpha Audio", niche: "Music", rank: 1, confidence: 96, reason: "x" },
       { brand_raw_id: 20, brand_name: "Beta Gadgets", niche: "Tech", rank: 2, confidence: 90, reason: "x" },
@@ -476,25 +476,42 @@ describe("Matches page V3 integration", () => {
     ], total: 4 }));
     mountMatches();
     await settle();
-    const select = screen.getByRole("combobox", { name: "Filter brand matches by niche" }) as HTMLSelectElement;
-    expect([...select.options].map((option) => option.textContent)).toEqual(["All niches", "Beauty (1)", "Music (2)", "Tech (1)"]);
     const names = () => screen.getAllByRole("article").map((card) => card.getAttribute("data-testid"));
-    expect(names()).toEqual(["card-ai-brand-10", "card-ai-brand-20", "card-ai-brand-30", "card-ai-brand-40"]);
+    const trigger = () => screen.getByTestId("button-match-niche");
+    expect(trigger()).toHaveTextContent("All niches");
+    expect(names()).toHaveLength(4);
 
-    fireEvent.change(select, { target: { value: "Music" } });
+    fireEvent.click(trigger());
+    const boxes = () => within(screen.getByTestId("popover-match-niche")).getAllByRole("checkbox");
+    expect(boxes().map((box) => box.closest("label")?.textContent)).toEqual(["Beauty1", "Music2", "Tech1"]);   // niche name + count
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /Music/ }));
     expect(names()).toEqual(["card-ai-brand-10", "card-ai-brand-30"]);
+    expect(trigger()).toHaveTextContent("Music");
     expect(screen.getByText("Showing 2 of 4 brands in Music")).toBeInTheDocument();
 
-    // Works together with the search box.
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search brand matches" }), { target: { value: "gamma" } });
-    expect(names()).toEqual(["card-ai-brand-30"]);
+    fireEvent.click(screen.getByRole("checkbox", { name: /Tech/ }));   // a second niche widens the list
+    expect(names()).toEqual(["card-ai-brand-10", "card-ai-brand-20", "card-ai-brand-30"]);
+    expect(trigger()).toHaveTextContent("Music, Tech");
+    expect(screen.getByText("Showing 3 of 4 brands in Music, Tech")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /Beauty/ }));
+    expect(trigger()).toHaveTextContent("3 niches");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /Beauty/ }));   // unchecking removes it again
+    fireEvent.click(screen.getByRole("checkbox", { name: /Tech/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Music/ }));
+    expect(trigger()).toHaveTextContent("All niches");
+    expect(names()).toHaveLength(4);
+
+    // Together with search, and the Clear button.
+    fireEvent.click(screen.getByRole("checkbox", { name: /Music/ }));
     fireEvent.change(screen.getByRole("searchbox", { name: "Search brand matches" }), { target: { value: "beta" } });
     expect(screen.getByText(/No brands match “beta” in Music/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Clear brand search" }));
-
-    fireEvent.change(select, { target: { value: "" } });
+    fireEvent.click(screen.getByTestId("button-clear-niches"));
+    expect(trigger()).toHaveTextContent("All niches");
     expect(names()).toHaveLength(4);
-    expect(screen.queryByText(/Showing \d+ of 4 brands/)).not.toBeInTheDocument();
     expect(fixture.calls("GET")).toHaveLength(1);   // filtering is local; no new request
   });
 

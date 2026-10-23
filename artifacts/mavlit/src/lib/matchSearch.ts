@@ -27,8 +27,8 @@ export function matchNiches(matches: { niche: string | null }[]): { niche: strin
   return [...byKey.values()].sort((a, b) => a.niche.localeCompare(b.niche));
 }
 
-/** Only the brands of one niche (case does not matter); an empty niche means all brands. */
-export function filterByNiche<T extends { niche: string | null }>(matches: T[], niche: string): T[] {
-  const key = nicheKey(niche);
-  return key ? matches.filter((match) => nicheKey(match.niche) === key) : matches;
+/** Only the brands of the chosen niche(s) (case does not matter); nothing chosen means all brands. */
+export function filterByNiche<T extends { niche: string | null }>(matches: T[], niches: string | string[]): T[] {
+  const keys = new Set((Array.isArray(niches) ? niches : [niches]).map(nicheKey).filter(Boolean));
+  return keys.size ? matches.filter((match) => keys.has(nicheKey(match.niche))) : matches;
 }

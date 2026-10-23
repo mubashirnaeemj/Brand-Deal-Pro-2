@@ -3,7 +3,7 @@ import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
-  CheckCircle2, Music, Building2, X, Copy, Check, AlertTriangle, Linkedin,
+  CheckCircle2, Music, Building2, X, Copy, Check, AlertTriangle, Linkedin, ExternalLink,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -51,7 +51,7 @@ function ScoreRing({ match, size = 56 }: { match: ApiMatch; size?: number }) {
   );
 }
 
-function CopyEmailButton({ email, label = "Copy email" }: { email: string; label?: string }) {
+function CopyEmailButton({ email }: { email: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button type="button" onClick={() => navigator.clipboard.writeText(email).then(() => {
@@ -59,34 +59,28 @@ function CopyEmailButton({ email, label = "Copy email" }: { email: string; label
       setTimeout(() => setCopied(false), 2000);
     })} className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-white hover:border-white/30">
       {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-      {copied ? "Copied!" : label}
+      {copied ? "Copied!" : "Copy email"}
     </button>
   );
 }
 
-// "Show LinkedIn" reveals the contact's profile URL (as a link) with a copy button. Only http(s) URLs become
-// links, so a malformed stored value can never turn into a clickable script URL.
-function LinkedInReveal({ url, name }: { url?: string | null; name?: string | null }) {
-  const [shown, setShown] = useState(false);
+// The contact's LinkedIn profile, always visible like the email, with an "Open LinkedIn" button. Only http(s)
+// URLs get the button, so a malformed stored value can never become a clickable script URL.
+function LinkedInRow({ url, name }: { url?: string | null; name?: string | null }) {
   const value = url?.trim();
   if (!value) return null;
   const safe = /^https?:\/\//i.test(value);
   return (
-    <div data-testid="linkedin-reveal">
-      <button type="button" onClick={() => setShown(open => !open)} aria-expanded={shown}
-        aria-label={`${shown ? "Hide" : "Show"} LinkedIn for ${name || "this contact"}`}
-        className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline">
-        <Linkedin size={12} aria-hidden />
-        {shown ? "Hide LinkedIn" : "Show LinkedIn"}
-      </button>
-      {shown && (
-        <div className="mt-2 flex items-center gap-2" data-testid="linkedin-url-row">
-          {safe
-            ? <a href={value} target="_blank" rel="noopener noreferrer" data-testid="link-linkedin"
-                className="min-w-0 flex-1 truncate font-mono text-xs text-primary hover:underline">{value}</a>
-            : <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground" data-testid="link-linkedin">{value}</span>}
-          <CopyEmailButton email={value} label="Copy link" />
-        </div>
+    <div className="flex items-center gap-2" data-testid="linkedin-row">
+      <Linkedin size={13} className="shrink-0 text-muted-foreground" aria-hidden />
+      <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground" data-testid="text-linkedin">{value}</span>
+      {safe && (
+        <a href={value} target="_blank" rel="noopener noreferrer" data-testid="link-linkedin"
+          aria-label={`Open LinkedIn for ${name || "this contact"}`}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:border-white/30 hover:text-white">
+          <ExternalLink size={12} aria-hidden />
+          Open LinkedIn
+        </a>
       )}
     </div>
   );
@@ -188,7 +182,7 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
                       </div>
                       <VerifiedBadge contact={contact} />
                       {isUnverified(contact) && <UnverifiedNote />}
-                      <LinkedInReveal url={contact.linkedin_url} name={contact.name} />
+                      <LinkedInRow url={contact.linkedin_url} name={contact.name} />
                     </>
                   ) : null}
                   {otherContacts.length > 0 && (
@@ -210,7 +204,7 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
                               {isUnverified(other) ? <UnverifiedNote className="mt-1.5" /> : (
                                 isVerified(other) && <div className="mt-1.5"><VerifiedBadge contact={other} /></div>
                               )}
-                              <div className="mt-2"><LinkedInReveal url={other.linkedin_url} name={other.name} /></div>
+                              <div className="mt-2"><LinkedInRow url={other.linkedin_url} name={other.name} /></div>
                             </li>
                           ))}
                         </ul>

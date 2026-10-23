@@ -99,7 +99,11 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
     staleTime: 60_000,
   });
   const contact = detail?.top_contact;
-  const otherContacts = (detail?.other_contacts ?? []).filter(other => other.email);
+  // "View more": the emails MAVLIT verified come first; within each group the API's rank order is kept.
+  const otherContacts = (detail?.other_contacts ?? []).filter(other => other.email)
+    .map((other, index) => ({ other, index }))
+    .sort((a, b) => Number(isVerified(b.other)) - Number(isVerified(a.other)) || a.index - b.index)
+    .map(({ other }) => other);
   const [showOthers, setShowOthers] = useState(false);
 
   useEffect(() => {

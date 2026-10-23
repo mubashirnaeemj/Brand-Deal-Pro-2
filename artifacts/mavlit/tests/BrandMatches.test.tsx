@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Switch } from "wouter";
 import BrandMatches from "@/pages/BrandMatches";
@@ -408,6 +408,12 @@ describe("Matches page V3 integration", () => {
     expect(others.className).toContain("max-h-64");
     expect(others.className).toContain("overflow-y-auto");
     expect(others.querySelectorAll("li")).toHaveLength(11);
+    // Emails verified by MAVLIT (both providers) are listed first, although Fourth Person comes after
+    // Second and Third in the API's order. The rest keep the API order.
+    const names = [...others.querySelectorAll("li > p:first-child")].map((node) => node.textContent);
+    expect(names[0]).toBe("Fourth Person");
+    expect(names.slice(1, 3)).toEqual(["Second Person", "Third Person"]);
+    expect(within(others.querySelectorAll("li")[0] as HTMLElement).getByTestId("badge-verified-email")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("button-view-more-contacts"));
     expect(screen.queryByTestId("list-other-contacts")).not.toBeInTheDocument();
   });

@@ -1,7 +1,11 @@
 import type { AiRankedMatch, AiMatchesVersion } from "@/lib/aiMatches";
 import BrandMatchReasons, { CARD_REASON_LIMIT } from "./BrandMatchReasons";
 import BrandLogo from "./BrandLogo";
+import { Star } from "lucide-react";
 import { nicheTextClass } from "@/lib/nicheColors";
+
+// A fit above this percentage earns the "Most relevant brand" label.
+export const MOST_RELEVANT_ABOVE = 80;
 
 export default function AiMatchCard({ match, expanded, onToggle, onOpen, version = "v2" }: {
   match: AiRankedMatch;
@@ -47,6 +51,13 @@ export default function AiMatchCard({ match, expanded, onToggle, onOpen, version
                 {match.brand_name}
               </button>}
             </div>
+            {match.confidence > MOST_RELEVANT_ABOVE && (
+              <span data-testid={`badge-most-relevant-${match.brand_raw_id}`}
+                className="mt-1 mr-1.5 inline-flex max-w-full items-center gap-1 rounded-md bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-300">
+                <Star size={11} className="shrink-0 fill-current" aria-hidden />
+                Most relevant brand
+              </span>
+            )}
             {match.niche && (
               <span data-testid={`text-ai-niche-${match.brand_raw_id}`}
                 className={`mt-1 inline-flex max-w-full truncate rounded-md bg-white/5 px-2 py-0.5 text-xs font-semibold ${nicheTextClass(match.niche)}`}>

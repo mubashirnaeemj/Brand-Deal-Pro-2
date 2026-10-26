@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiRequestError, type BrandPartnershipPosts } from "@/lib/api";
 
@@ -18,7 +18,11 @@ function postDate(value: string | null): string {
     date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
+// Posts shown before "View more": few enough to fit the panel without scrolling it.
+const PREVIEW_POSTS = 2;
+
 export default function BrandPartnershipPosts({ brandId, brandName }: { brandId: number; brandName: string }) {
+  const [expanded, setExpanded] = useState(false);
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["brand-partnership-posts", brandId],
     queryFn: async () => {
@@ -43,10 +47,7 @@ export default function BrandPartnershipPosts({ brandId, brandName }: { brandId:
 
   return (
     <section className="rounded-xl border border-border bg-white/[0.03] p-4">
-      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Creator partnership posts
-        {data && <span data-testid="text-partnership-posts-total" className="ml-1.5 normal-case tracking-normal text-white/70">({data.posts.length})</span>}
-      </h3>
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Creator partnership posts</h3>
       {isLoading ? (
         <p role="status" className="text-sm text-muted-foreground">Loading partnership posts…</p>
       ) : error ? (
@@ -64,8 +65,9 @@ export default function BrandPartnershipPosts({ brandId, brandName }: { brandId:
       ) : !data?.posts.length ? (
         <p className="text-sm text-muted-foreground">No confirmed creator partnership posts for this brand yet.</p>
       ) : (
-        <ul data-testid="list-partnership-posts" className="max-h-72 space-y-3 overflow-y-auto pr-1">
-          {data.posts.map((post, index) => {
+        <>
+        <ul data-testid="list-partnership-posts" className={`space-y-3 ${expanded ? "max-h-72 overflow-y-auto pr-1" : ""}`}>
+          {(expanded ? data.posts : data.posts.slice(0, PREVIEW_POSTS)).map((post, index) => {
             const url = postUrl(post.post_url);
             const creators = post.creators.map((creator) => creator.trim().replace(/^@/, "")).filter(Boolean);
             const others = Math.max(0, creators.length - 2);
@@ -99,6 +101,13 @@ export default function BrandPartnershipPosts({ brandId, brandName }: { brandId:
             );
           })}
         </ul>
+        {data.posts.length > PREVIEW_POSTS && (
+          <button type="button" onClick={() => setExpanded(open => !open)} aria-expanded={expanded}
+            data-testid="button-view-more-posts" className="mt-3 text-xs font-semibold text-primary hover:underline">
+            {expanded ? "Show fewer posts" : `View more (${data.posts.length})`}
+          </button>
+        )}
+        </>
       )}
     </section>
   );

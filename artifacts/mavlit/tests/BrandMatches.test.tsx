@@ -636,12 +636,13 @@ describe("Matches page V3 integration", () => {
     expect(window.location.pathname + window.location.search).toBe("/pitch?brand=Alpha%20Audio");
   });
 
-  it("shows the total next to Creator partnership posts and keeps a long list in a scrollable box", async () => {
+  it("shows two partnership posts, then View more (total) opens the whole list in a scrollable box", async () => {
     const aiFetch = globalThis.fetch;
-    const posts = Array.from({ length: 14 }, (_, i) => ({
+    const makePosts = (n: number) => Array.from({ length: n }, (_, i) => ({
       source: "instagram", post_url: `https://www.instagram.com/p/POST${i}/`, post_date: `2026-09-${String(i + 1).padStart(2, "0")}`,
       sponsorship_confidence: 95, creators: [`creator${i}`],
     }));
+    let posts = makePosts(14);
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = new URL(String(input), window.location.origin).pathname;
       const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -653,11 +654,21 @@ describe("Matches page V3 integration", () => {
     await settle();
     fireEvent.click(screen.getByTestId("button-ai-brand-10"));
     await settle();
-    expect(screen.getByTestId("text-partnership-posts-total")).toHaveTextContent("(14)");
-    const list = screen.getByTestId("list-partnership-posts");
-    expect(list.className).toContain("max-h-72");
-    expect(list.className).toContain("overflow-y-auto");
-    expect(list.querySelectorAll("li")).toHaveLength(14);                    // every post is in the list; the box scrolls
+    expect(screen.queryByTestId("text-partnership-posts-total")).not.toBeInTheDocument();   // no total in the title
+    const list = () => screen.getByTestId("list-partnership-posts");
+    expect(list().querySelectorAll("li")).toHaveLength(2);                                   // a preview of two
+    expect(list().className).not.toContain("overflow-y-auto");                               // that fits without scrolling
+    const more = screen.getByTestId("button-view-more-posts");
+    expect(more).toHaveTextContent("View more (14)");
+    expect(more).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(more);
+    expect(list().querySelectorAll("li")).toHaveLength(14);
+    expect(list().className).toContain("max-h-72");
+    expect(list().className).toContain("overflow-y-auto");
+    expect(screen.getByTestId("button-view-more-posts")).toHaveTextContent("Show fewer posts");
+    fireEvent.click(screen.getByTestId("button-view-more-posts"));
+    expect(list().querySelectorAll("li")).toHaveLength(2);
   });
 
   it("labels brands with a fit above 80% as the most relevant brand", async () => {

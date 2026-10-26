@@ -60,7 +60,7 @@ export default function AiMatchCard({ match, expanded, onToggle, onOpen, version
       className="flex cursor-pointer flex-col rounded-2xl border border-border bg-card transition-colors duration-300 hover:border-primary/50">
       <div className="flex items-center justify-between gap-3 p-6">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <BrandLogo name={match.brand_name} website={match.website} testId={`img-ai-logo-${match.brand_raw_id}`} />
+          <BrandLogo name={match.brand_name} website={match.website} size={44} testId={`img-ai-logo-${match.brand_raw_id}`} />
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-baseline gap-2">
               <span className="shrink-0 text-xs font-semibold text-muted-foreground">#{match.rank}</span>

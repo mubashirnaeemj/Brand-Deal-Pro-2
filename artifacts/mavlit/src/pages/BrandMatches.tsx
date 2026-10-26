@@ -3,13 +3,14 @@ import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
-  CheckCircle2, Music, Building2, X, Copy, Check, AlertTriangle, Linkedin, ExternalLink,
+  CheckCircle2, Music, X, Copy, Check, AlertTriangle, Linkedin, ExternalLink,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BrandPartnershipPosts from "@/components/BrandPartnershipPosts";
 import BrandMatchSearch from "@/components/BrandMatchSearch";
 import SaveBrandButton from "@/components/SaveBrandButton";
+import BrandLogo from "@/components/BrandLogo";
 import { matchNiches } from "@/lib/matchSearch";
 import MatchScoreBreakdown from "@/components/MatchScoreBreakdown";
 import AiMatchesSection from "@/components/AiMatchesSection";
@@ -20,7 +21,6 @@ import { nicheTextClass } from "@/lib/nicheColors";
 import { api, type ApiBrand, type ApiContact, type ApiMatch } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
-const ACCENT = "#7c3aed";
 
 function nicheOf(match: ApiMatch) {
   return match.niche?.trim() || "Uncategorized";
@@ -146,10 +146,7 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
         className="fixed top-0 right-0 h-full w-full max-w-md bg-[hsl(240_10%_5%)] border-l border-border z-50 flex flex-col overflow-hidden shadow-2xl">
         <div className="flex items-center justify-between px-6 py-5 border-b border-border shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0"
-              style={{ background: `linear-gradient(135deg, ${ACCENT}cc, ${ACCENT}66)` }}>
-              <Building2 size={18} />
-            </div>
+            <BrandLogo name={match.brand_name} website={match.website} size={44} testId="img-panel-logo" />
             <div>
               <h2 className="text-white font-bold text-base leading-tight">{match.brand_name}</h2>
               <span className={`text-xs font-semibold ${nicheTextClass(match.niche)}`} data-testid="text-panel-niche">{nicheOf(match)}</span>
@@ -313,7 +310,7 @@ export default function BrandMatches() {
       <AnimatePresence>
         {selectedAiMatch && <ContactPanel fitConfidence={selectedAiMatch.confidence}
           match={{ brand_raw_id: selectedAiMatch.brand_raw_id, brand_name: selectedAiMatch.brand_name,
-            niche: selectedAiMatch.niche, total_score: selectedAiMatch.confidence / 100, dimensions: {},
+            niche: selectedAiMatch.niche, website: selectedAiMatch.website, total_score: selectedAiMatch.confidence / 100, dimensions: {},
             reasons: selectedAiMatch.reason ? [selectedAiMatch.reason] : [] }}
           onClose={() => setSelectedAiMatch(null)} />}
       </AnimatePresence>

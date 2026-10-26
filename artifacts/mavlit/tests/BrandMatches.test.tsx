@@ -587,6 +587,34 @@ describe("Matches page V3 integration", () => {
     expect(card.getAllByRole("progressbar")).toHaveLength(1);          // and so is the straight bar
   });
 
+  it("shows a larger brand logo on the card and the same logo in the Contact Intel panel", async () => {
+    stubBrandDetail();
+    const reasons = ["One"];
+    fixture.respond("GET", ranking("completed", { matches: [
+      { brand_raw_id: 10, brand_name: "Alpha Audio", niche: "Music", rank: 1, confidence: 96, reason: "Audio.", reasons, website: "https://alpha.example" },
+    ], total: 1 }));
+    mountMatches();
+    await settle();
+    const cardLogo = screen.getByTestId("img-ai-logo-10");
+    expect(cardLogo).toHaveStyle({ width: "44px", height: "44px" });
+    expect(cardLogo.querySelector("img")).toHaveAttribute("src", expect.stringContaining("domain=alpha.example&sz=128"));
+    fireEvent.click(screen.getByTestId("button-contact-intel-10"));
+    await settle();
+    const panelLogo = screen.getByTestId("img-panel-logo");
+    expect(panelLogo).toHaveStyle({ width: "44px", height: "44px" });
+    expect(panelLogo.querySelector("img")).toHaveAttribute("src", expect.stringContaining("domain=alpha.example"));
+    expect(screen.getByRole("heading", { name: "Alpha Audio" })).toBeInTheDocument();
+  });
+
+  it("falls back to the brand's first letter in the panel when it has no website", async () => {
+    stubBrandDetail();
+    mountMatches();
+    await settle();
+    fireEvent.click(screen.getByTestId("button-contact-intel-10"));
+    await settle();
+    expect(screen.getByTestId("img-panel-logo")).toHaveTextContent("A");
+  });
+
   it("has a Contact Intel button that opens the details, then a Create pitch email button last on the card", async () => {
     stubBrandDetail();
     mountMatches();

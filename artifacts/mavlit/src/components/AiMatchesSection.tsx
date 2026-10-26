@@ -21,6 +21,8 @@ interface Props {
   search: string;
   niches?: string[];
   onNichesChange?: (niches: string[]) => void;
+  /** When set, only the matches with these brand ids are shown (the "Saved" tab). */
+  savedIds?: ReadonlySet<number> | null;
   timedOut?: boolean;
   preferences?: string | null;
 }
@@ -53,10 +55,11 @@ function formatRanked(value: string | null | undefined) {
 }
 
 export default function AiMatchesSection({ version, data, loading, error, refreshing, onRefresh, onCheckStatus, onOpen,
-  progressMessage, expandedByBrand, onToggleReasons, search, niches = [], onNichesChange, timedOut = false, preferences }: Props) {
+  progressMessage, expandedByBrand, onToggleReasons, search, niches = [], onNichesChange, savedIds = null, timedOut = false, preferences }: Props) {
   const status = data?.status;
   const pending = status === "queued" || status === "running";
-  const matches = data?.matches ?? [];
+  const allMatches = data?.matches ?? [];
+  const matches = savedIds ? allMatches.filter((match) => savedIds.has(match.brand_raw_id)) : allMatches;
   const filtered = filterBrandMatches(filterByNiche(matches, niches), search);
   const busy = refreshing || pending;
   const ranked = formatRanked(data?.ranked_at);
@@ -121,7 +124,12 @@ export default function AiMatchesSection({ version, data, loading, error, refres
               ) : ' Try "Re-rank with AI".'}
             </p>
           )}
-          {version === "v3" && !busy && status !== "failed" && data?.total === 0 && matches.length === 0 && (
+          {savedIds && matches.length === 0 && (
+            <p data-testid="text-no-saved-matches" className="py-16 text-center text-muted-foreground">
+              None of your matched brands is saved yet. Use <span className="font-semibold text-white">Save</span> on a match to keep it here.
+            </p>
+          )}
+          {!savedIds && version === "v3" && !busy && status !== "failed" && data?.total === 0 && matches.length === 0 && (
             <p className="py-16 text-center text-muted-foreground">No matches yet — complete your profile and save to generate them.</p>
           )}
           {version !== "v3" && status === "idle" && matches.length === 0 && (

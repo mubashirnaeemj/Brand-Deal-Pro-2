@@ -10,6 +10,7 @@ import Footer from "@/components/Footer";
 import BrandPartnershipPosts from "@/components/BrandPartnershipPosts";
 import BrandMatchSearch from "@/components/BrandMatchSearch";
 import SaveBrandButton from "@/components/SaveBrandButton";
+import useSavedBrands from "@/hooks/useSavedBrands";
 import BrandLogo from "@/components/BrandLogo";
 import { matchNiches } from "@/lib/matchSearch";
 import MatchScoreBreakdown from "@/components/MatchScoreBreakdown";
@@ -248,6 +249,8 @@ export default function BrandMatches() {
   const searchParams = useSearch();
   const [search, setSearch] = useState("");
   const [nicheChoices, setNicheChoices] = useState<string[]>([]);
+  const [view, setView] = useState<"all" | "saved">("all");
+  const { saved: savedBrands } = useSavedBrands();
   useEffect(() => {
     const requested = new URLSearchParams(searchParams).get("version");
     try { localStorage.setItem("mavlit_matches_version", "v3"); } catch { /* Storage can be unavailable in embedded previews. */ }
@@ -263,6 +266,10 @@ export default function BrandMatches() {
   const matchedBrands = v3Matches.data?.matches ?? [];
   const availableNiches = matchNiches(matchedBrands).map((entry) => entry.niche);
   const niches = nicheChoices.filter((choice) => availableNiches.includes(choice));
+  // The "Saved" tab: only the matched brands the creator saved. A saved brand that dropped out of the matches is named below.
+  const savedIds = new Set(savedBrands.map((brand) => brand.brand_id));
+  const matchedIds = new Set(matchedBrands.map((match) => match.brand_raw_id));
+  const savedOutside = savedBrands.filter((brand) => !matchedIds.has(brand.brand_id));
   const [expandedAiReasons, setExpandedAiReasons] = useState<Record<number, boolean>>({});
   const toggleAiReasons = (brandId: number) => {
     setExpandedAiReasons((previous) => ({
@@ -293,6 +300,15 @@ export default function BrandMatches() {
             </p>
           </motion.div>
 
+          <div role="tablist" aria-label="Brand matches view" className="mb-5 flex w-fit gap-2 rounded-2xl border border-border bg-card p-1">
+            {([["all", "All matches"], ["saved", `Saved (${savedBrands.length})`]] as const).map(([id, label]) => (
+              <button key={id} type="button" role="tab" aria-selected={view === id} data-testid={`tab-matches-${id}`}
+                onClick={() => { setView(id); setNicheChoices([]); }}   // the niches differ between the tabs; start each with none chosen
+                className={`rounded-xl px-5 py-2 text-sm font-bold transition-all ${view === id ? "bg-primary text-white shadow-md shadow-primary/30" : "text-muted-foreground hover:text-white"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="mb-6 flex flex-wrap items-start gap-3">
             <BrandMatchSearch id="matches-search-v3" label="Search brand matches" className="min-w-[16rem] max-w-lg flex-1"
               value={search} onChange={setSearch} />
@@ -302,7 +318,14 @@ export default function BrandMatches() {
               refreshing={v3Matches.refreshing} onRefresh={v3Matches.refresh} onOpen={setSelectedAiMatch}
               timedOut={v3Matches.timedOut} onCheckStatus={v3Matches.checkStatus} preferences={user?.brand_preferences}
               progressMessage={progressMessage} expandedByBrand={expandedAiReasons}
-              search={search} niches={niches} onNichesChange={setNicheChoices} onToggleReasons={toggleAiReasons} />
+              search={search} niches={niches} onNichesChange={setNicheChoices} onToggleReasons={toggleAiReasons}
+              savedIds={view === "saved" ? savedIds : null} />
+            {view === "saved" && savedOutside.length > 0 && (
+              <p data-testid="text-saved-outside-matches" className="mt-6 text-xs text-muted-foreground">
+                {savedOutside.length === 1 ? "1 saved brand is" : `${savedOutside.length} saved brands are`} not in your current matches:{" "}
+                {savedOutside.slice(0, 5).map((brand) => brand.name).join(", ")}{savedOutside.length > 5 ? `, and ${savedOutside.length - 5} more` : ""}.
+              </p>
+            )}
           </section>
         </div>
       </main>

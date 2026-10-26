@@ -204,7 +204,8 @@ describe("Matches page V3 integration", () => {
     expect(localStorage.getItem("mavlit_matches_version")).toBe("v3");
     expect(screen.getByTestId("section-matches-v3")).toBeInTheDocument();
     expect(screen.queryByTestId("section-matches-v2")).not.toBeInTheDocument();
-    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    // No version tabs (V1 / V2 / V3): the only tabs are the view tabs, All matches and Saved.
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent?.replace(/\s*\(\d+\)/, ""))).toEqual(["All matches", "Saved"]);
     expect(fixture.calls("GET")).toHaveLength(1);
     expect(fixture.calls("POST")).toHaveLength(0);
     expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Previous results below are not final.");
@@ -669,6 +670,47 @@ describe("Matches page V3 integration", () => {
     expect(screen.getByTestId("button-view-more-posts")).toHaveTextContent("Show fewer posts");
     fireEvent.click(screen.getByTestId("button-view-more-posts"));
     expect(list().querySelectorAll("li")).toHaveLength(2);
+  });
+
+  it("has a Saved tab that shows only the matched brands the creator saved", async () => {
+    fixture.respond("GET", ranking("completed", { matches: [
+      { brand_raw_id: 10, brand_name: "Alpha Audio", niche: "Music", rank: 1, confidence: 96, reason: "x" },
+      { brand_raw_id: 20, brand_name: "Beta Gadgets", niche: "Tech", rank: 2, confidence: 90, reason: "x" },
+      { brand_raw_id: 30, brand_name: "Gamma Strings", niche: "Music", rank: 3, confidence: 80, reason: "x" },
+    ], total: 3 }));
+    const savedAt = "2026-10-20T00:00:00Z";
+    fixture.savedBrands.push(
+      { brand_id: 20, name: "Beta Gadgets", niche: "Tech", short_bio: null, saved_at: savedAt },
+      { brand_id: 30, name: "Gamma Strings", niche: "Music", short_bio: null, saved_at: savedAt },
+      { brand_id: 999, name: "Ghost Brand", niche: "Fashion", short_bio: null, saved_at: savedAt },   // saved, but not in the current matches
+    );
+    mountMatches();
+    await settle();
+    const cards = () => screen.getAllByRole("article").map((card) => card.getAttribute("data-testid"));
+    expect(cards()).toEqual(["card-ai-brand-10", "card-ai-brand-20", "card-ai-brand-30"]);
+    expect(screen.getByTestId("tab-matches-all")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("tab-matches-saved")).toHaveTextContent("Saved (3)");              // all saved brands, as the dashboard counts
+
+    fireEvent.click(screen.getByTestId("tab-matches-saved"));
+    expect(screen.getByTestId("tab-matches-saved")).toHaveAttribute("aria-selected", "true");
+    expect(cards()).toEqual(["card-ai-brand-20", "card-ai-brand-30"]);                            // only the saved matches
+    expect(screen.getByTestId("text-saved-outside-matches")).toHaveTextContent("1 saved brand is not in your current matches: Ghost Brand.");
+
+    // Search works inside the tab; unsaving a card takes it out of the tab at once.
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search brand matches" }), { target: { value: "beta" } });
+    expect(cards()).toEqual(["card-ai-brand-20"]);
+    fireEvent.click(screen.getByRole("button", { name: "Clear brand search" }));
+    fireEvent.click(within(screen.getByTestId("card-ai-brand-20")).getByTestId("button-save-brand-20"));
+    await settle();
+    expect(cards()).toEqual(["card-ai-brand-30"]);
+    expect(screen.getByTestId("tab-matches-saved")).toHaveTextContent("Saved (2)");
+    fireEvent.click(within(screen.getByTestId("card-ai-brand-30")).getByTestId("button-save-brand-30"));
+    await settle();
+    expect(screen.queryAllByRole("article")).toHaveLength(0);
+    expect(screen.getByTestId("text-no-saved-matches")).toHaveTextContent("None of your matched brands is saved yet");
+
+    fireEvent.click(screen.getByTestId("tab-matches-all"));
+    expect(cards()).toEqual(["card-ai-brand-10", "card-ai-brand-20", "card-ai-brand-30"]);       // everything is still in All matches
   });
 
   it("labels brands with a fit of 85% or more as Top Fit for You", async () => {

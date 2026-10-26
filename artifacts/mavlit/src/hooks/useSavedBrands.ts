@@ -29,5 +29,5 @@ export default function useSavedBrands() {
       catch { await queryClient.invalidateQueries({ queryKey: KEY }); }
     }
   };
-  return { isSaved, toggle };
+  return { saved, isSaved, toggle };
 }

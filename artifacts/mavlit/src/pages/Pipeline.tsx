@@ -698,7 +698,6 @@ const CONFIDENCE_STYLE = {
  * creators the brand has paid (see pipeline/rate_intelligence.py).
  */
 function RateEstimator({ dealContext, brand }: { dealContext: DealContext; brand: { id: number | null; name: string } | null }) {
-  const [, setLocation] = useLocation();
   const { deliverable, exclusivity, exclusivityMonths, usage } = dealContext;
   const [result, setResult] = useState<RateEstimateResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -761,18 +760,11 @@ function RateEstimator({ dealContext, brand }: { dealContext: DealContext; brand
             <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-secondary text-muted-foreground border border-border">{brand!.name}</span>
           </div>
 
-          {creatorRate ? (
+          {creatorRate && (
             <div className="px-4 py-3 rounded-xl bg-primary/8 border border-primary/20">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/70 mb-0.5">Your typical rate</p>
               <p className="text-lg font-extrabold text-white">${creatorRate.amount.replace(/^\$/, "")}</p>
             </div>
-          ) : (
-            <button type="button"
-              onClick={() => { setLocation("/profile"); setTimeout(() => document.getElementById("typical-rates")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120); }}
-              className="w-full px-4 py-3 rounded-xl bg-primary/10 border border-primary/25 hover:bg-primary/15 hover:border-primary/40 transition-all text-left">
-              <p className="text-xs font-semibold text-primary">Add your typical rates in Profile →</p>
-              <p className="text-[11px] text-primary/50 mt-0.5">See your own rate next to the estimate.</p>
-            </button>
           )}
 
           {!result && (

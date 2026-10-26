@@ -671,19 +671,20 @@ describe("Matches page V3 integration", () => {
     expect(list().querySelectorAll("li")).toHaveLength(2);
   });
 
-  it("labels brands with a fit above 80% as the most relevant brand", async () => {
+  it("labels brands with a fit of 85% or more as Top Fit for You", async () => {
     fixture.respond("GET", ranking("completed", { matches: [
       { brand_raw_id: 10, brand_name: "Alpha Audio", niche: "Music", rank: 1, confidence: 96, reason: "x" },
-      { brand_raw_id: 20, brand_name: "Beta Gadgets", niche: "Tech", rank: 2, confidence: 81, reason: "x" },
-      { brand_raw_id: 30, brand_name: "Gamma Strings", niche: "Music", rank: 3, confidence: 80, reason: "x" },
-      { brand_raw_id: 40, brand_name: "Delta Glow", niche: "Beauty", rank: 4, confidence: 60, reason: "x" },
+      { brand_raw_id: 20, brand_name: "Beta Gadgets", niche: "Tech", rank: 2, confidence: 85, reason: "x" },
+      { brand_raw_id: 30, brand_name: "Gamma Strings", niche: "Music", rank: 3, confidence: 84, reason: "x" },
+      { brand_raw_id: 40, brand_name: "Delta Glow", niche: "Beauty", rank: 4, confidence: 81, reason: "x" },
     ], total: 4 }));
     mountMatches();
     await settle();
-    expect(screen.getByTestId("badge-most-relevant-10")).toHaveTextContent("Most relevant brand");
-    expect(screen.getByTestId("badge-most-relevant-20")).toBeInTheDocument();                 // 81%
-    expect(screen.queryByTestId("badge-most-relevant-30")).not.toBeInTheDocument();           // exactly 80% is not "more than 80"
-    expect(screen.queryByTestId("badge-most-relevant-40")).not.toBeInTheDocument();
+    expect(screen.getByTestId("badge-top-fit-10")).toHaveTextContent("Top Fit for You");
+    expect(screen.getByTestId("badge-top-fit-20")).toBeInTheDocument();                       // exactly 85% counts
+    expect(screen.queryByTestId("badge-top-fit-30")).not.toBeInTheDocument();                 // 84% does not
+    expect(screen.queryByTestId("badge-top-fit-40")).not.toBeInTheDocument();                 // neither does 81%, which the old label (above 80) gave
+    expect(screen.queryByText("Most relevant brand")).not.toBeInTheDocument();
   });
 
   it("colours only the niche text of each card by niche", async () => {

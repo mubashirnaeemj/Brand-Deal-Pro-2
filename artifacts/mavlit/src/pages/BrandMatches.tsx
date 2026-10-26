@@ -9,6 +9,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BrandPartnershipPosts from "@/components/BrandPartnershipPosts";
 import BrandMatchSearch from "@/components/BrandMatchSearch";
+import SaveBrandButton from "@/components/SaveBrandButton";
 import { matchNiches } from "@/lib/matchSearch";
 import MatchScoreBreakdown from "@/components/MatchScoreBreakdown";
 import AiMatchesSection from "@/components/AiMatchesSection";
@@ -155,6 +156,7 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <SaveBrandButton brandId={match.brand_raw_id} name={match.brand_name} niche={match.niche} />
             {fitConfidence === undefined ? <ScoreRing match={match} size={44} /> : (
               <span className="rounded-full border border-primary/30 bg-primary/15 px-3 py-1 text-xs font-bold text-white cursor-default">{fitConfidence}% fit</span>
             )}

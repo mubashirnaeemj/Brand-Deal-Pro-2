@@ -30,6 +30,9 @@ export function installAiMatchesApi() {
   const requests: RequestRecord[] = [];
   const unexpected: string[] = [];
   const responders = new Map<string, Responder>();
+  // The creator's saved brands (GET /saved-brands/me, POST /saved-brands, DELETE /saved-brands/{id}), kept in memory.
+  const savedBrands: { brand_id: number; name: string; niche: string; short_bio: string | null; saved_at: string }[] = [];
+  const savedCalls: string[] = [];
   for (const version of ["v2", "v3"] as const) {
     responders.set(`GET ${version}`, () => ({ body: ranking("completed") }));
     responders.set(`POST ${version}`, () => ({ body: ranking("queued") }));
@@ -38,6 +41,24 @@ export function installAiMatchesApi() {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), window.location.origin);
     const method = init?.method ?? "GET";
+    const saved = /^\/api\/mavlit\/saved-brands(?:\/(me|\d+))?$/.exec(url.pathname);
+    if (saved) {
+      const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+      savedCalls.push(`${method} ${saved[1] ?? ""}`.trim());
+      if (method === "GET" && saved[1] === "me") return json(savedBrands);
+      if (method === "POST" && !saved[1]) {
+        const { brand_id } = JSON.parse(String(init?.body));
+        if (!savedBrands.some((brand) => brand.brand_id === brand_id)) savedBrands.push({ brand_id, name: `brand ${brand_id}`, niche: "", short_bio: null, saved_at: "2026-10-26T00:00:00Z" });
+        return json({ brand_id, saved: true });
+      }
+      if (method === "DELETE" && saved[1] && saved[1] !== "me") {
+        const index = savedBrands.findIndex((brand) => String(brand.brand_id) === saved[1]);
+        if (index >= 0) savedBrands.splice(index, 1);
+        return json({ brand_id: Number(saved[1]), saved: false });
+      }
+      unexpected.push(`${method} ${url}`);
+      throw new Error(`Unexpected saved-brands request: ${method} ${url}`);
+    }
     const route = /^\/api\/mavlit\/matches\/me\/(v2|v3)(\/refresh)?$/.exec(url.pathname);
     if (!route) {
       // The profile fixture rejects every unlisted route, including V1.
@@ -58,7 +79,7 @@ export function installAiMatchesApi() {
   }));
 
   return {
-    profile, requests,
+    profile, requests, savedBrands, savedCalls,
     calls(method: "GET" | "POST", version: AiMatchesVersion = "v3") {
       return requests.filter((request) => request.method === method && request.version === version);
     },

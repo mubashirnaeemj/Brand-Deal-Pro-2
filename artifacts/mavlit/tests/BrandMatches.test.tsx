@@ -535,6 +535,40 @@ describe("Matches page V3 integration", () => {
     expect(screen.getAllByRole("article")).toHaveLength(1);
   });
 
+  it("lets the creator save and unsave a brand from its card and from the details panel", async () => {
+    const aiFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input), window.location.origin).pathname;
+      const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (path === "/api/mavlit/brands/10") return json({ brand_id: 10, name: "Alpha Audio", top_contact: null, other_contacts: [] });
+      if (path === "/api/mavlit/matches/me/brands/10/posts") return json({ brand_raw_id: 10, brand_name: "Alpha Audio", posts: [] });
+      return aiFetch(input, init);
+    }));
+    mountMatches();
+    await settle();
+    const cardButton = () => within(screen.getByTestId("card-ai-brand-10")).getByTestId("button-save-brand-10");
+    expect(cardButton()).toHaveTextContent("Save");
+    expect(cardButton()).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(cardButton());
+    await settle();
+    expect(cardButton()).toHaveTextContent("Saved");
+    expect(cardButton()).toHaveAttribute("aria-pressed", "true");
+    expect(fixture.savedBrands.map((brand) => brand.brand_id)).toEqual([10]);           // POST /saved-brands reached the server
+    expect(screen.queryByText("Contact Intel")).not.toBeInTheDocument();                // clicking Save does not open the details
+
+    // The details panel shows the same state and can unsave.
+    fireEvent.click(screen.getByTestId("card-ai-brand-10"));
+    await settle();
+    const panelButton = () => screen.getAllByTestId("button-save-brand-10").find((button) => !screen.getByTestId("card-ai-brand-10").contains(button))!;
+    expect(panelButton()).toHaveTextContent("Saved");
+    fireEvent.click(panelButton());
+    await settle();
+    expect(fixture.savedBrands).toEqual([]);                                             // DELETE /saved-brands/10
+    expect(cardButton()).toHaveTextContent("Save");
+    expect(fixture.savedCalls).toEqual(["GET me", "POST", "DELETE 10"]);                 // one list request, shared by every button
+  });
+
   it("labels brands with a fit above 80% as the most relevant brand", async () => {
     fixture.respond("GET", ranking("completed", { matches: [
       { brand_raw_id: 10, brand_name: "Alpha Audio", niche: "Music", rank: 1, confidence: 96, reason: "x" },

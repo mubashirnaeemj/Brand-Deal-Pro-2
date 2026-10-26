@@ -1,8 +1,15 @@
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AiMatchesSection from "@/components/AiMatchesSection";
 import { rankedBrands, ranking } from "./fixtures/aiMatchesApi";
+
+// The cards' Save buttons read the saved-brands list; here it is simply empty.
+beforeEach(() => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } })));
+});
+afterEach(() => { vi.unstubAllGlobals(); });
 
 function mount(overrides: Partial<ComponentProps<typeof AiMatchesSection>> = {}) {
   const props: ComponentProps<typeof AiMatchesSection> = {
@@ -12,7 +19,9 @@ function mount(overrides: Partial<ComponentProps<typeof AiMatchesSection>> = {})
     onToggleReasons: vi.fn(), search: "", preferences: "Avoid Unwanted Amplifiers",
     ...overrides,
   };
-  return { ...render(<AiMatchesSection {...props} />), props };
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return { ...render(<AiMatchesSection {...props} />, { wrapper }), props };
 }
 
 describe("V3 ranking presentation", () => {

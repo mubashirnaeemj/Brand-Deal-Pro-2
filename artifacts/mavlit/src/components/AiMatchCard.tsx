@@ -2,6 +2,7 @@ import type { AiRankedMatch, AiMatchesVersion } from "@/lib/aiMatches";
 import BrandMatchReasons, { CARD_REASON_LIMIT } from "./BrandMatchReasons";
 import BrandLogo from "./BrandLogo";
 import { Star } from "lucide-react";
+import SaveBrandButton from "./SaveBrandButton";
 import { nicheTextClass } from "@/lib/nicheColors";
 
 // A fit above this percentage earns the "Most relevant brand" label.
@@ -67,9 +68,12 @@ export default function AiMatchCard({ match, expanded, onToggle, onOpen, version
           </div>
         </div>
         <div className="shrink-0">
-        <span className="inline-block cursor-default rounded-md bg-primary/15 px-2 py-0.5 text-xs font-bold text-primary">
-          {match.confidence}% fit
-        </span>
+        <div className="flex items-center justify-end gap-2">
+          <SaveBrandButton brandId={match.brand_raw_id} name={match.brand_name} niche={match.niche} />
+          <span className="inline-block cursor-default rounded-md bg-primary/15 px-2 py-0.5 text-xs font-bold text-primary">
+            {match.confidence}% fit
+          </span>
+        </div>
         {version === "v3" && <div role="progressbar" aria-label={`${match.brand_name} confidence`}
           aria-valuemin={0} aria-valuemax={100} aria-valuenow={match.confidence}
           className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-primary/15">

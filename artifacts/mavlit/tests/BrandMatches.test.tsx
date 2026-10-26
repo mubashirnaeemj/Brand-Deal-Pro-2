@@ -663,9 +663,11 @@ describe("Matches page V3 integration", () => {
     fireEvent.click(screen.getByTestId("button-ai-reasons-10"));        // "Show all reasons"
     await settle();
     expect(screen.queryByText("Contact Intel", { selector: "p" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "View brand details" }));
+    expect(screen.queryByRole("button", { name: "View brand details" })).not.toBeInTheDocument();   // Contact Intel is the way in now
+    fireEvent.click(screen.getByTestId("button-contact-intel-10"));
     await settle();
     expect(screen.getByText("Contact Intel", { selector: "p" })).toBeInTheDocument();
+    expect(within(screen.getByTestId("card-ai-brand-10")).getByText("Why it's a match")).toHaveClass("font-bold", "text-white");
   });
 
   it("renders backend order including unwanted brands and restores it after search", async () => {

@@ -98,7 +98,7 @@ export default function AiMatchCard({ match, expanded, onToggle, onOpen, version
       </div>
       <div className="flex flex-1 flex-col gap-3 px-6 pb-6">
         <div className="h-px bg-border" />
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Why it's a match</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-white">Why it's a match</p>
         {match.reason && (
           <p data-testid={`text-ai-reason-${match.brand_raw_id}`} className="text-sm leading-relaxed text-muted-foreground">{match.reason}</p>
         )}
@@ -115,10 +115,6 @@ export default function AiMatchCard({ match, expanded, onToggle, onOpen, version
             {expanded ? "Show less" : `Show all ${reasons.length} reasons`}
           </button>
         )}
-        {version === "v3" && website && <button type="button" onClick={onOpen}
-          className="self-start pt-2 text-xs font-semibold text-primary hover:underline">
-          View brand details
-        </button>}
         <button type="button" onClick={onOpen} data-testid={`button-contact-intel-${match.brand_raw_id}`}
           className="mt-auto flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-[hsl(240_10%_8%)] px-4 py-3 text-left transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
           <span className="min-w-0">

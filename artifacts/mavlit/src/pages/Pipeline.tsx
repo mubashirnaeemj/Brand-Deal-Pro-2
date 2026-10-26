@@ -118,15 +118,6 @@ function Spin() {
   return <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }} className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full shrink-0" />;
 }
 
-function OutputBox({ text }: { text: string }) {
-  return (
-    <div className="relative bg-black/60 border border-border rounded-xl p-4">
-      <pre className="font-mono text-xs text-white/90 whitespace-pre-wrap leading-relaxed pr-16">{text}</pre>
-      <div className="absolute top-3 right-3"><CopyBtn text={text} /></div>
-    </div>
-  );
-}
-
 // ── Brand icon/initial helper ──────────────────────────────────────────────────
 
 function BrandAvatar({ brand }: { brand: string }) {
@@ -717,16 +708,10 @@ function RateEstimator({ dealContext, brand }: { dealContext: DealContext; brand
   const creatorRate = deliverable ? readCreatorRate(DEAL_PLATFORM, deliverable) : null;
   const ready = !!brand?.name && !!deliverable;
 
-  // The inputs as the API takes them. The months only count for Narrow / Broad exclusivity, as a whole number (the
-  // API takes an integer) from 1 to 36.
-  const months = Number(exclusivityMonths);
   const inputs = {
     ...(brand?.id ? { brand_id: brand.id } : {}),
     brand_name: brand?.name ?? "",
-    deliverable_type: deliverable,
-    ...(exclusivity ? { exclusivity } : {}),
-    ...(usage ? { usage } : {}),
-    ...((exclusivity === "Narrow" || exclusivity === "Broad") && months > 0 ? { duration_months: Math.min(36, Math.max(1, Math.round(months))) } : {}),
+    ...dealTerms(dealContext),
   };
 
   // The estimate already made for exactly these inputs is kept on the server, so it is still here after a reload.
@@ -865,17 +850,41 @@ function RateEstimator({ dealContext, brand }: { dealContext: DealContext; brand
 
 // ── Contract Advice ────────────────────────────────────────────────────────────
 
-function ContractAdvice({ contactType, dealContext }: { contactType?: "agency" | "in-house"; dealContext: DealContext }) {
+interface ContractAdviceResult {
+  id: number;
+  looks_good: boolean | null;
+  issues: string[];
+  deal_comparison: string[];
+  summary: string | null;
+}
+
+const CONTRACT_MAX_CHARS = 20000;
+
+function ContractAdvice({ contactType, dealContext, brandName }: { contactType?: "agency" | "in-house"; dealContext: DealContext; brandName: string }) {
   const [text, setText]      = useState("");
   const [generating, setGen] = useState(false);
-  const [output, setOutput]  = useState<string | null>(null);
+  const [result, setResult]  = useState<ContractAdviceResult | null>(null);
   const [error, setError]    = useState<string | null>(null);
+  const terms = dealTerms(dealContext);
+  const termsSet = Object.keys(terms).length > 0;
 
   const analyze = async () => {
-    if (!text.trim()) return;
-    // Placeholder: the AI contract review is not connected yet.
-    setOutput(null);
-    setError("This feature isn't available yet.");
+    const contract = text.trim();
+    if (!contract || generating) return;
+    setGen(true);
+    setError(null);
+    try {
+      setResult(await api.post<ContractAdviceResult>("/contract-advice", {
+        contract_text: contract,
+        ...(brandName ? { brand_name: brandName } : {}),
+        ...terms,
+      }));
+    } catch (err) {
+      setResult(null);
+      setError(err instanceof ApiRequestError && err.status === 502
+        ? "The review could not be completed. Please try again in a moment."
+        : err instanceof Error ? err.message : "Couldn't review the contract.");
+    } finally { setGen(false); }
   };
 
   return (
@@ -893,18 +902,63 @@ function ContractAdvice({ contactType, dealContext }: { contactType?: "agency" |
 
       <div>
         <p className="text-xs font-semibold text-white/70 mb-1.5">Paste your contract text</p>
-        <textarea value={text} onChange={e => setText(e.target.value)} rows={7}
+        <textarea value={text} onChange={e => setText(e.target.value)} rows={7} maxLength={CONTRACT_MAX_CHARS}
+          aria-label="Contract text"
           placeholder="Paste the contract or the specific clauses you want reviewed…"
           className="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-border text-white text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 resize-none transition-all" />
+        <div className="mt-1 flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
+          <span data-testid="contract-terms-hint">
+            {termsSet
+              ? "The contract will also be compared with the deal terms you set above."
+              : "Set a Deliverable type, Exclusivity and Usage in the Deal context above to compare the contract with your terms."}
+          </span>
+          <span className="shrink-0">{text.length.toLocaleString()}/{CONTRACT_MAX_CHARS.toLocaleString()}</span>
+        </div>
       </div>
 
-      <button onClick={analyze} disabled={!text.trim() || generating}
+      <button onClick={analyze} disabled={!text.trim() || generating} data-testid="button-analyze-contract"
         className="w-full py-3 rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 disabled:opacity-40 text-white transition-all flex items-center justify-center gap-2">
         {generating ? <><Spin />Analyzing…</> : <><Sparkles size={13} />✦ Analyze contract</>}
       </button>
 
-      {error && <p className="text-xs text-red-400">{error}</p>}
-      {output && <OutputBox text={output} />}
+      {error && <p role="alert" className="text-xs text-red-400">{error}</p>}
+
+      {result && (
+        <div className="space-y-4" data-testid="contract-result">
+          <div data-testid="contract-verdict"
+            className={`px-4 py-3 rounded-xl border text-sm font-semibold ${result.looks_good === false
+              ? "bg-amber-500/10 border-amber-500/30 text-amber-200" : "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"}`}>
+            {result.looks_good === false ? "Worth a closer look before you sign" : "No major concerns found"}
+          </div>
+          {result.summary && <p className="text-xs text-white/80 leading-relaxed">{result.summary}</p>}
+          {result.issues.length > 0 && (
+            <div className="bg-card border border-border rounded-xl p-4 space-y-2" data-testid="contract-issues">
+              <p className="text-xs font-bold text-white uppercase tracking-wider">Things to look at</p>
+              <ul className="space-y-2">
+                {result.issues.map((issue, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <AlertTriangle size={12} className="mt-0.5 shrink-0 text-amber-400" />
+                    <span className="text-xs text-white/80 leading-relaxed">{issue}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {result.deal_comparison.length > 0 && (
+            <div className="bg-card border border-border rounded-xl p-4 space-y-2" data-testid="contract-comparison">
+              <p className="text-xs font-bold text-white uppercase tracking-wider">Compared with your deal terms</p>
+              <ul className="space-y-2">
+                {result.deal_comparison.map((line, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-1 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                    <span className="text-xs text-white/80 leading-relaxed">{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Static educational checklist — always visible */}
       <div className="bg-card border border-border rounded-xl p-5 space-y-4">
@@ -1010,6 +1064,18 @@ function DealContextPanel({ value, onChange }: { value: DealContext; onChange: (
       </div>
     </div>
   );
+}
+
+// The Deal context as the API takes it. The months only count for Narrow / Broad exclusivity, as a whole number (the
+// API takes an integer) from 1 to 36. Empty choices are left out.
+function dealTerms(ctx: DealContext) {
+  const months = Number(ctx.exclusivityMonths);
+  return {
+    ...(ctx.deliverable ? { deliverable_type: ctx.deliverable } : {}),
+    ...(ctx.exclusivity ? { exclusivity: ctx.exclusivity } : {}),
+    ...(ctx.usage ? { usage: ctx.usage } : {}),
+    ...((ctx.exclusivity === "Narrow" || ctx.exclusivity === "Broad") && months > 0 ? { duration_months: Math.min(36, Math.max(1, Math.round(months))) } : {}),
+  };
 }
 
 // ── Brand search ───────────────────────────────────────────────────────────────
@@ -1198,7 +1264,7 @@ function DealMakerTab({
         isOpen={openCard === "contract"}
         onToggle={() => toggle("contract")}
       >
-        <ContractAdvice contactType={brandInfo?.type} dealContext={dealContext} />
+        <ContractAdvice contactType={brandInfo?.type} dealContext={dealContext} brandName={brandName} />
       </AccordionCard>
 
     </div>

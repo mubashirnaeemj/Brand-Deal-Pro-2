@@ -16,6 +16,8 @@ const pitch = (id: number, brand: string) => ({
 
 let pitches: ReturnType<typeof pitch>[];
 let rateRequests: Record<string, unknown>[];
+let contractRequests: Record<string, unknown>[];
+let contractStatus: number;
 let savedEstimates: Record<string, unknown>[];   // what the server has kept (GET /rate-intelligence/latest)
 let deleteCalls: string[];
 let deleteStatus: number;
@@ -26,6 +28,8 @@ beforeEach(() => {
   deleteCalls = [];
   rateRequests = [];
   savedEstimates = [];
+  contractRequests = [];
+  contractStatus = 200;
   deleteStatus = 200;
   profileApi = installProfileApi(creatorProfile());
   const base = globalThis.fetch;
@@ -33,6 +37,16 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), window.location.origin);
     if (url.pathname === "/api/mavlit/pitches/me") return json({ pitches, total: pitches.length });
+    if (url.pathname === "/api/mavlit/contract-advice" && init?.method === "POST") {
+      contractRequests.push(JSON.parse(String(init.body)));
+      if (contractStatus !== 200) return json({ detail: "Contract review failed" }, contractStatus);
+      return json({
+        id: 1, looks_good: false, summary: "This contract asks for far more than the deal you expect.",
+        issues: ["Usage rights are perpetual and cover paid ads.", "No cancellation fee if the brand cancels."],
+        deal_comparison: ["Exclusivity: asks for more than expected: 12 months across the whole category, not 3 months on one product."],
+        created_at: "2026-10-26T09:30:00Z",
+      });
+    }
     if (url.pathname === "/api/mavlit/rate-intelligence/latest") {
       const q = url.searchParams;
       if (!q.get("deliverable_type")) return json(savedEstimates.at(-1) ?? null);            // the newest estimate of all
@@ -232,6 +246,52 @@ describe("Deal Tools", () => {
     expect(input).toHaveValue("");
     fireEvent.click(screen.getByText("Rate Intelligence"));
     expect(screen.getByText(/Choose the/)).toBeInTheDocument();
+  });
+
+  it("Contract Advice sends the contract with the deal terms and shows the verdict, issues and the comparison", async () => {
+    const input = await openDealTools();
+    fireEvent.click(screen.getByText("Contract Advice"));
+    expect(screen.getByTestId("contract-terms-hint")).toHaveTextContent("Set a Deliverable type, Exclusivity and Usage");
+    const analyze = () => screen.getByTestId("button-analyze-contract");
+    expect(analyze()).toBeDisabled();                                                    // nothing pasted yet
+
+    fireEvent.change(input, { target: { value: "Alpha" } });
+    fireEvent.mouseDown(within(screen.getByTestId("list-deal-brands")).getByRole("option", { name: "Alpha Audio" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reel" }));
+    fireEvent.click(screen.getByRole("button", { name: /Narrow/ }));
+    fireEvent.change(screen.getByPlaceholderText("Duration (months)"), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: "Organic only" }));
+    expect(screen.getByTestId("contract-terms-hint")).toHaveTextContent("compared with the deal terms you set above");
+
+    fireEvent.change(screen.getByLabelText("Contract text"), { target: { value: "  Exclusivity for 12 months in the whole category.  " } });
+    expect(analyze()).toBeEnabled();
+    fireEvent.click(analyze());
+    expect(await screen.findByTestId("contract-result")).toBeInTheDocument();
+    expect(contractRequests).toEqual([{
+      contract_text: "Exclusivity for 12 months in the whole category.", brand_name: "Alpha Audio",
+      deliverable_type: "Reel", exclusivity: "Narrow", usage: "Organic only", duration_months: 3,
+    }]);
+    expect(screen.getByTestId("contract-verdict")).toHaveTextContent("Worth a closer look before you sign");
+    expect(screen.getByText("This contract asks for far more than the deal you expect.")).toBeInTheDocument();
+    expect(within(screen.getByTestId("contract-issues")).getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.getByTestId("contract-comparison")).toHaveTextContent("12 months across the whole category, not 3 months on one product");
+    expect(screen.queryByText("This feature isn't available yet.")).not.toBeInTheDocument();
+  });
+
+  it("Contract Advice works without deal terms, and shows a message when the review fails", async () => {
+    await openDealTools();
+    fireEvent.click(screen.getByText("Contract Advice"));
+    fireEvent.change(screen.getByLabelText("Contract text"), { target: { value: "Some clauses" } });
+    contractStatus = 502;
+    fireEvent.click(screen.getByTestId("button-analyze-contract"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The review could not be completed. Please try again in a moment.");
+    expect(contractRequests).toEqual([{ contract_text: "Some clauses" }]);                  // no terms, no brand
+    expect(screen.queryByTestId("contract-result")).not.toBeInTheDocument();
+
+    contractStatus = 200;
+    fireEvent.click(screen.getByTestId("button-analyze-contract"));
+    expect(await screen.findByTestId("contract-result")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();                             // the error clears
   });
 
   it("sends only the brand name for a brand that was not pitched, and Instagram Live as the deliverable", async () => {

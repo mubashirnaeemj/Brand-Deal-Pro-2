@@ -1,8 +1,10 @@
+import { useEffect, useRef, useState } from "react";
 import { RefreshCw, Loader2 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { AiMatchesResponse, AiRankedMatch, AiMatchesVersion } from "@/lib/aiMatches";
 import AiMatchCard from "./AiMatchCard";
 import BrandMatchNicheChips from "./BrandMatchNicheChips";
+import MatchPagination, { MATCHES_PER_PAGE } from "./MatchPagination";
 import { filterBrandMatches, filterByNiche } from "@/lib/matchSearch";
 import { Link } from "wouter";
 
@@ -61,6 +63,19 @@ export default function AiMatchesSection({ version, data, loading, error, refres
   const allMatches = data?.matches ?? [];
   const matches = savedIds ? allMatches.filter((match) => savedIds.has(match.brand_raw_id)) : allMatches;
   const filtered = filterBrandMatches(filterByNiche(matches, niches), search);
+
+  // 30 brands per page, in rank order. A new search, niche choice or tab starts again at page 1.
+  const [page, setPage] = useState(1);
+  const gridTop = useRef<HTMLDivElement>(null);
+  const filterKey = JSON.stringify([search.trim(), niches, !!savedIds]);
+  useEffect(() => { setPage(1); }, [filterKey]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / MATCHES_PER_PAGE));
+  const currentPage = Math.min(page, pageCount);   // e.g. the last card of the last page was unsaved
+  const visible = filtered.slice((currentPage - 1) * MATCHES_PER_PAGE, currentPage * MATCHES_PER_PAGE);
+  const goToPage = (next: number) => {
+    setPage(next);
+    gridTop.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  };
   const busy = refreshing || pending;
   const ranked = formatRanked(data?.ranked_at);
   const meta = ranked ? `Ranked ${ranked} · ${data?.total ?? matches.length} brands` : "";
@@ -148,15 +163,18 @@ export default function AiMatchesSection({ version, data, loading, error, refres
                 </p>
               )}
               {filtered.length > 0 ? (
-                <div aria-busy={version === "v3" && busy}
-                  className={`grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 ${version === "v3" && busy ? "opacity-50" : ""}`}>
-                  {filtered.map((match) => (
+                <>
+                <div ref={gridTop} aria-busy={version === "v3" && busy} data-testid="grid-matches"
+                  className={`scroll-mt-28 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 ${version === "v3" && busy ? "opacity-50" : ""}`}>
+                  {visible.map((match) => (
                     <AiMatchCard key={match.brand_raw_id} match={match} version={version}
                       expanded={expandedByBrand[match.brand_raw_id] ?? false}
                       onToggle={() => onToggleReasons(match.brand_raw_id)}
                       onOpen={() => onOpen(match)} />
                   ))}
                 </div>
+                <MatchPagination page={currentPage} pageCount={pageCount} total={filtered.length} onChange={goToPage} />
+                </>
               ) : (
                 <div className="py-16 text-center text-muted-foreground">
                   <p>{search.trim() ? `No brands match “${search.trim()}”${niches.length ? ` in ${niches.join(", ")}` : ""}.` : `No matches in ${niches.join(", ")}.`}</p>

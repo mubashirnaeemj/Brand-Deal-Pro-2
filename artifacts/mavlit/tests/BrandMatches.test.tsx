@@ -688,6 +688,53 @@ describe("Matches page V3 integration", () => {
     expect(list().querySelectorAll("li")).toHaveLength(2);
   });
 
+  it("shows 30 brands per page, in rank order, with page buttons", async () => {
+    const many = Array.from({ length: 67 }, (_, i) => ({
+      brand_raw_id: 1000 + i, brand_name: `Brand ${String(i + 1).padStart(2, "0")}`, niche: i % 2 ? "Tech" : "Music",
+      rank: i + 1, confidence: 90 - Math.floor(i / 2), reason: "x",
+    }));
+    fixture.respond("GET", ranking("completed", { matches: many, total: many.length }));
+    mountMatches();
+    await settle();
+    const ids = () => screen.getAllByRole("article").map((card) => card.getAttribute("data-testid"));
+    const pagination = () => screen.getByTestId("match-pagination");
+
+    expect(ids()).toHaveLength(30);
+    expect(ids()[0]).toBe("card-ai-brand-1000");
+    expect(ids()[29]).toBe("card-ai-brand-1029");
+    expect(screen.getByTestId("text-match-range")).toHaveTextContent("Showing 1–30 of 67 brands");
+    expect(screen.getByTestId("button-page-prev")).toBeDisabled();
+    expect(screen.getByTestId("button-page-1")).toHaveAttribute("aria-current", "page");
+    expect(within(pagination()).getAllByRole("button", { name: /^Page \d+$/ }).map((b) => b.textContent)).toEqual(["1", "2", "3"]);
+
+    fireEvent.click(screen.getByTestId("button-page-next"));
+    expect(ids()).toHaveLength(30);
+    expect(ids()[0]).toBe("card-ai-brand-1030");                                                      // the next 30, not a repeat
+    expect(screen.getByTestId("text-match-range")).toHaveTextContent("Showing 31–60 of 67 brands");
+    expect(screen.getByTestId("button-page-2")).toHaveAttribute("aria-current", "page");
+
+    fireEvent.click(screen.getByTestId("button-page-3"));
+    expect(ids()).toHaveLength(7);
+    expect(ids()[6]).toBe("card-ai-brand-1066");
+    expect(screen.getByTestId("text-match-range")).toHaveTextContent("Showing 61–67 of 67 brands");
+    expect(screen.getByTestId("button-page-next")).toBeDisabled();
+
+    // A new search, or a niche, starts again at page 1 and pages only the brands that match.
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search brand matches" }), { target: { value: "Brand 1" } });
+    expect(screen.queryByTestId("match-pagination")).not.toBeInTheDocument();                         // "Brand 1" matches Brand 10 to Brand 19: 10 brands, one page
+    expect(ids()).toHaveLength(10);
+    fireEvent.click(screen.getByRole("button", { name: "Clear brand search" }));
+    expect(screen.getByTestId("button-page-1")).toHaveAttribute("aria-current", "page");              // back on page 1 after clearing
+    expect(ids()[0]).toBe("card-ai-brand-1000");
+  });
+
+  it("shows no page buttons when everything fits on one page", async () => {
+    mountMatches();
+    await settle();
+    expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(screen.queryByTestId("match-pagination")).not.toBeInTheDocument();
+  });
+
   it("has a Saved tab that shows only the matched brands the creator saved", async () => {
     fixture.respond("GET", ranking("completed", { matches: [
       { brand_raw_id: 10, brand_name: "Alpha Audio", niche: "Music", rank: 1, confidence: 96, reason: "x" },

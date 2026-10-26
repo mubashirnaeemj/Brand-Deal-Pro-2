@@ -588,6 +588,13 @@ describe("Matches page V3 integration", () => {
     expect(card.getAllByRole("progressbar")).toHaveLength(1);          // and so is the straight bar
   });
 
+  it("starts with the page heading, without the Brand Matches badge line above it", async () => {
+    mountMatches();
+    await settle();
+    expect(screen.getByRole("heading", { level: 1, name: "Your Brand Matches" })).toBeInTheDocument();
+    expect(screen.queryByText("Based on your creator profile")).not.toBeInTheDocument();
+  });
+
   it("shows a larger brand logo on the card and the same logo in the Contact Intel panel", async () => {
     stubBrandDetail();
     const reasons = ["One"];

@@ -3,7 +3,7 @@ import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
-  CheckCircle2, Music, X, Copy, Check, AlertTriangle, Linkedin, ExternalLink,
+  CheckCircle2, X, Copy, Check, AlertTriangle, Linkedin, ExternalLink,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -286,12 +286,6 @@ export default function BrandMatches() {
         <div className="max-w-6xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }} className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/30">
-                <Music size={11} />Brand Matches
-              </span>
-              <span className="text-muted-foreground text-xs">Based on your creator profile</span>
-            </div>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-4">
               <h1 className="text-4xl font-extrabold text-white tracking-tight">Your Brand Matches</h1>
             </div>

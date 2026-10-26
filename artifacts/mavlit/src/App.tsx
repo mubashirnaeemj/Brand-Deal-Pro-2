@@ -16,7 +16,6 @@ import Pipeline from "@/pages/Pipeline";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
 import Login from "@/pages/Login";
-import BrandCatalog from "@/pages/BrandCatalog";
 import { AuthProvider, isProfileComplete, useAuth } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -49,7 +48,6 @@ function Router() {
       <Route path="/home" component={Home} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
-      <Route path="/brand-catalog" component={BrandCatalog} />
       <Route path="/creator-profile" component={ProfileSettings} />
       <Route path="/brand-matches" component={BrandMatches} />
       <Route path="/brands/:slug" component={BrandDetail} />

@@ -667,7 +667,10 @@ describe("Matches page V3 integration", () => {
     fireEvent.click(screen.getByTestId("button-contact-intel-10"));
     await settle();
     expect(screen.getByText("Contact Intel", { selector: "p" })).toBeInTheDocument();
-    expect(within(screen.getByTestId("card-ai-brand-10")).getByText("Why it's a match")).toHaveClass("font-bold", "text-white");
+    const card = within(screen.getByTestId("card-ai-brand-10"));
+    expect(card.getByText("Why it's a match")).toHaveClass("font-bold", "text-white");
+    expect(card.getByTestId("text-ai-reason-10")).toHaveClass("font-bold");              // the paragraph is bold
+    expect(card.getByText("One").closest("li")).not.toHaveClass("font-bold");           // the bullet reasons are not
   });
 
   it("renders backend order including unwanted brands and restores it after search", async () => {

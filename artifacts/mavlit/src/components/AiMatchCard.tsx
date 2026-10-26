@@ -100,7 +100,7 @@ export default function AiMatchCard({ match, expanded, onToggle, onOpen, version
         <div className="h-px bg-border" />
         <p className="text-xs font-bold uppercase tracking-wider text-white">Why it's a match</p>
         {match.reason && (
-          <p data-testid={`text-ai-reason-${match.brand_raw_id}`} className="text-sm leading-relaxed text-muted-foreground">{match.reason}</p>
+          <p data-testid={`text-ai-reason-${match.brand_raw_id}`} className="text-sm font-bold leading-relaxed text-muted-foreground">{match.reason}</p>
         )}
         {reasons.length > 0 && (
           <BrandMatchReasons reasons={expanded ? reasons : reasons.slice(0, CARD_REASON_LIMIT)} />

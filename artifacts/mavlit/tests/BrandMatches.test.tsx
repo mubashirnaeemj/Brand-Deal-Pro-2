@@ -636,6 +636,30 @@ describe("Matches page V3 integration", () => {
     expect(window.location.pathname + window.location.search).toBe("/pitch?brand=Alpha%20Audio");
   });
 
+  it("shows the total next to Creator partnership posts and keeps a long list in a scrollable box", async () => {
+    const aiFetch = globalThis.fetch;
+    const posts = Array.from({ length: 14 }, (_, i) => ({
+      source: "instagram", post_url: `https://www.instagram.com/p/POST${i}/`, post_date: `2026-09-${String(i + 1).padStart(2, "0")}`,
+      sponsorship_confidence: 95, creators: [`creator${i}`],
+    }));
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input), window.location.origin).pathname;
+      const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (path === "/api/mavlit/brands/10") return json({ brand_id: 10, name: "Alpha Audio", top_contact: null, other_contacts: [] });
+      if (path === "/api/mavlit/matches/me/brands/10/posts") return json({ brand_raw_id: 10, brand_name: "Alpha Audio", posts });
+      return aiFetch(input, init);
+    }));
+    mountMatches();
+    await settle();
+    fireEvent.click(screen.getByTestId("button-ai-brand-10"));
+    await settle();
+    expect(screen.getByTestId("text-partnership-posts-total")).toHaveTextContent("(14)");
+    const list = screen.getByTestId("list-partnership-posts");
+    expect(list.className).toContain("max-h-72");
+    expect(list.className).toContain("overflow-y-auto");
+    expect(list.querySelectorAll("li")).toHaveLength(14);                    // every post is in the list; the box scrolls
+  });
+
   it("labels brands with a fit above 80% as the most relevant brand", async () => {
     fixture.respond("GET", ranking("completed", { matches: [
       { brand_raw_id: 10, brand_name: "Alpha Audio", niche: "Music", rank: 1, confidence: 96, reason: "x" },

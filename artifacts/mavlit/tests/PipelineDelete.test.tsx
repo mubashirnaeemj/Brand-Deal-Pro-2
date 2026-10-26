@@ -158,6 +158,26 @@ describe("Deal Tools", () => {
     expect(screen.getByTestId("button-estimate-rate")).toBeInTheDocument();
   });
 
+  it("sends the exclusivity months only for Narrow or Broad, as a whole number", async () => {
+    const input = await openDealTools();
+    fireEvent.click(screen.getByText("Rate Intelligence"));
+    fireEvent.change(input, { target: { value: "Alpha" } });
+    fireEvent.mouseDown(within(screen.getByTestId("list-deal-brands")).getByRole("option", { name: "Alpha Audio" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reel" }));
+    fireEvent.click(screen.getByRole("button", { name: /Narrow/ }));
+    fireEvent.change(screen.getByPlaceholderText("Duration (months)"), { target: { value: "2.5" } });
+    fireEvent.click(screen.getByTestId("button-estimate-rate"));
+    await screen.findByTestId("rate-estimate");
+    expect(rateRequests[0]).toMatchObject({ exclusivity: "Narrow", duration_months: 3 });
+
+    // Switching to None hides the months box and the months are no longer sent, even though 2.5 is still typed.
+    fireEvent.click(screen.getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByTestId("button-estimate-rate"));
+    await waitFor(() => expect(rateRequests).toHaveLength(2));
+    expect(rateRequests[1]).toMatchObject({ exclusivity: "None" });
+    expect(rateRequests[1]).not.toHaveProperty("duration_months");
+  });
+
   it("sends only the brand name for a brand that was not pitched, and Instagram Live as the deliverable", async () => {
     const input = await openDealTools();
     fireEvent.click(screen.getByText("Rate Intelligence"));

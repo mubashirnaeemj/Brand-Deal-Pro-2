@@ -723,7 +723,8 @@ function RateEstimator({ dealContext, brand }: { dealContext: DealContext; brand
         deliverable_type: deliverable,
         ...(exclusivity ? { exclusivity } : {}),
         ...(usage ? { usage } : {}),
-        ...((exclusivity === "Narrow" || exclusivity === "Broad") && months > 0 ? { duration_months: months } : {}),
+        // Only for Narrow / Broad exclusivity; a whole number of months (the API takes an integer), 1 to 36.
+        ...((exclusivity === "Narrow" || exclusivity === "Broad") && months > 0 ? { duration_months: Math.min(36, Math.max(1, Math.round(months))) } : {}),
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't estimate the rate.");

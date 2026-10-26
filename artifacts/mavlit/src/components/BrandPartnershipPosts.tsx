@@ -43,7 +43,10 @@ export default function BrandPartnershipPosts({ brandId, brandName }: { brandId:
 
   return (
     <section className="rounded-xl border border-border bg-white/[0.03] p-4">
-      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Creator partnership posts</h3>
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Creator partnership posts
+        {data && <span data-testid="text-partnership-posts-total" className="ml-1.5 normal-case tracking-normal text-white/70">({data.posts.length})</span>}
+      </h3>
       {isLoading ? (
         <p role="status" className="text-sm text-muted-foreground">Loading partnership posts…</p>
       ) : error ? (
@@ -61,7 +64,7 @@ export default function BrandPartnershipPosts({ brandId, brandName }: { brandId:
       ) : !data?.posts.length ? (
         <p className="text-sm text-muted-foreground">No confirmed creator partnership posts for this brand yet.</p>
       ) : (
-        <ul className="space-y-3">
+        <ul data-testid="list-partnership-posts" className="max-h-72 space-y-3 overflow-y-auto pr-1">
           {data.posts.map((post, index) => {
             const url = postUrl(post.post_url);
             const creators = post.creators.map((creator) => creator.trim().replace(/^@/, "")).filter(Boolean);

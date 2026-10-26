@@ -67,11 +67,11 @@ export default function AiMatchesSection({ version, data, loading, error, refres
 
   return (
     <section data-testid={`section-matches-${version}`}>
-      <p className="mb-4 text-xs text-muted-foreground">
-        {version === "v3"
-          ? "MAVLIT AI ranking using your profile, match evidence, and brand preferences. Brands you want rank higher."
-          : "V2 — AI ranking: an LLM compares your profile (niche, tags, description) with each brand's description and tags."}
-      </p>
+      {version !== "v3" && (
+        <p className="mb-4 text-xs text-muted-foreground">
+          V2 — AI ranking: an LLM compares your profile (niche, tags, description) with each brand's description and tags.
+        </p>
+      )}
       {onNichesChange && <BrandMatchNicheChips matches={matches} value={niches} onChange={onNichesChange} />}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm text-muted-foreground" data-testid="text-ai-meta">{meta}</span>

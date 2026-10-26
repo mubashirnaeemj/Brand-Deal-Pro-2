@@ -522,9 +522,9 @@ describe("Matches page V3 integration", () => {
       .toEqual(["Music3", "Beauty2", "Tech2", "Finance1", "Fitness1", "Travel1"]);   // ties: A to Z
     expect(screen.queryByTestId("button-niches-more")).not.toBeInTheDocument();
     expect(screen.queryByText("View more")).not.toBeInTheDocument();
-    // Placed below the intro text.
-    const intro = screen.getByText(/MAVLIT AI ranking using your profile/);
-    expect(intro.compareDocumentPosition(screen.getByTestId("match-niches")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The old intro sentence is gone; the chips come before the refresh row.
+    expect(screen.queryByText(/MAVLIT AI ranking using your profile/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("match-niches").compareDocumentPosition(screen.getByTestId("button-ai-rerank")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // The chips use the default text colour; only the brand cards keep the niche colours.
     for (const chip of group.getAllByTestId("chip-niche")) {
       expect(chip.innerHTML).not.toMatch(/text-(violet|sky|pink|orange|emerald|fuchsia|amber|lime|yellow|red|cyan|teal|green|slate|indigo|blue|purple|rose)-/);

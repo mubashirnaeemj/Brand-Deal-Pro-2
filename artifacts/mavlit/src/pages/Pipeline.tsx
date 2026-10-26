@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Headphones, Music, Cpu, Camera, ShoppingBag, Zap,
-  ChevronDown, ChevronUp, Copy, Check, Sparkles, AlertTriangle, Building2, Users, BookOpen, Plus, Trash2,
+  ChevronDown, ChevronUp, Copy, Check, Sparkles, AlertTriangle, Building2, Users, BookOpen, Plus, Trash2, Search, X,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -24,7 +24,6 @@ interface PitchRecord {
 }
 
 interface DealContext {
-  platform: "" | "Instagram" | "TikTok" | "YouTube";
   deliverable: string;
   exclusivity: "" | "None" | "Narrow" | "Broad";
   exclusivityMonths: string;
@@ -47,17 +46,13 @@ const BRAND_DB: Record<string, {
 
 // ── Deal context data ──────────────────────────────────────────────────────────
 
-const DEAL_PLATFORMS = ["Instagram", "TikTok", "YouTube"] as const;
+// Every deal is for Instagram, so there is no platform choice.
+const DEAL_PLATFORM = "Instagram";
 
-const DELIVERABLES_BY_PLATFORM: Record<string, string[]> = {
-  "":          ["Reel", "TikTok video", "Story", "YouTube integration", "Static post"],
-  "Instagram": ["Reel", "Story", "Static post"],
-  "TikTok":    ["TikTok video"],
-  "YouTube":   ["YouTube integration"],
-};
+const DELIVERABLE_TYPES = ["Reel", "Story", "Static post", "Instagram Live"];
 
 const EMPTY_DEAL_CONTEXT: DealContext = {
-  platform: "", deliverable: "", exclusivity: "", exclusivityMonths: "", usage: "",
+  deliverable: "", exclusivity: "", exclusivityMonths: "", usage: "",
 };
 
 // ── Benchmark data (sample ranges — replace with real data) ────────────────────
@@ -83,16 +78,6 @@ const BENCHMARK_DATA: Record<string, BenchmarkRange> = {
   "Instagram|Static post|micro": { low: "$250",   median: "$480",   high: "$850",   sampleNote: "~55 reported deals" },
   "Instagram|Static post|mid":   { low: "$750",   median: "$1,500", high: "$2,800", sampleNote: "~35 reported deals" },
   "Instagram|Static post|macro": { low: "$2,500", median: "$5,000", high: "$9,000", sampleNote: "~14 reported deals" },
-  // TikTok × TikTok video
-  "TikTok|TikTok video|nano":  { low: "$100",   median: "$200",   high: "$400",    sampleNote: "~50 reported deals" },
-  "TikTok|TikTok video|micro": { low: "$300",   median: "$600",   high: "$1,200",  sampleNote: "~110 reported deals" },
-  "TikTok|TikTok video|mid":   { low: "$900",   median: "$1,800", high: "$3,500",  sampleNote: "~65 reported deals" },
-  "TikTok|TikTok video|macro": { low: "$3,000", median: "$6,500", high: "$12,000", sampleNote: "~22 reported deals" },
-  // YouTube × YouTube integration
-  "YouTube|YouTube integration|nano":  { low: "$200",   median: "$450",   high: "$800",    sampleNote: "~22 reported deals" },
-  "YouTube|YouTube integration|micro": { low: "$700",   median: "$1,500", high: "$3,000",  sampleNote: "~65 reported deals" },
-  "YouTube|YouTube integration|mid":   { low: "$2,000", median: "$4,500", high: "$9,000",  sampleNote: "~48 reported deals" },
-  "YouTube|YouTube integration|macro": { low: "$7,000", median: "$14,000","high": "$25,000",sampleNote: "~18 reported deals" },
 };
 
 const TIER_CONFIG: Record<FollowerTier, { label: string; range: string }> = {
@@ -741,8 +726,9 @@ function AccordionCard({ title, description, isOpen, onToggle, children }: {
 
 function RateEstimator({ dealContext }: { dealContext: DealContext }) {
   const [, setLocation] = useLocation();
-  const { platform, deliverable, exclusivity, usage } = dealContext;
-  const hasContext = !!(platform && deliverable);
+  const platform = DEAL_PLATFORM;
+  const { deliverable, exclusivity, usage } = dealContext;
+  const hasContext = !!deliverable;
 
   const followerCount = hasContext ? readCreatorFollowers(platform) : null;
   const followerTier  = followerCount !== null ? getFollowerTier(followerCount) : null;
@@ -805,7 +791,7 @@ function RateEstimator({ dealContext }: { dealContext: DealContext }) {
       {/* Empty state */}
       {!hasContext && (
         <div className="px-4 py-5 rounded-xl bg-secondary/40 border border-border text-center">
-          <p className="text-xs text-muted-foreground">Set a <span className="text-white font-medium">Platform</span> and <span className="text-white font-medium">Deliverable type</span> in the Deal context above to see benchmark ranges.</p>
+          <p className="text-xs text-muted-foreground">Set a <span className="text-white font-medium">Deliverable type</span> in the Deal context above to see benchmark ranges.</p>
         </div>
       )}
 
@@ -1056,15 +1042,9 @@ function PillGroup<T extends string>({
 
 function DealContextPanel({ value, onChange }: { value: DealContext; onChange: (ctx: DealContext) => void }) {
   const set = <K extends keyof DealContext>(key: K, val: DealContext[K]) => {
-    const next = { ...value, [key]: val };
-    if (key === "platform") {
-      const allowed = DELIVERABLES_BY_PLATFORM[val as string] ?? [];
-      if (next.deliverable && !allowed.includes(next.deliverable)) next.deliverable = "";
-    }
-    onChange(next);
+    onChange({ ...value, [key]: val });
   };
 
-  const deliverableOptions = DELIVERABLES_BY_PLATFORM[value.platform] ?? DELIVERABLES_BY_PLATFORM[""];
   const showMonths = value.exclusivity === "Narrow" || value.exclusivity === "Broad";
 
   return (
@@ -1076,14 +1056,8 @@ function DealContextPanel({ value, onChange }: { value: DealContext; onChange: (
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <PillGroup
-          label="Platform"
-          options={DEAL_PLATFORMS}
-          value={value.platform}
-          onChange={v => set("platform", v as DealContext["platform"])}
-        />
-        <PillGroup
           label="Deliverable type"
-          options={deliverableOptions}
+          options={DELIVERABLE_TYPES}
           value={value.deliverable as DealContext["deliverable"]}
           onChange={v => set("deliverable", v)}
         />
@@ -1123,6 +1097,94 @@ function DealContextPanel({ value, onChange }: { value: DealContext; onChange: (
   );
 }
 
+// ── Brand search ───────────────────────────────────────────────────────────────
+
+const CUSTOM_BRAND = "A brand I found myself";
+
+/**
+ * "Which brand are you working on?": type to search the brands you have pitched, or use whatever you typed as a
+ * brand you found yourself. `selected` is a pitched brand's name, CUSTOM_BRAND, or "" when nothing is chosen.
+ */
+function BrandSearch({ options, selected, custom, onSelect, onCustom }: {
+  options: string[];
+  selected: string;
+  custom: string;
+  onSelect: (brand: string) => void;
+  onCustom: (text: string) => void;
+}) {
+  const shown = selected === CUSTOM_BRAND ? custom : selected;
+  const [query, setQuery] = useState(shown);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  // A brand picked from outside (a pitch's "Use Deal Tools" link) fills the box. An emptied selection never wipes
+  // what is being typed: editing a chosen brand clears the selection but keeps the text.
+  useEffect(() => { if (shown) setQuery(shown); }, [shown]);
+
+  const needle = query.trim().toLowerCase();
+  const matches = options.filter(option => !needle || option.toLowerCase().includes(needle));
+  const exact = options.some(option => option.toLowerCase() === needle);
+  const offerCustom = !!needle && !exact;
+  const rows = [...matches.map(name => ({ kind: "brand" as const, name })), ...(offerCustom ? [{ kind: "custom" as const, name: query.trim() }] : [])];
+
+  const pick = (row: (typeof rows)[number] | undefined) => {
+    if (!row) return;
+    if (row.kind === "brand") { onSelect(row.name); onCustom(""); setQuery(row.name); }
+    else { onSelect(CUSTOM_BRAND); onCustom(row.name); setQuery(row.name); }
+    setOpen(false);
+  };
+  const change = (text: string) => {
+    setQuery(text);
+    setOpen(true);
+    setActive(0);
+    if (selected === CUSTOM_BRAND) { onCustom(text); if (!text.trim()) onSelect(""); }
+    else if (selected && text !== selected) onSelect("");   // editing a chosen brand starts a new search
+  };
+  const clear = () => { setQuery(""); onSelect(""); onCustom(""); setOpen(false); };
+
+  return (
+    <div className="relative">
+      <Search size={14} aria-hidden className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+      <input
+        role="combobox" aria-expanded={open} aria-controls="deal-brand-list" aria-autocomplete="list"
+        aria-label="Which brand are you working on?" data-testid="input-deal-brand"
+        value={query} placeholder="Search your pitched brands, or type a brand you found yourself…"
+        onChange={e => change(e.target.value)} onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        onKeyDown={e => {
+          if (e.key === "ArrowDown") { e.preventDefault(); setOpen(true); setActive(i => Math.min(i + 1, rows.length - 1)); }
+          else if (e.key === "ArrowUp") { e.preventDefault(); setActive(i => Math.max(i - 1, 0)); }
+          else if (e.key === "Enter") { e.preventDefault(); pick(rows[active]); }
+          else if (e.key === "Escape") setOpen(false);
+        }}
+        className="w-full pl-9 pr-9 py-3 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 transition-all"
+      />
+      {query && (
+        <button type="button" onClick={clear} aria-label="Clear brand" data-testid="button-clear-deal-brand"
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-white">
+          <X size={14} aria-hidden />
+        </button>
+      )}
+      {open && rows.length > 0 && (
+        <ul id="deal-brand-list" role="listbox" data-testid="list-deal-brands"
+          className="absolute z-20 mt-1.5 max-h-60 w-full overflow-y-auto rounded-xl border border-border bg-card py-1 shadow-2xl">
+          {rows.map((row, index) => (
+            <li key={`${row.kind}-${row.name}`} role="option" aria-selected={index === active}
+              onMouseDown={e => { e.preventDefault(); pick(row); }} onMouseEnter={() => setActive(index)}
+              className={`cursor-pointer px-3.5 py-2.5 text-sm ${index === active ? "bg-primary/15 text-white" : "text-white/80"}`}>
+              {row.kind === "brand" ? row.name : <>Use “<span className="font-semibold text-white">{row.name}</span>” — a brand I found myself</>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {open && !rows.length && (
+        <p className="absolute z-20 mt-1.5 w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs text-muted-foreground shadow-2xl">
+          No pitched brands yet. Type the brand you are working on.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Deal Maker Tab ─────────────────────────────────────────────────────────────
 
 function DealMakerTab({
@@ -1138,44 +1200,20 @@ function DealMakerTab({
 
   const toggle = (id: string) => setOpenCard(prev => prev === id ? null : id);
 
-  const brandOptions = [
-    ...pitches.filter(p => !p.status.startsWith("closed_") && p.status !== "closed").map(p => p.brand),
-    "A brand I found myself",
-  ];
-  const uniqueOptions = [...new Set(brandOptions)];
+  const uniqueOptions = [...new Set(pitches.filter(p => !p.status.startsWith("closed_") && p.status !== "closed").map(p => p.brand))];
 
-  const isCustom  = selectedBrand === "A brand I found myself";
+  const isCustom  = selectedBrand === CUSTOM_BRAND;
   const brandName = isCustom ? custom.trim() : selectedBrand;
   const brandInfo = brandName && !isCustom ? BRAND_DB[brandName] : null;
 
   return (
     <div className="space-y-5">
-      {/* Brand dropdown */}
+      {/* Brand search */}
       <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
         <div>
           <p className="text-xs font-bold text-white uppercase tracking-wider mb-2">Which brand are you working on?</p>
-          <div className="relative">
-            <select
-              value={selectedBrand}
-              onChange={e => { onSelectBrand(e.target.value); setCustom(""); }}
-              className="w-full px-3.5 py-3 rounded-xl bg-black/40 border border-border text-white text-sm appearance-none focus:outline-none focus:border-primary/60 transition-all pr-9"
-            >
-              <option value="" disabled>Select a brand…</option>
-              {uniqueOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          </div>
+          <BrandSearch options={uniqueOptions} selected={selectedBrand} custom={custom} onSelect={onSelectBrand} onCustom={setCustom} />
         </div>
-
-        <AnimatePresence>
-          {isCustom && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-              <p className="text-xs font-semibold text-white/70 mb-1.5">Brand name</p>
-              <input value={custom} onChange={e => setCustom(e.target.value)} placeholder="e.g. Focusrite, Rode, Ableton"
-                className="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-border text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 transition-all" />
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <AnimatePresence>
           {brandInfo && (

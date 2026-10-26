@@ -16,6 +16,7 @@ const pitch = (id: number, brand: string) => ({
 
 let pitches: ReturnType<typeof pitch>[];
 let rateRequests: Record<string, unknown>[];
+let savedEstimates: Record<string, unknown>[];   // what the server has kept (GET /rate-intelligence/latest)
 let deleteCalls: string[];
 let deleteStatus: number;
 let profileApi: ReturnType<typeof installProfileApi>;
@@ -24,6 +25,7 @@ beforeEach(() => {
   pitches = [pitch(1, "Alpha Audio"), pitch(2, "Zeta Guitars")];
   deleteCalls = [];
   rateRequests = [];
+  savedEstimates = [];
   deleteStatus = 200;
   profileApi = installProfileApi(creatorProfile());
   const base = globalThis.fetch;
@@ -31,15 +33,29 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), window.location.origin);
     if (url.pathname === "/api/mavlit/pitches/me") return json({ pitches, total: pitches.length });
+    if (url.pathname === "/api/mavlit/rate-intelligence/latest") {
+      const q = url.searchParams;
+      if (!q.get("deliverable_type")) return json(savedEstimates.at(-1) ?? null);            // the newest estimate of all
+      const hit = [...savedEstimates].reverse().find((e) =>
+        (q.get("brand_id") ? String(e.brand_id) === q.get("brand_id") : String(e.brand_name).toLowerCase() === q.get("brand_name")!.toLowerCase()) &&
+        e.deliverable_type === q.get("deliverable_type") && (e.exclusivity ?? null) === q.get("exclusivity") && (e.usage ?? null) === q.get("usage") &&
+        (["Narrow", "Broad"].includes(q.get("exclusivity") ?? "") ? String(e.duration_months ?? "") === (q.get("duration_months") ?? "") : true));
+      return json(hit ?? null);
+    }
     if (url.pathname === "/api/mavlit/rate-intelligence" && init?.method === "POST") {
-      rateRequests.push(JSON.parse(String(init.body)));
-      return json({
-        id: 1, brand_name: "Alpha Audio", rate_min: 250, rate_typical: 420, rate_max: 700, currency: "USD", confidence: "medium",
+      const body = JSON.parse(String(init.body));
+      rateRequests.push(body);
+      const made = {
+        id: rateRequests.length, brand_id: body.brand_id ?? null, platform: "Instagram", deliverable_type: body.deliverable_type,
+        exclusivity: body.exclusivity ?? null, usage: body.usage ?? null, duration_months: body.duration_months ?? null,
+        brand_name: body.brand_name, rate_min: 250, rate_typical: 420, rate_max: 700, currency: "USD", confidence: "medium",
         reasoning: "Anchored on the median of creators your size.", basis: "Beauty, 50k-100k, Reel",
         adjustments: [{ factor: "usage", effect: "Adds about 35% for paid usage." }],
         details: { creator_niche: "Beauty", follower_bucket: "50k-100k", data_row: { creators: 29, points: 34, median: 442 }, brand_followers: "1,631,664", partner_creators: [{ username: "a" }, { username: "b" }] },
-        created_at: "2026-10-26T00:00:00Z",
-      });
+        created_at: "2026-10-26T09:30:00Z",
+      };
+      savedEstimates.push(made);
+      return json(made);
     }
     const target = /^\/api\/mavlit\/pitches\/(\d+)$/.exec(url.pathname);
     if (target && init?.method === "DELETE") {
@@ -138,7 +154,7 @@ describe("Deal Tools", () => {
     fireEvent.change(screen.getByPlaceholderText("Duration (months)"), { target: { value: "6" } });
     fireEvent.click(screen.getByRole("button", { name: "Includes paid usage or whitelisting" }));
     expect(rateRequests).toHaveLength(0);                                   // nothing is asked until the button is pressed
-    fireEvent.click(screen.getByTestId("button-estimate-rate"));
+    fireEvent.click(await screen.findByTestId("button-estimate-rate"));
     expect(await screen.findByTestId("rate-estimate")).toBeInTheDocument();
     expect(rateRequests).toEqual([{
       brand_id: 1, brand_name: "Alpha Audio", platform: "Instagram", deliverable_type: "Reel",
@@ -155,7 +171,7 @@ describe("Deal Tools", () => {
     // Changing a deal term makes the shown estimate stale.
     fireEvent.click(screen.getByRole("button", { name: "Story" }));
     expect(screen.queryByTestId("rate-estimate")).not.toBeInTheDocument();
-    expect(screen.getByTestId("button-estimate-rate")).toBeInTheDocument();
+    expect(await screen.findByTestId("button-estimate-rate")).toBeInTheDocument();
   });
 
   it("sends the exclusivity months only for Narrow or Broad, as a whole number", async () => {
@@ -166,16 +182,56 @@ describe("Deal Tools", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reel" }));
     fireEvent.click(screen.getByRole("button", { name: /Narrow/ }));
     fireEvent.change(screen.getByPlaceholderText("Duration (months)"), { target: { value: "2.5" } });
-    fireEvent.click(screen.getByTestId("button-estimate-rate"));
+    fireEvent.click(await screen.findByTestId("button-estimate-rate"));
     await screen.findByTestId("rate-estimate");
     expect(rateRequests[0]).toMatchObject({ exclusivity: "Narrow", duration_months: 3 });
 
     // Switching to None hides the months box and the months are no longer sent, even though 2.5 is still typed.
     fireEvent.click(screen.getByRole("button", { name: "None" }));
-    fireEvent.click(screen.getByTestId("button-estimate-rate"));
+    fireEvent.click(await screen.findByTestId("button-estimate-rate"));
     await waitFor(() => expect(rateRequests).toHaveLength(2));
     expect(rateRequests[1]).toMatchObject({ exclusivity: "None" });
     expect(rateRequests[1]).not.toHaveProperty("duration_months");
+  });
+
+  it("keeps the estimate on the server: after a reload the last brand, deal terms and estimate come back", async () => {
+    const input = await openDealTools();
+    fireEvent.click(screen.getByText("Rate Intelligence"));
+    fireEvent.change(input, { target: { value: "Alpha" } });
+    fireEvent.mouseDown(within(screen.getByTestId("list-deal-brands")).getByRole("option", { name: "Alpha Audio" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reel" }));
+    fireEvent.click(screen.getByRole("button", { name: /Broad/ }));
+    fireEvent.change(screen.getByPlaceholderText("Duration (months)"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: "Includes paid usage or whitelisting" }));
+    fireEvent.click(await screen.findByTestId("button-estimate-rate"));
+    await screen.findByTestId("rate-estimate");
+    expect(rateRequests).toHaveLength(1);
+
+    // "Reload": the page and its state are gone, the server still has the estimate.
+    cleanup();
+    const reloaded = await openDealTools();
+    await waitFor(() => expect(reloaded).toHaveValue("Alpha Audio"));                         // brand restored (after the server answers)
+    const pill = (name: string | RegExp) => screen.getByRole("button", { name }).className;
+    expect(pill("Reel")).toContain("text-primary");                                           // deal terms restored
+    expect(pill(/Broad/)).toContain("text-primary");
+    expect(pill("Includes paid usage or whitelisting")).toContain("text-primary");
+    expect(screen.getByPlaceholderText("Duration (months)")).toHaveValue(6);
+    fireEvent.click(screen.getByText("Rate Intelligence"));
+    expect(await screen.findByTestId("rate-estimate")).toBeInTheDocument();                  // the estimate is shown again
+    expect(screen.getByTestId("rate-typical")).toHaveTextContent("$420");
+    expect(screen.getByTestId("rate-saved-at")).toHaveTextContent("Saved estimate from");
+    expect(rateRequests).toHaveLength(1);                                                     // nothing was estimated again
+
+    // Other deal terms have no saved estimate; the button comes back.
+    fireEvent.click(screen.getByRole("button", { name: "Story" }));
+    expect(await screen.findByTestId("button-estimate-rate")).toBeInTheDocument();
+  });
+
+  it("starts empty after a reload when no estimate was ever saved", async () => {
+    const input = await openDealTools();
+    expect(input).toHaveValue("");
+    fireEvent.click(screen.getByText("Rate Intelligence"));
+    expect(screen.getByText(/Choose the/)).toBeInTheDocument();
   });
 
   it("sends only the brand name for a brand that was not pitched, and Instagram Live as the deliverable", async () => {
@@ -184,7 +240,7 @@ describe("Deal Tools", () => {
     fireEvent.change(input, { target: { value: "Rode Microphones" } });
     fireEvent.keyDown(input, { key: "Enter" });
     fireEvent.click(screen.getByRole("button", { name: "Instagram Live" }));
-    fireEvent.click(screen.getByTestId("button-estimate-rate"));
+    fireEvent.click(await screen.findByTestId("button-estimate-rate"));
     await screen.findByTestId("rate-estimate");
     expect(rateRequests).toEqual([{ brand_name: "Rode Microphones", platform: "Instagram", deliverable_type: "Instagram Live" }]);
   });

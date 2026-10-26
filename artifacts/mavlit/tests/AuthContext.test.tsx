@@ -36,14 +36,12 @@ describe("AuthContext.updateProfile full-replacement contract", () => {
       if (init?.method !== "PUT") return response;
       fixture.replaceOnServer({
         ...fixture.persisted, instagram_audience_gender: "both",
-        instagram_audience_age_min: 21, instagram_audience_age_max: 40,
       });
       return new Response(JSON.stringify({ success: true }), { status: 200 });
     }));
     await act(async () => { await result.current.updateProfile({ full_name: "Updated Name" }); });
     expect(result.current.user).toMatchObject({
       full_name: "Updated Name", instagram_audience_gender: "both",
-      instagram_audience_age_min: 21, instagram_audience_age_max: 40,
     });
   });
 

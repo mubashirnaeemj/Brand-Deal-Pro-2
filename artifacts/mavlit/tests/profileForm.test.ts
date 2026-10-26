@@ -3,9 +3,9 @@ import { profilePatch, profileToForm, validateProfile } from "@/pages/profileFor
 import { creatorProfile } from "./fixtures/creatorProfile";
 
 const emptyAudienceWrites = {
-  instagram_audience_gender: null, instagram_audience_age_min: null, instagram_audience_age_max: null,
+  instagram_audience_gender: null,
   instagram_audience_description: null,
-  youtube_audience_gender: null, youtube_audience_age_min: null, youtube_audience_age_max: null,
+  youtube_audience_gender: null,
   youtube_audience_description: null,
 };
 
@@ -24,49 +24,38 @@ describe("profile form replacement patches", () => {
 
   it("loads separate audience demographics without falling back to legacy shared fields", () => {
     const form = profileToForm(creatorProfile({
-      instagram_audience_gender: "female", instagram_audience_age_min: 18, instagram_audience_age_max: 34,
-      youtube_audience_gender: "both", youtube_audience_age_min: 25, youtube_audience_age_max: 65,
+      instagram_audience_gender: "female", instagram_audience_description: "Women aged 18-34 who love skincare.",
+      youtube_audience_gender: "both",
     }));
-    expect(form.instagram).toMatchObject({ audienceGender: "female", audienceAgeMin: "18", audienceAgeMax: "34" });
-    expect(form.youtube).toMatchObject({ audienceGender: "both", audienceAgeMin: "25", audienceAgeMax: "65" });
-    expect(profileToForm(creatorProfile()).instagram).toMatchObject({ audienceGender: "", audienceAgeMin: "", audienceAgeMax: "" });
+    expect(form.instagram).toMatchObject({ audienceGender: "female", audienceDescription: "Women aged 18-34 who love skincare." });
+    expect(form.youtube).toMatchObject({ audienceGender: "both" });
+    expect(profileToForm(creatorProfile()).instagram).toMatchObject({ audienceGender: "", audienceDescription: "" });
+    expect(form.instagram).not.toHaveProperty("audienceAgeMin");   // the age lives in the description now
   });
 
   it.each(["instagram", "youtube"] as const)("saves and clears %s demographics using the API fields", (platform) => {
     const profile = creatorProfile();
     const form = profileToForm(profile);
-    Object.assign(form[platform], { audienceGender: "male", audienceAgeMin: "18", audienceAgeMax: "45" });
+    Object.assign(form[platform], { audienceGender: "male" });
     expect(validateProfile(form, profile)).toBeNull();
     expect(profilePatch(form, profile)).toEqual({
       ...emptyAudienceWrites,
       brand_preferences: profile.brand_preferences,
       [`${platform}_audience_gender`]: "male",
-      [`${platform}_audience_age_min`]: 18,
-      [`${platform}_audience_age_max`]: 45,
     });
     const saved = { ...profile, ...profilePatch(form, profile) };
     const cleared = profileToForm(saved);
-    Object.assign(cleared[platform], { audienceGender: "", audienceAgeMin: "", audienceAgeMax: "" });
+    Object.assign(cleared[platform], { audienceGender: "" });
     expect(profilePatch(cleared, saved)).toEqual({
       ...emptyAudienceWrites,
       brand_preferences: saved.brand_preferences,
       [`${platform}_audience_gender`]: null,
-      [`${platform}_audience_age_min`]: null,
-      [`${platform}_audience_age_max`]: null,
     });
   });
 
   it.each(["instagram", "youtube"] as const)("validates optional %s audience details", (platform) => {
     const profile = creatorProfile();
     const form = profileToForm(profile);
-    for (const invalid of ["12", "101", "-1", "1.5", "not a number"]) {
-      form[platform].audienceAgeMin = invalid;
-      expect(validateProfile(form, profile)).toContain("whole numbers between 13 and 100");
-    }
-    form[platform].audienceAgeMin = "45";
-    form[platform].audienceAgeMax = "18";
-    expect(validateProfile(form, profile)).toContain("age from must be less");
-    form[platform].audienceAgeMax = "";
     expect(validateProfile(form, profile)).toBeNull();
     form[platform].audienceGender = "unknown";
     expect(validateProfile(form, profile)).toContain("Select Male, Female, or Both");

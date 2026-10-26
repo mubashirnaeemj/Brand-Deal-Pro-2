@@ -73,18 +73,18 @@ describe("three-page Instagram profile", () => {
     expect(screen.getByTestId("input-brand-preferences")).toHaveValue("More guitar brands");
   });
 
-  it("manual mode exposes editable fields and saves numeric audience ages for Instagram only", async () => {
+  it("manual mode exposes editable fields and saves the audience gender and description (with the age) for Instagram only", async () => {
     await mount();
     await details();
     expect(screen.getByTestId("input-followers")).not.toHaveAttribute("readonly");
     expect(screen.getByLabelText("instagram audience gender")).toBeEnabled();
     fireEvent.change(screen.getByLabelText("instagram audience gender"), { target: { value: "both" } });
-    fireEvent.change(screen.getByLabelText("instagram audience age range"), { target: { value: "25-44" } });
-    fireEvent.change(screen.getByLabelText("Instagram audience description"), { target: { value: "  Guitar enthusiasts and aspiring musicians.  " } });
+    expect(screen.queryByLabelText("instagram audience age range")).not.toBeInTheDocument();   // the age is written in the description
+    fireEvent.change(screen.getByLabelText("Instagram audience description"), { target: { value: "  Guitar enthusiasts aged 25-44 and aspiring musicians.  " } });
     await save();
     expect(fixture.writes[0].body).toEqual(instagramSaved({
-      instagram_audience_gender: "both", instagram_audience_age_min: 25, instagram_audience_age_max: 44,
-      instagram_audience_description: "Guitar enthusiasts and aspiring musicians.",
+      instagram_audience_gender: "both",
+      instagram_audience_description: "Guitar enthusiasts aged 25-44 and aspiring musicians.",
     }));
     expect(window.location.pathname + window.location.search).toBe("/brand-matches?version=v3");
   });
@@ -226,13 +226,12 @@ describe("three-page Instagram profile", () => {
     else { await save(); expect(fixture.persisted.brand_preferences).toBe("x".repeat(1000)); }
   });
 
-  it("shows inline age-range errors and blocks invalid saves", async () => {
+  it("has no separate audience age field: the audience description asks for the age", async () => {
     await mount();
     await details();
-    fireEvent.change(screen.getByLabelText("instagram audience age range"), { target: { value: "45-18" } });
-    expect(screen.getByText(/Audience age from must be less/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
-    expect(fixture.writes).toHaveLength(0);
+    expect(screen.queryByLabelText("instagram audience age range")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("input-audience-age-range")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Instagram audience description")).toHaveAttribute("placeholder", expect.stringContaining("age"));
   });
 
   it.each(["GET", "PUT"] as const)("keeps the draft and page after a failed %s, then retries safely", async (method) => {

@@ -34,8 +34,7 @@ function finish(extra: Record<string, unknown> = {}) {
   fixture.replaceOnServer({
     ...fixture.persisted, instagram_description_status: "completed",
     instagram_description: "Generated creator description", instagram_audience_gender: "female",
-    instagram_audience_age_min: 18, instagram_audience_age_max: 34,
-    instagram_audience_description: "Young musicians learning guitar.",
+    instagram_audience_description: "Young musicians aged 18-34 learning guitar.",
     instagram_followers: 9876, follower_count: 9876, instagram_sub_niches: ["Guitar"],
     ...extra,
   });
@@ -59,8 +58,8 @@ describe("Instagram wizard generation", () => {
     await tick(450);
     expect(screen.getByLabelText("instagram audience gender")).toHaveValue("female");
     expect(screen.getByLabelText("instagram audience gender")).toBeEnabled();
-    expect(screen.getByLabelText("instagram audience age range")).toHaveValue("18-34");
-    expect(screen.getByLabelText("Instagram audience description")).toHaveValue("Young musicians learning guitar.");
+    expect(screen.queryByLabelText("instagram audience age range")).not.toBeInTheDocument();   // the age is in the description
+    expect(screen.getByLabelText("Instagram audience description")).toHaveValue("Young musicians aged 18-34 learning guitar.");
     expect(screen.getByLabelText("Instagram audience description")).toBeEnabled();
     expect(screen.getByTestId("input-followers")).toHaveValue(9876);
     expect(screen.getByTestId("input-followers")).not.toHaveAttribute("readonly");
@@ -71,13 +70,12 @@ describe("Instagram wizard generation", () => {
     fireEvent.change(screen.getByTestId("input-followers"), { target: { value: "10001" } });
     fireEvent.change(screen.getByTestId("input-description"), { target: { value: "My corrected content description" } });
     fireEvent.change(screen.getByLabelText("Instagram audience description"), { target: { value: "My corrected audience" } });
-    fireEvent.change(screen.getByLabelText("instagram audience age range"), { target: { value: "25-44" } });
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
     await settle();
     expect(fixture.persisted).toMatchObject({
       primary_platform: "instagram", instagram_followers: 10001, instagram_sub_niches: ["Guitar"],
-      instagram_audience_gender: "female", instagram_audience_age_min: 25, instagram_audience_age_max: 44,
+      instagram_audience_gender: "female",
       instagram_audience_description: "My corrected audience",
       instagram_description: "My corrected content description",
       instagram_description_mode: "generate",
@@ -92,7 +90,7 @@ describe("Instagram wizard generation", () => {
     await settle();
     details();
     expect(screen.getByTestId("input-followers")).toHaveValue(10001);
-    expect(screen.getByLabelText("instagram audience age range")).toHaveValue("25-44");
+    expect(screen.getByLabelText("Instagram audience description")).toHaveValue("My corrected audience");
   });
 
   it("fills highest views from the completed job, sends it in the PUT, and keeps it after reload", async () => {
@@ -288,11 +286,10 @@ describe("Instagram wizard generation", () => {
 
   it("leaves null estimates empty", async () => {
     await mount();
-    finish({ instagram_audience_gender: null, instagram_audience_age_min: null, instagram_audience_age_max: null });
+    finish({ instagram_audience_gender: null });
     await tick(1500);
     await tick(450);
     expect(screen.getByLabelText("instagram audience gender")).toHaveValue("");
-    expect(screen.getByLabelText("instagram audience age range")).toHaveValue("");
   });
 
   it("displays and saves generated sub-niches with spaces rather than underscores", async () => {
@@ -378,7 +375,7 @@ describe("Instagram wizard generation", () => {
     await tick(450);
     expect(screen.getByText("Step 3 of 3")).toBeInTheDocument();
     expect(screen.getByTestId("input-followers")).toHaveValue(9876);
-    expect(screen.getByLabelText("instagram audience age range")).toHaveValue("18-34");
+    expect(screen.getByLabelText("Instagram audience description")).toHaveValue("Young musicians aged 18-34 learning guitar.");
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
   });
 

@@ -71,8 +71,6 @@ export const EMPTY_ONBOARDING: OnboardingData = {
   },
   instagram: {
     audienceGender: "",
-    audienceAgeMin: "",
-    audienceAgeMax: "",
     username: "",
     followers: "",
     niches: [],
@@ -82,8 +80,6 @@ export const EMPTY_ONBOARDING: OnboardingData = {
   },
   youtube: {
     audienceGender: "",
-    audienceAgeMin: "",
-    audienceAgeMax: "",
     channelName: "",
     subscribers: "",
     niches: [],

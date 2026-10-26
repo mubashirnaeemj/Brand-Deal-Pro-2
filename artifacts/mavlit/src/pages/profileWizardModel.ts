@@ -1,5 +1,5 @@
 import type { CreatorProfile, DescriptionPlatform } from "@/contexts/AuthContext";
-import { fillEmptyAudience, formatAudienceAgeRange } from "@/lib/audience";
+import { fillEmptyAudience } from "@/lib/audience";
 import { parsePrimaryNiches, type OnboardingData } from "@/components/onboarding/types";
 import { profileToForm, type ProfileForm } from "./profileForm";
 import { normalizeSubNiches } from "@/lib/subNiches";
@@ -29,10 +29,9 @@ export function applyProfileGeneration(form: ProfileForm, profile: CreatorProfil
   if (current.descriptionMode === "generate") {
     return { ...form, [platform]: {
       ...current,
-      ...fillEmptyAudience({ ...current, audienceGender: "", audienceAgeMin: "", audienceAgeMax: "" }, profile, platform),
+      ...fillEmptyAudience({ ...current, audienceGender: "" }, profile, platform),
       description: generated.description,
       subNiches: generated.subNiches,
-      audienceAgeRange: generated.audienceAgeRange,
       audienceDescription: generated.audienceDescription,
       ...(platform === "instagram" ? {
         followers: profileToForm(profile).instagram.followers,
@@ -44,7 +43,6 @@ export function applyProfileGeneration(form: ProfileForm, profile: CreatorProfil
   const audience = fillEmptyAudience(current, profile, platform);
   return { ...form, [platform]: {
     ...audience,
-    audienceAgeRange: current.audienceAgeRange || formatAudienceAgeRange(audience),
     audienceDescription: current.audienceDescription.trim() ? current.audienceDescription : generated.audienceDescription,
     description: current.description.trim() ? current.description : generated.description,
   } };
@@ -67,13 +65,11 @@ export function restoreWizardForm(profile: CreatorProfile, draft: unknown): Prof
       instagram: {
         ...initial.instagram, ...legacy.instagram,
         description: legacy.instagram.contentDescription,
-        audienceAgeRange: formatAudienceAgeRange({ ...initial.instagram, ...legacy.instagram }),
         descriptionMode: legacy.instagramDescriptionMode === "generate" ? "generate" : "manual", primaryNiches: legacy.instagram.niches,
       },
       youtube: {
         ...initial.youtube, ...legacy.youtube,
         description: legacy.youtube.contentDescription,
-        audienceAgeRange: formatAudienceAgeRange({ ...initial.youtube, ...legacy.youtube }),
         descriptionMode: legacy.youtubeDescriptionMode === "generate" ? "generate" : "manual", primaryNiches: legacy.youtube.niches,
       },
     });
@@ -85,10 +81,5 @@ export function restoreWizardForm(profile: CreatorProfile, draft: unknown): Prof
     instagram: { ...initial.instagram, ...value.instagram },
     youtube: { ...initial.youtube, ...value.youtube },
   });
-  for (const platform of ["instagram", "youtube"] as const) {
-    if (typeof value[platform]?.audienceAgeRange !== "string") {
-      restored[platform].audienceAgeRange = formatAudienceAgeRange(restored[platform]);
-    }
-  }
   return restored;
 }

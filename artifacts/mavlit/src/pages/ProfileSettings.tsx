@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar";
 import { formatPrimaryNiches, NICHE_OPTIONS, parsePlatforms, samePrimaryNiches } from "@/components/onboarding/types";
 import { isDescriptionPending, isProfileComplete, type CreatorProfile, type DescriptionJob, type DescriptionPlatform, useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
-import { fillEmptyAudience, audienceAgeRangeError, audienceError, formatAudienceAgeRange } from "@/lib/audience";
+import { fillEmptyAudience, audienceError } from "@/lib/audience";
 import ProfileWizard from "@/components/profile/ProfileWizard";
 import RecentPostsCard from "@/components/profile/RecentPostsCard";
 import { isPostsList, listCreatorPosts, type CreatorPostsList } from "@/lib/creatorPosts";
@@ -345,10 +345,9 @@ export default function ProfileSettings() {
         // An untouched empty input is not a request to clear a value that
         // arrived on the server since this editor loaded.
         const fields = { ...saveForm[platform] };
-        for (const key of ["audienceGender", "audienceAgeMin", "audienceAgeMax"] as const) {
+        for (const key of ["audienceGender"] as const) {
           if (!fields[key].trim() && fields[key] === baseline[platform][key]) fields[key] = fresh[platform][key];
         }
-        fields.audienceAgeRange = form[platform].audienceAgeRange || formatAudienceAgeRange(fields);
         if (!fields.audienceDescription.trim() && fields.audienceDescription === baseline[platform].audienceDescription) {
           fields.audienceDescription = fresh[platform].audienceDescription;
         }
@@ -399,11 +398,7 @@ export default function ProfileSettings() {
         if ((`${platform}_audience_gender` in patch &&
               (updated[`${platform}_audience_gender`] || "") !== audience.audienceGender) ||
             (`${platform}_audience_description` in patch &&
-              (updated[`${platform}_audience_description`]?.trim() || "") !== audience.audienceDescription.trim()) ||
-            (`${platform}_audience_age_min` in patch &&
-              (updated[`${platform}_audience_age_min`] ?? null) !== (audience.audienceAgeMin.trim() ? Number(audience.audienceAgeMin) : null)) ||
-            (`${platform}_audience_age_max` in patch &&
-              (updated[`${platform}_audience_age_max`] ?? null) !== (audience.audienceAgeMax.trim() ? Number(audience.audienceAgeMax) : null))) {
+              (updated[`${platform}_audience_description`]?.trim() || "") !== audience.audienceDescription.trim())) {
           setProfile(updated);
           setError(`The profile API did not keep your ${platform === "instagram" ? "Instagram" : "YouTube"} audience details. Please try again.`);
           return;
@@ -446,7 +441,7 @@ export default function ProfileSettings() {
             onContinue={continueStep} onBack={() => { setError(null); setStep(step === 3 ? 2 : 1); }}
             onExit={exit} onGenerate={() => void generateInstagram()} onSave={() => void save()}
             saving={saving} generating={generatingCount > 0 || jobPending}
-            canSave={!audienceError(form.instagram) && !audienceAgeRangeError(form.instagram.audienceAgeRange) &&
+            canSave={!audienceError(form.instagram) &&
               form.instagram.audienceDescription.length <= 1500 && form.brandPreferences.length <= 1000 &&
               form.pitchStylePreferences.length <= 1000 &&
               (form.instagram.descriptionMode === "manual" || generationComplete)}

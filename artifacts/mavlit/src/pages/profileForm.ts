@@ -1,5 +1,5 @@
 import type { CreatorProfile } from "@/contexts/AuthContext";
-import { audienceAgeRangeError, audienceError, audienceFromProfile, audiencePayload, formatAudienceAgeRange } from "@/lib/audience";
+import { audienceError, audienceFromProfile, audiencePayload } from "@/lib/audience";
 import { normalizeSubNiches } from "@/lib/subNiches";
 import type { DescriptionMode } from "@/components/onboarding/types";
 import { formatPlatforms, formatPrimaryNiches, NICHE_OPTIONS, parsePlatforms, parsePrimaryNiches, type PlatformKey } from "@/components/onboarding/types";
@@ -11,10 +11,8 @@ export type PlatformDetails = {
   description: string;
   descriptionMode: DescriptionMode;
   audienceGender: string;
-  audienceAgeMin: string;
-  audienceAgeMax: string;
-  audienceAgeRange: string;
-  audienceDescription: string;
+  audienceDescription: string;   // who the audience is, including their age range
+
 };
 
 export type ProfileForm = {
@@ -51,7 +49,6 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
       description: text(profile.instagram_description),
       descriptionMode: profile.instagram_description_mode === "generate" ? "generate" : "manual",
       ...audienceFromProfile(profile, "instagram"),
-      audienceAgeRange: formatAudienceAgeRange(audienceFromProfile(profile, "instagram")),
       audienceDescription: text(profile.instagram_audience_description),
     },
     youtube: {
@@ -63,7 +60,6 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
       description: text(profile.youtube_description),
       descriptionMode: profile.youtube_description_mode === "generate" ? "generate" : "manual",
       ...audienceFromProfile(profile, "youtube"),
-      audienceAgeRange: formatAudienceAgeRange(audienceFromProfile(profile, "youtube")),
       audienceDescription: text(profile.youtube_audience_description),
     },
   };
@@ -83,7 +79,7 @@ export function validateProfile(form: ProfileForm, profile: CreatorProfile): str
   for (const platform of ["instagram", "youtube"] as const) {
     if (!form.primaryPlatforms.includes(platform)) continue;
     const label = platform === "instagram" ? "Instagram" : "YouTube";
-    const error = audienceAgeRangeError(form[platform].audienceAgeRange) || audienceError(form[platform]);
+    const error = audienceError(form[platform]);
     if (error) return `${label}: ${error}`;
     if (form[platform].audienceDescription.length > 1500) return `${label}: Audience description must be 1500 characters or fewer.`;
   }

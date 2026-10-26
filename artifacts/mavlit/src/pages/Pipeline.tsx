@@ -21,6 +21,7 @@ interface PitchRecord {
   status: string;
   agreedRate?: string;
   sentAt: string | null;
+  brandId?: number | null;   // brands_raw id of the pitched brand, when it is in MAVLIT's database
 }
 
 interface DealContext {
@@ -54,66 +55,6 @@ const DELIVERABLE_TYPES = ["Reel", "Story", "Static post", "Instagram Live"];
 const EMPTY_DEAL_CONTEXT: DealContext = {
   deliverable: "", exclusivity: "", exclusivityMonths: "", usage: "",
 };
-
-// ── Benchmark data (sample ranges — replace with real data) ────────────────────
-
-type FollowerTier = "nano" | "micro" | "mid" | "macro";
-
-interface BenchmarkRange { low: string; median: string; high: string; sampleNote: string; }
-
-// Keys: `${platform}|${deliverable}|${tier}` — SAMPLE RANGES, clearly labeled
-const BENCHMARK_DATA: Record<string, BenchmarkRange> = {
-  // Instagram × Reel
-  "Instagram|Reel|nano":  { low: "$150",   median: "$300",   high: "$600",    sampleNote: "~40 reported deals" },
-  "Instagram|Reel|micro": { low: "$400",   median: "$750",   high: "$1,500",  sampleNote: "~90 reported deals" },
-  "Instagram|Reel|mid":   { low: "$1,200", median: "$2,500", high: "$5,000",  sampleNote: "~55 reported deals" },
-  "Instagram|Reel|macro": { low: "$4,000", median: "$8,000", high: "$15,000", sampleNote: "~25 reported deals" },
-  // Instagram × Story
-  "Instagram|Story|nano":  { low: "$75",    median: "$140",   high: "$250",   sampleNote: "~35 reported deals" },
-  "Instagram|Story|micro": { low: "$175",   median: "$325",   high: "$600",   sampleNote: "~70 reported deals" },
-  "Instagram|Story|mid":   { low: "$500",   median: "$950",   high: "$2,000", sampleNote: "~45 reported deals" },
-  "Instagram|Story|macro": { low: "$1,500", median: "$3,000", high: "$6,000", sampleNote: "~18 reported deals" },
-  // Instagram × Static post
-  "Instagram|Static post|nano":  { low: "$100",   median: "$190",   high: "$350",   sampleNote: "~30 reported deals" },
-  "Instagram|Static post|micro": { low: "$250",   median: "$480",   high: "$850",   sampleNote: "~55 reported deals" },
-  "Instagram|Static post|mid":   { low: "$750",   median: "$1,500", high: "$2,800", sampleNote: "~35 reported deals" },
-  "Instagram|Static post|macro": { low: "$2,500", median: "$5,000", high: "$9,000", sampleNote: "~14 reported deals" },
-};
-
-const TIER_CONFIG: Record<FollowerTier, { label: string; range: string }> = {
-  nano:  { label: "Nano",     range: "under 25k" },
-  micro: { label: "Micro",    range: "25k–100k" },
-  mid:   { label: "Mid-tier", range: "100k–500k" },
-  macro: { label: "Macro",    range: "500k+" },
-};
-
-const TIERS: FollowerTier[] = ["nano", "micro", "mid", "macro"];
-
-function getFollowerTier(n: number): FollowerTier {
-  if (n < 25_000)  return "nano";
-  if (n < 100_000) return "micro";
-  if (n < 500_000) return "mid";
-  return "macro";
-}
-
-function readCreatorFollowers(platform: string): number | null {
-  try {
-    const raw = localStorage.getItem("mavlit_creator_profile");
-    if (!raw) return null;
-    const profile = JSON.parse(raw) as { stats?: Record<string, { followers?: string }> };
-    const stats = profile.stats ?? {};
-    // Try matching platform first, then take max across all
-    const platformKey = Object.keys(stats).find(k => k.toLowerCase() === platform.toLowerCase());
-    if (platformKey && stats[platformKey]?.followers) {
-      const n = parseInt(stats[platformKey].followers!.replace(/[^0-9]/g, ""), 10);
-      if (!isNaN(n) && n > 0) return n;
-    }
-    const counts = Object.values(stats)
-      .map(s => parseInt((s.followers ?? "").replace(/[^0-9]/g, ""), 10))
-      .filter(n => !isNaN(n) && n > 0);
-    return counts.length > 0 ? Math.max(...counts) : null;
-  } catch { return null; }
-}
 
 function readCreatorRate(platform: string, deliverable: string): { amount: string; includesExclusivity: boolean; includesPaidUsage: boolean } | null {
   try {
@@ -724,58 +665,73 @@ function AccordionCard({ title, description, isOpen, onToggle, children }: {
 
 // ── Rate Intelligence ──────────────────────────────────────────────────────────
 
-function RateEstimator({ dealContext }: { dealContext: DealContext }) {
+interface RateEstimateResult {
+  id: number;
+  brand_name: string | null;
+  rate_min: number | null;
+  rate_typical: number | null;
+  rate_max: number | null;
+  currency: string | null;
+  confidence: "low" | "medium" | "high" | null;
+  reasoning: string | null;
+  basis: string | null;
+  adjustments: { factor: string; effect: string }[];
+  details: {
+    creator_niche?: string | null; follower_bucket?: string | null; creator_followers?: number | null;
+    data_row?: { creators: number; points: number; median: number } | null;
+    brand_followers?: string | null; partner_creators?: { username: string }[];
+  };
+}
+
+const money = (value: number | null, currency: string | null) =>
+  value === null ? "—" : `${currency && currency !== "USD" ? `${currency} ` : "$"}${value.toLocaleString("en-US")}`;
+
+const CONFIDENCE_STYLE = {
+  high:   "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  medium: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  low:    "bg-red-500/10 text-red-300 border-red-500/30",
+} as const;
+
+/**
+ * Rate Intelligence: asks MAVLIT to estimate one Instagram deliverable for the chosen brand and Deal context. The
+ * estimate rests on the rate data of creators in the same niche and follower bucket, the brand's size and the
+ * creators the brand has paid (see pipeline/rate_intelligence.py).
+ */
+function RateEstimator({ dealContext, brand }: { dealContext: DealContext; brand: { id: number | null; name: string } | null }) {
   const [, setLocation] = useLocation();
-  const platform = DEAL_PLATFORM;
-  const { deliverable, exclusivity, usage } = dealContext;
-  const hasContext = !!deliverable;
+  const { deliverable, exclusivity, exclusivityMonths, usage } = dealContext;
+  const [result, setResult] = useState<RateEstimateResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const followerCount = hasContext ? readCreatorFollowers(platform) : null;
-  const followerTier  = followerCount !== null ? getFollowerTier(followerCount) : null;
-  const benchmarkKey  = hasContext && followerTier ? `${platform}|${deliverable}|${followerTier}` : null;
-  const benchmark     = benchmarkKey ? BENCHMARK_DATA[benchmarkKey] ?? null : null;
+  // A different brand or deal term makes the shown estimate stale.
+  const inputKey = JSON.stringify([brand?.id ?? null, brand?.name ?? "", deliverable, exclusivity, exclusivityMonths, usage]);
+  useEffect(() => { setResult(null); setError(null); }, [inputKey]);
 
-  // Creator's own rate for this platform × deliverable
-  const creatorRate   = hasContext ? readCreatorRate(platform, deliverable) : null;
-  const hasRate       = !!creatorRate;
-  // "specified" = creator deliberately toggled at least one flag
-  const hasSpecified  = !!(creatorRate?.includesExclusivity || creatorRate?.includesPaidUsage);
+  const creatorRate = deliverable ? readCreatorRate(DEAL_PLATFORM, deliverable) : null;
+  const ready = !!brand?.name && !!deliverable;
 
-  const dealHasExclusivity = exclusivity === "Narrow" || exclusivity === "Broad";
-  const dealHasPaidUsage   = usage === "Includes paid usage or whitelisting";
+  const estimate = async () => {
+    if (!ready || !brand) return;
+    setLoading(true);
+    setError(null);
+    const months = Number(exclusivityMonths);
+    try {
+      setResult(await api.post<RateEstimateResult>("/rate-intelligence", {
+        ...(brand.id ? { brand_id: brand.id } : {}),
+        brand_name: brand.name,
+        platform: DEAL_PLATFORM,
+        deliverable_type: deliverable,
+        ...(exclusivity ? { exclusivity } : {}),
+        ...(usage ? { usage } : {}),
+        ...((exclusivity === "Narrow" || exclusivity === "Broad") && months > 0 ? { duration_months: months } : {}),
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't estimate the rate.");
+    } finally { setLoading(false); }
+  };
 
-  // ── Dynamic modifier notes — adapt to how much rate data the creator provided ──
-  const modifierNotes: string[] = [];
-
-  if (!hasRate) {
-    // Case 1: no rate entered — generic guidance
-    if (exclusivity === "Narrow")
-      modifierNotes.push("Narrow exclusivity typically pushes deals toward the upper portion of the range.");
-    if (exclusivity === "Broad")
-      modifierNotes.push("Broad category exclusivity often sits noticeably higher in the range — sometimes above it.");
-    if (dealHasPaidUsage)
-      modifierNotes.push("Paid usage or whitelisting rights commonly add a meaningful premium on top of the base range.");
-    if (!exclusivity && !usage)
-      modifierNotes.push("With no exclusivity and organic-only usage, deals typically sit in the lower to middle of the range.");
-  } else if (hasRate && hasSpecified) {
-    // Case 3: rate + flags set — precise comparison only
-    if (dealHasExclusivity && !creatorRate.includesExclusivity)
-      modifierNotes.push(
-        exclusivity === "Broad"
-          ? "Broad category exclusivity isn't included in your typical rate for this deliverable — deals with it tend to sit noticeably higher in this range."
-          : "Narrow exclusivity isn't included in your typical rate — it typically pushes deals toward the upper portion of the range."
-      );
-    if (dealHasPaidUsage && !creatorRate.includesPaidUsage)
-      modifierNotes.push("Paid usage rights aren't in your typical rate for this deliverable. Usage rights commonly add a meaningful premium.");
-    if (dealHasExclusivity && creatorRate.includesExclusivity)
-      modifierNotes.push("Your typical rate for this deliverable already accounts for exclusivity — no additional adjustment needed for that term.");
-    if (dealHasPaidUsage && creatorRate.includesPaidUsage)
-      modifierNotes.push("Your typical rate already includes paid usage rights — that term is already priced in.");
-    if (!dealHasExclusivity && !dealHasPaidUsage)
-      modifierNotes.push("No exclusivity or paid usage in this deal — your typical rate is a solid reference point.");
-  }
-  // Case 2 (hasRate && !hasSpecified): no dynamic modifier bullets — neutral note shown separately below range cards
-
+  const details = result?.details ?? {};
   return (
     <div className="space-y-4">
       {/* Disclaimer */}
@@ -783,166 +739,103 @@ function RateEstimator({ dealContext }: { dealContext: DealContext }) {
         <div className="flex items-start gap-2.5">
           <AlertTriangle size={13} className="text-amber-400 mt-0.5 shrink-0" />
           <p className="text-xs text-amber-200/90 leading-relaxed">
-            These are observed ranges from reported deals — not a rate card and not what you should charge. Rates vary significantly based on your vertical, audience quality, exclusivity terms, and the specific brand's budget. Use this as context, not as an answer. You will need to use your own judgment based on your conversations with this brand.
+            This is an estimate built from rates other creators list for the same niche and audience size, plus what we know about this brand. It is not a rate card and not what you should charge. Use it as context, and use your own judgment based on your conversations with the brand.
           </p>
         </div>
       </div>
 
-      {/* Empty state */}
-      {!hasContext && (
+      {!ready && (
         <div className="px-4 py-5 rounded-xl bg-secondary/40 border border-border text-center">
-          <p className="text-xs text-muted-foreground">Set a <span className="text-white font-medium">Deliverable type</span> in the Deal context above to see benchmark ranges.</p>
+          <p className="text-xs text-muted-foreground">
+            {!brand?.name ? <>Choose the <span className="text-white font-medium">brand</span> you are working on above</> : <>Set a <span className="text-white font-medium">Deliverable type</span> in the Deal context above</>}
+            {" "}to estimate a rate.
+          </p>
         </div>
       )}
 
-      {/* Benchmark */}
-      {hasContext && (
-        <AnimatePresence mode="wait">
-          <motion.div key={benchmarkKey ?? "no-data"} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
+      {ready && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-primary/15 text-primary border border-primary/30">{DEAL_PLATFORM}</span>
+            <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-secondary text-muted-foreground border border-border">{deliverable}</span>
+            <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-secondary text-muted-foreground border border-border">{brand!.name}</span>
+          </div>
 
-            {/* Context bar */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-primary/15 text-primary border border-primary/30">{platform}</span>
-              <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-secondary text-muted-foreground border border-border">{deliverable}</span>
-              {followerTier && (
-                <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-secondary text-muted-foreground border border-border">
-                  {TIER_CONFIG[followerTier].label} · {TIER_CONFIG[followerTier].range}
-                  {followerCount !== null && <span className="text-white/50"> ({(followerCount / 1000).toFixed(0)}k from profile)</span>}
-                </span>
-              )}
-              {!followerTier && (
-                <span className="text-xs text-muted-foreground italic">Add your follower count in Profile settings to personalise this</span>
-              )}
+          {creatorRate ? (
+            <div className="px-4 py-3 rounded-xl bg-primary/8 border border-primary/20">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/70 mb-0.5">Your typical rate</p>
+              <p className="text-lg font-extrabold text-white">${creatorRate.amount.replace(/^\$/, "")}</p>
             </div>
+          ) : (
+            <button type="button"
+              onClick={() => { setLocation("/profile"); setTimeout(() => document.getElementById("typical-rates")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120); }}
+              className="w-full px-4 py-3 rounded-xl bg-primary/10 border border-primary/25 hover:bg-primary/15 hover:border-primary/40 transition-all text-left">
+              <p className="text-xs font-semibold text-primary">Add your typical rates in Profile →</p>
+              <p className="text-[11px] text-primary/50 mt-0.5">See your own rate next to the estimate.</p>
+            </button>
+          )}
 
-            {/* Your rate row — or prompt to add rates */}
-            {hasRate ? (
-              <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-primary/8 border border-primary/20">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/70 mb-0.5">Your typical rate</p>
-                  <p className="text-lg font-extrabold text-white">
-                    ${creatorRate.amount.replace(/^\$/, "")}
-                  </p>
-                  {hasSpecified && (
-                    <p className="text-[10px] text-white/40 mt-0.5 leading-tight">
-                      Includes:{" "}
-                      {[creatorRate.includesExclusivity && "exclusivity", creatorRate.includesPaidUsage && "paid usage rights"].filter(Boolean).join(" · ")}
-                    </p>
-                  )}
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Benchmark range</p>
-                  {benchmark
-                    ? <p className="text-xs font-bold text-white/70">{benchmark.low} – {benchmark.high}</p>
-                    : <p className="text-xs text-muted-foreground italic">No data for this tier</p>
-                  }
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setLocation("/profile");
-                  setTimeout(() => {
-                    document.getElementById("typical-rates")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }, 120);
-                }}
-                className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-primary/10 border border-primary/25 hover:bg-primary/15 hover:border-primary/40 transition-all text-left group"
-              >
-                <div>
-                  <p className="text-xs font-semibold text-primary group-hover:text-primary/90 transition-colors">
-                    Add your typical rates in Profile →
-                  </p>
-                  <p className="text-[11px] text-primary/50 mt-0.5">See your own rate next to these ranges.</p>
-                </div>
-              </button>
-            )}
+          {!result && (
+            <button type="button" onClick={() => void estimate()} disabled={loading} data-testid="button-estimate-rate"
+              className="w-full py-3 rounded-xl text-sm font-bold bg-primary text-white hover:bg-primary/85 transition-colors disabled:opacity-50">
+              {loading ? "Estimating…" : "Estimate rate"}
+            </button>
+          )}
+          {error && <p role="alert" className="text-xs text-red-400">{error}</p>}
 
-            {/* Range cards */}
-            {benchmark ? (
-              <>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { label: "Low end",   val: benchmark.low,    dim: true  },
-                    { label: "Median",    val: benchmark.median, dim: false },
-                    { label: "High end",  val: benchmark.high,   dim: true  },
-                  ].map(c => (
-                    <div key={c.label} className={`rounded-xl p-3 text-center border ${c.dim ? "bg-secondary/40 border-border" : "bg-primary/10 border-primary/30"}`}>
-                      <p className="text-xs text-muted-foreground mb-1 leading-tight">{c.label}</p>
-                      <p className={`text-sm font-extrabold ${c.dim ? "text-white/80" : "text-white"}`}>{c.val}</p>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  {benchmark.sampleNote} · MAVLIT Rate Index · <span className="text-amber-400/80">sample data</span>
-                </p>
-
-                {/* Case 2: rate entered but no flags specified — neutral note */}
-                {hasRate && !hasSpecified && (
-                  <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-amber-500/8 border border-amber-500/20">
-                    <AlertTriangle size={12} className="text-amber-400/80 mt-0.5 shrink-0" />
-                    <p className="text-xs text-amber-200/70 leading-relaxed">
-                      Consider whether your usual rate already accounts for this deal's exclusivity and usage terms.
-                    </p>
-                  </div>
-                )}
-              </>
-            ) : (
-              /* No data for this combo yet */
-              <div className="px-4 py-4 rounded-xl bg-secondary/40 border border-border text-center">
-                <p className="text-xs text-muted-foreground">No benchmark data yet for this combination. The developer can add it to the rate table.</p>
-              </div>
-            )}
-
-            {/* What moves this range */}
-            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-              <p className="text-xs font-bold text-white uppercase tracking-wider">What moves this range</p>
-              <ul className="space-y-2">
-                {modifierNotes.map((note, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                    <span className="text-xs text-white/80 leading-relaxed">{note}</span>
-                  </li>
-                ))}
+          {result && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4" data-testid="rate-estimate">
+              <div className="grid grid-cols-3 gap-2">
                 {[
-                  "Audience quality matters more than follower count alone — strong engagement and niche specificity both lift rates.",
-                  "In-house brand teams and agency-managed deals often have different budget structures and approval timelines.",
-                  "Being approached rather than cold-pitching typically gives you a stronger negotiating position.",
-                ].map((note, i) => (
-                  <li key={`static-${i}`} className="flex items-start gap-2">
-                    <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-white/20 shrink-0" />
-                    <span className="text-xs text-muted-foreground leading-relaxed">{note}</span>
-                  </li>
+                  { label: "Low end", value: result.rate_min, dim: true },
+                  { label: "Typical", value: result.rate_typical, dim: false },
+                  { label: "High end", value: result.rate_max, dim: true },
+                ].map(c => (
+                  <div key={c.label} className={`rounded-xl p-3 text-center border ${c.dim ? "bg-secondary/40 border-border" : "bg-primary/10 border-primary/30"}`}>
+                    <p className="text-xs text-muted-foreground mb-1 leading-tight">{c.label}</p>
+                    <p className={`text-sm font-extrabold ${c.dim ? "text-white/80" : "text-white"}`} data-testid={`rate-${c.label.split(" ")[0].toLowerCase()}`}>{money(c.value, result.currency)}</p>
+                  </div>
                 ))}
-              </ul>
-            </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span>Per {deliverable}</span>
+                {result.confidence && (
+                  <span data-testid="rate-confidence" className={`px-2 py-0.5 rounded-md font-semibold border ${CONFIDENCE_STYLE[result.confidence]}`}>
+                    {result.confidence.charAt(0).toUpperCase() + result.confidence.slice(1)} confidence
+                  </span>
+                )}
+              </div>
 
-            {/* Tier reference */}
-            {followerTier && (
-              <details className="group">
-                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-white transition-colors select-none list-none flex items-center gap-1">
-                  <ChevronDown size={11} className="group-open:rotate-180 transition-transform" />
-                  See all tiers for {platform} × {deliverable}
-                </summary>
-                <div className="mt-2 grid grid-cols-2 gap-1.5">
-                  {TIERS.map(t => {
-                    const d = BENCHMARK_DATA[`${platform}|${deliverable}|${t}`];
-                    const isActive = t === followerTier;
-                    return (
-                      <div key={t} className={`rounded-lg px-3 py-2 border text-xs ${isActive ? "bg-primary/10 border-primary/30" : "bg-secondary/40 border-border"}`}>
-                        <p className={`font-semibold mb-0.5 ${isActive ? "text-primary" : "text-white/60"}`}>
-                          {TIER_CONFIG[t].label} <span className="font-normal">({TIER_CONFIG[t].range})</span>
-                        </p>
-                        {d ? <p className="text-white/70">{d.low} – {d.high}</p> : <p className="text-muted-foreground italic">No data</p>}
-                      </div>
-                    );
-                  })}
+              {result.reasoning && <p className="text-xs text-white/80 leading-relaxed">{result.reasoning}</p>}
+
+              {result.adjustments.length > 0 && (
+                <div className="bg-card border border-border rounded-xl p-4 space-y-2">
+                  <p className="text-xs font-bold text-white uppercase tracking-wider">What shaped it</p>
+                  <ul className="space-y-2">
+                    {result.adjustments.map((a, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                        <span className="text-xs text-white/80 leading-relaxed"><span className="font-semibold capitalize">{a.factor}</span>: {a.effect}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </details>
-            )}
+              )}
 
-          </motion.div>
-        </AnimatePresence>
+              <p className="text-[11px] text-muted-foreground leading-relaxed" data-testid="rate-data-used">
+                {details.creator_niche ? `${details.creator_niche} creators` : "Creators"}
+                {details.follower_bucket ? ` with ${details.follower_bucket} followers` : ""}
+                {details.data_row ? ` · ${details.data_row.creators} creators, ${details.data_row.points} prices, median ${money(details.data_row.median, "USD")}` : " · no matching rate data"}
+                {details.brand_followers && !/unknown/i.test(details.brand_followers) ? ` · brand: ${details.brand_followers} Instagram followers` : ""}
+                {` · ${details.partner_creators?.length ?? 0} creator${details.partner_creators?.length === 1 ? "" : "s"} the brand has paid`}
+              </p>
+              <button type="button" onClick={() => void estimate()} disabled={loading}
+                className="text-xs font-semibold text-primary hover:underline disabled:opacity-50">
+                {loading ? "Estimating…" : "Estimate again"}
+              </button>
+            </motion.div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -1205,6 +1098,7 @@ function DealMakerTab({
   const isCustom  = selectedBrand === CUSTOM_BRAND;
   const brandName = isCustom ? custom.trim() : selectedBrand;
   const brandInfo = brandName && !isCustom ? BRAND_DB[brandName] : null;
+  const pitchedBrandId = isCustom ? null : pitches.find(p => p.brand === brandName)?.brandId ?? null;
 
   return (
     <div className="space-y-5">
@@ -1248,7 +1142,7 @@ function DealMakerTab({
         isOpen={openCard === "rate"}
         onToggle={() => toggle("rate")}
       >
-        <RateEstimator dealContext={dealContext} />
+        <RateEstimator dealContext={dealContext} brand={brandName ? { id: pitchedBrandId, name: brandName } : null} />
       </AccordionCard>
 
       <AccordionCard
@@ -1292,6 +1186,7 @@ export default function Pipeline() {
       status: p.status,
       agreedRate: p.agreed_rate ?? undefined,
       sentAt: p.sent_at,
+      brandId: p.brand_id,
   }));
 
   const updatePitch = async (id: number, body: PitchUpdateRequest) => {

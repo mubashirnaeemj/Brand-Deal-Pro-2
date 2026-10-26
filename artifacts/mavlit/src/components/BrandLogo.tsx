@@ -17,7 +17,7 @@ function WebsiteLogo({ name, domain, testId, size }: { name: string; domain: str
       className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 font-semibold text-white"
       style={{ width: size, height: size, fontSize: Math.round(size * 0.43), backgroundColor: fallback ? brandAvatarColor(name) : "#ffffff" }}>
       {fallback ? letter : (
-        <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=${size > 32 ? 128 : 64}`}
+        <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`}
           alt="" aria-hidden="true" loading="lazy" referrerPolicy="no-referrer"
           className="h-full w-full object-contain"
           onError={markFailed}

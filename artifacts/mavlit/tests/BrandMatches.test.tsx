@@ -597,7 +597,7 @@ describe("Matches page V3 integration", () => {
     await settle();
     const cardLogo = screen.getByTestId("img-ai-logo-10");
     expect(cardLogo).toHaveStyle({ width: "44px", height: "44px" });
-    expect(cardLogo.querySelector("img")).toHaveAttribute("src", expect.stringContaining("domain=alpha.example&sz=128"));
+    expect(cardLogo.querySelector("img")).toHaveAttribute("src", expect.stringContaining("domain=alpha.example&sz=64"));
     fireEvent.click(screen.getByTestId("button-contact-intel-10"));
     await settle();
     const panelLogo = screen.getByTestId("img-panel-logo");

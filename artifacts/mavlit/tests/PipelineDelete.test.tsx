@@ -15,6 +15,7 @@ const pitch = (id: number, brand: string) => ({
 });
 
 let pitches: ReturnType<typeof pitch>[];
+let rateRequests: Record<string, unknown>[];
 let deleteCalls: string[];
 let deleteStatus: number;
 let profileApi: ReturnType<typeof installProfileApi>;
@@ -22,6 +23,7 @@ let profileApi: ReturnType<typeof installProfileApi>;
 beforeEach(() => {
   pitches = [pitch(1, "Alpha Audio"), pitch(2, "Zeta Guitars")];
   deleteCalls = [];
+  rateRequests = [];
   deleteStatus = 200;
   profileApi = installProfileApi(creatorProfile());
   const base = globalThis.fetch;
@@ -29,6 +31,16 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), window.location.origin);
     if (url.pathname === "/api/mavlit/pitches/me") return json({ pitches, total: pitches.length });
+    if (url.pathname === "/api/mavlit/rate-intelligence" && init?.method === "POST") {
+      rateRequests.push(JSON.parse(String(init.body)));
+      return json({
+        id: 1, brand_name: "Alpha Audio", rate_min: 250, rate_typical: 420, rate_max: 700, currency: "USD", confidence: "medium",
+        reasoning: "Anchored on the median of creators your size.", basis: "Beauty, 50k-100k, Reel",
+        adjustments: [{ factor: "usage", effect: "Adds about 35% for paid usage." }],
+        details: { creator_niche: "Beauty", follower_bucket: "50k-100k", data_row: { creators: 29, points: 34, median: 442 }, brand_followers: "1,631,664", partner_creators: [{ username: "a" }, { username: "b" }] },
+        created_at: "2026-10-26T00:00:00Z",
+      });
+    }
     const target = /^\/api\/mavlit\/pitches\/(\d+)$/.exec(url.pathname);
     if (target && init?.method === "DELETE") {
       deleteCalls.push(target[1]);
@@ -113,12 +125,47 @@ describe("Deal Tools", () => {
     for (const gone of ["TikTok", "YouTube", "TikTok video", "YouTube integration"]) expect(screen.queryByRole("button", { name: gone })).not.toBeInTheDocument();
   });
 
-  it("Rate Intelligence uses Instagram, and says so when there is no benchmark for Instagram Live", async () => {
-    await openDealTools();
+  it("Rate Intelligence asks for a brand and a deliverable, then shows the estimate it gets for the pitched brand", async () => {
+    const input = await openDealTools();
     fireEvent.click(screen.getByText("Rate Intelligence"));
+    expect(screen.getByText(/Choose the/)).toHaveTextContent("Choose the brand you are working on above");
+    fireEvent.change(input, { target: { value: "Alpha" } });
+    fireEvent.mouseDown(within(screen.getByTestId("list-deal-brands")).getByRole("option", { name: "Alpha Audio" }));
     expect(screen.getByText(/Set a/)).toHaveTextContent("Set a Deliverable type in the Deal context above");
+
+    fireEvent.click(screen.getByRole("button", { name: "Reel" }));
+    fireEvent.click(screen.getByRole("button", { name: /Broad/ }));
+    fireEvent.change(screen.getByPlaceholderText("Duration (months)"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: "Includes paid usage or whitelisting" }));
+    expect(rateRequests).toHaveLength(0);                                   // nothing is asked until the button is pressed
+    fireEvent.click(screen.getByTestId("button-estimate-rate"));
+    expect(await screen.findByTestId("rate-estimate")).toBeInTheDocument();
+    expect(rateRequests).toEqual([{
+      brand_id: 1, brand_name: "Alpha Audio", platform: "Instagram", deliverable_type: "Reel",
+      exclusivity: "Broad", usage: "Includes paid usage or whitelisting", duration_months: 6,
+    }]);
+    expect(screen.getByTestId("rate-low")).toHaveTextContent("$250");
+    expect(screen.getByTestId("rate-typical")).toHaveTextContent("$420");
+    expect(screen.getByTestId("rate-high")).toHaveTextContent("$700");
+    expect(screen.getByTestId("rate-confidence")).toHaveTextContent("Medium confidence");
+    expect(screen.getByText("Anchored on the median of creators your size.")).toBeInTheDocument();
+    expect(screen.getByText(/Adds about 35% for paid usage/)).toBeInTheDocument();
+    expect(screen.getByTestId("rate-data-used")).toHaveTextContent("Beauty creators with 50k-100k followers · 29 creators, 34 prices, median $442 · brand: 1,631,664 Instagram followers · 2 creators the brand has paid");
+
+    // Changing a deal term makes the shown estimate stale.
+    fireEvent.click(screen.getByRole("button", { name: "Story" }));
+    expect(screen.queryByTestId("rate-estimate")).not.toBeInTheDocument();
+    expect(screen.getByTestId("button-estimate-rate")).toBeInTheDocument();
+  });
+
+  it("sends only the brand name for a brand that was not pitched, and Instagram Live as the deliverable", async () => {
+    const input = await openDealTools();
+    fireEvent.click(screen.getByText("Rate Intelligence"));
+    fireEvent.change(input, { target: { value: "Rode Microphones" } });
+    fireEvent.keyDown(input, { key: "Enter" });
     fireEvent.click(screen.getByRole("button", { name: "Instagram Live" }));
-    expect(screen.getAllByText("Instagram").length).toBeGreaterThan(0);                       // the context chip
-    expect(screen.getByText(/No benchmark data yet for this combination/)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("button-estimate-rate"));
+    await screen.findByTestId("rate-estimate");
+    expect(rateRequests).toEqual([{ brand_name: "Rode Microphones", platform: "Instagram", deliverable_type: "Instagram Live" }]);
   });
 });

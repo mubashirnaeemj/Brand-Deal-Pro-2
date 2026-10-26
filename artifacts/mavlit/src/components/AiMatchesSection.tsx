@@ -51,7 +51,7 @@ function formatRanked(value: string | null | undefined) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString();
+  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
 export default function AiMatchesSection({ version, data, loading, error, refreshing, onRefresh, onCheckStatus, onOpen,
@@ -63,7 +63,7 @@ export default function AiMatchesSection({ version, data, loading, error, refres
   const filtered = filterBrandMatches(filterByNiche(matches, niches), search);
   const busy = refreshing || pending;
   const ranked = formatRanked(data?.ranked_at);
-  const meta = ranked ? `Ranked ${ranked} — ${data?.total ?? matches.length} brands` : "";
+  const meta = ranked ? `Ranked ${ranked} · ${data?.total ?? matches.length} brands` : "";
 
   return (
     <section data-testid={`section-matches-${version}`}>

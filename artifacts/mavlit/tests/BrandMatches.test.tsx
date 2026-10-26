@@ -588,6 +588,15 @@ describe("Matches page V3 integration", () => {
     expect(card.getAllByRole("progressbar")).toHaveLength(1);          // and so is the straight bar
   });
 
+  it("shows when the ranking ran as a date and short time, then the number of brands", async () => {
+    fixture.respond("GET", ranking("completed", { ranked_at: "2026-10-22T19:25:50Z", total: 58 }));
+    mountMatches();
+    await settle();
+    const when = new Date("2026-10-22T19:25:50Z").toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    expect(screen.getByTestId("text-ai-meta")).toHaveTextContent(`Ranked ${when} · 58 brands`);
+    expect(screen.getByTestId("text-ai-meta").textContent).not.toMatch(/:\d\d:\d\d/);   // no seconds
+  });
+
   it("starts with the page heading, without the Brand Matches badge line above it", async () => {
     mountMatches();
     await settle();

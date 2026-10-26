@@ -30,7 +30,7 @@ function mountMatches(path = "/brand-matches?version=v3") {
 
 // Exercise HTTP/transport/schema failures independently of job status "failed".
 describe("Matches page request errors and expired sessions", () => {
-  const cardOrder = () => screen.getAllByRole("article").map((card) => card.getAttribute("data-testid"));
+  const cardOrder = () => screen.getAllByRole("article", { hidden: true }).map((card) => card.getAttribute("data-testid"));
   const previousCards = ["card-ai-brand-30", "card-ai-brand-10", "card-ai-brand-20"];
 
   it("recovers from a transient GET failure without showing a terminal error or starting a ranking", async () => {
@@ -119,7 +119,7 @@ describe("Matches page request errors and expired sessions", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(cardOrder()).toEqual(previousCards);
     expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
-    expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Previous results below are not final.");
+    expect(screen.getByTestId("status-v3-updating")).not.toHaveTextContent("Previous results below are not final.");
     fixture.respond("GET", ranking("completed", { matches: rankedBrands.slice(1), total: 2 }));
     await tick(3_000);
     expect(cardOrder()).toEqual(previousCards.slice(1));
@@ -208,7 +208,7 @@ describe("Matches page V3 integration", () => {
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent?.replace(/\s*\(\d+\)/, ""))).toEqual(["All matches", "Saved"]);
     expect(fixture.calls("GET")).toHaveLength(1);
     expect(fixture.calls("POST")).toHaveLength(0);
-    expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Previous results below are not final.");
+    expect(screen.getByTestId("status-v3-updating")).not.toHaveTextContent("Previous results below are not final.");
     fixture.respond("GET", ranking("completed"));
     await tick(3_000);
     expect(fixture.calls("GET")).toHaveLength(2);
@@ -239,20 +239,20 @@ describe("Matches page V3 integration", () => {
     fixture.respond("GET", ranking("queued"));
     mountMatches();
     await settle();
-    expect(screen.getAllByRole("article")[0].parentElement).toHaveAttribute("aria-busy", "true");
+    expect(screen.getAllByRole("article", { hidden: true })[0].parentElement).toHaveAttribute("aria-busy", "true");
     await tick(179_999);
     expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Updating your matches");
     await tick(1);
     expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Still working — check back shortly");
     expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Automatic checks have paused.");
-    expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Previous results below are not final.");
+    expect(screen.getByTestId("status-v3-updating")).not.toHaveTextContent("Previous results below are not final.");
     expect(screen.getByRole("button", { name: "Check status" })).toBeEnabled();
     expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
     const reads = fixture.calls("GET").length;
     await tick(30_000);
     expect(fixture.calls("GET")).toHaveLength(reads);
     expect(fixture.calls("POST")).toHaveLength(0);
-    expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(screen.getAllByRole("article", { hidden: true })).toHaveLength(3);
   });
 
   it.each(["completed", "failed"] as const)("checks a paused job without POSTing and handles %s", async (status) => {
@@ -268,8 +268,8 @@ describe("Matches page V3 integration", () => {
     expect(fixture.calls("POST")).toHaveLength(0);
     expect(screen.queryByRole("button", { name: "Check status" })).not.toBeInTheDocument();
     expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Updating your matches");
-    expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Previous results below are not final.");
-    expect(screen.getAllByRole("article")[0].parentElement).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByTestId("status-v3-updating")).not.toHaveTextContent("Previous results below are not final.");
+    expect(screen.getAllByRole("article", { hidden: true })[0].parentElement).toHaveAttribute("aria-busy", "true");
     expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
 
     fixture.respond("GET", ranking(status, {
@@ -277,9 +277,9 @@ describe("Matches page V3 integration", () => {
     }));
     await tick(3_000);
     expect(screen.queryByTestId("status-v3-updating")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("article")[0].parentElement).toHaveAttribute("aria-busy", "false");
+    expect(screen.getAllByRole("article", { hidden: true })[0].parentElement).toHaveAttribute("aria-busy", "false");
     expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
-    expect(screen.getAllByRole("article")).toHaveLength(2);
+    expect(screen.getAllByRole("article", { hidden: true })).toHaveLength(2);
     if (status === "failed") {
       expect(screen.getByTestId("text-ai-failed")).toHaveTextContent("Fixture ranking failed");
       expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
@@ -318,7 +318,7 @@ describe("Matches page V3 integration", () => {
     await settle();
     expect(fixture.calls("POST")).toHaveLength(1);
     expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
-    expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Previous results below are not final.");
+    expect(screen.getByTestId("status-v3-updating")).not.toHaveTextContent("Previous results below are not final.");
     fireEvent.click(screen.getByTestId("button-ai-rerank"));
     await settle();
     expect(fixture.calls("POST")).toHaveLength(1);
@@ -334,7 +334,7 @@ describe("Matches page V3 integration", () => {
     await tick(3_000);
     expect(screen.queryByTestId("status-v3-updating")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
-    expect(screen.getAllByRole("article").map((card) => card.getAttribute("data-testid")))
+    expect(screen.getAllByRole("article", { hidden: true }).map((card) => card.getAttribute("data-testid")))
       .toEqual(["card-ai-brand-10", "card-ai-brand-20"]);
     await tick(12_000);
     expect(fixture.calls("GET")).toHaveLength(reads + 2);
@@ -477,7 +477,7 @@ describe("Matches page V3 integration", () => {
     ], total: 4 }));
     mountMatches();
     await settle();
-    const names = () => screen.getAllByRole("article").map((card) => card.getAttribute("data-testid"));
+    const names = () => screen.getAllByRole("article", { hidden: true }).map((card) => card.getAttribute("data-testid"));
     const chip = (niche: string) => within(screen.getByTestId("match-niches")).getByRole("button", { name: new RegExp(`^${niche}`) });
     const chips = () => within(screen.getByTestId("match-niches")).getAllByTestId("chip-niche").map((c) => c.textContent);
     // Most brands first, then A to Z; each with its brand count. Three niches: no "View more" needed.
@@ -533,7 +533,7 @@ describe("Matches page V3 integration", () => {
     expect(screen.getByTestId("text-ai-niche-100").className).toContain("text-violet-400");
     fireEvent.click(group.getByRole("button", { name: /^Travel/ }));
     expect(group.getByRole("button", { name: /^Travel/ })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(screen.getAllByRole("article", { hidden: true })).toHaveLength(1);
   });
 
   it("lets the creator save and unsave a brand from its card and from the details panel", async () => {
@@ -696,7 +696,7 @@ describe("Matches page V3 integration", () => {
     fixture.respond("GET", ranking("completed", { matches: many, total: many.length }));
     mountMatches();
     await settle();
-    const ids = () => screen.getAllByRole("article").map((card) => card.getAttribute("data-testid"));
+    const ids = () => screen.getAllByRole("article", { hidden: true }).map((card) => card.getAttribute("data-testid"));
     const pagination = () => screen.getByTestId("match-pagination");
 
     expect(ids()).toHaveLength(30);
@@ -731,7 +731,7 @@ describe("Matches page V3 integration", () => {
   it("shows no page buttons when everything fits on one page", async () => {
     mountMatches();
     await settle();
-    expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(screen.getAllByRole("article", { hidden: true })).toHaveLength(3);
     expect(screen.queryByTestId("match-pagination")).not.toBeInTheDocument();
   });
 
@@ -749,7 +749,7 @@ describe("Matches page V3 integration", () => {
     );
     mountMatches();
     await settle();
-    const cards = () => screen.getAllByRole("article").map((card) => card.getAttribute("data-testid"));
+    const cards = () => screen.getAllByRole("article", { hidden: true }).map((card) => card.getAttribute("data-testid"));
     expect(cards()).toEqual(["card-ai-brand-10", "card-ai-brand-20", "card-ai-brand-30"]);
     expect(screen.getByTestId("tab-matches-all")).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("tab-matches-saved")).toHaveTextContent("Saved (3)");              // all saved brands, as the dashboard counts
@@ -769,7 +769,7 @@ describe("Matches page V3 integration", () => {
     expect(screen.getByTestId("tab-matches-saved")).toHaveTextContent("Saved (2)");
     fireEvent.click(within(screen.getByTestId("card-ai-brand-30")).getByTestId("button-save-brand-30"));
     await settle();
-    expect(screen.queryAllByRole("article")).toHaveLength(0);
+    expect(screen.queryAllByRole("article", { hidden: true })).toHaveLength(0);
     expect(screen.getByTestId("text-no-saved-matches")).toHaveTextContent("None of your matched brands is saved yet");
 
     fireEvent.click(screen.getByTestId("tab-matches-all"));
@@ -845,7 +845,7 @@ describe("Matches page V3 integration", () => {
   it("renders backend order including unwanted brands and restores it after search", async () => {
     mountMatches();
     await settle();
-    const order = () => screen.getAllByRole("article").map((card) => card.getAttribute("data-testid"));
+    const order = () => screen.getAllByRole("article", { hidden: true }).map((card) => card.getAttribute("data-testid"));
     expect(order()).toEqual(["card-ai-brand-30", "card-ai-brand-10", "card-ai-brand-20"]);
     expect(screen.getByTestId("card-brand-preferences")).toHaveTextContent("Avoid Unwanted Amplifiers");
     fireEvent.change(screen.getByRole("searchbox", { name: "Search brand matches" }), { target: { value: "Unwanted" } });

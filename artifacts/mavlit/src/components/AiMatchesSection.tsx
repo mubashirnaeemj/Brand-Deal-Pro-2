@@ -49,6 +49,41 @@ function AiRankingStatus({ message, hasPreviousMatches }: { message: string; has
   );
 }
 
+/**
+ * While a v3 ranking runs: the progress line in the middle of the screen. Over the previous brands (blurred behind it)
+ * when there are some, else on its own. After three minutes of waiting it says so and offers "Check status".
+ */
+function RankingOverlay({ message, timedOut, pending, onCheckStatus, floating }: {
+  message: string; timedOut: boolean; pending: boolean; onCheckStatus: () => void; floating: boolean;
+}) {
+  const reducedMotion = useReducedMotion();
+  const card = (
+    <div role="status" aria-live="polite" data-testid="status-v3-updating"
+      className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-2xl border border-primary/30 bg-background/80 px-8 py-8 text-center shadow-2xl backdrop-blur-sm">
+      {!timedOut && <Loader2 size={28} aria-hidden="true" className="animate-spin text-primary" />}
+      <p className="text-sm font-semibold text-white/80">{timedOut ? "Still working — check back shortly" : "Updating your matches…"}</p>
+      {timedOut ? (
+        <p className="text-sm text-muted-foreground">Automatic checks have paused. Your ranking continues in the background.</p>
+      ) : (
+        <motion.p key={message} data-testid="text-ranking-message" initial={{ opacity: reducedMotion ? 1 : 0 }} animate={{ opacity: 1 }}
+          transition={{ duration: reducedMotion ? 0 : 0.35 }} className="text-lg font-bold leading-snug text-white">
+          {message}
+        </motion.p>
+      )}
+      {!timedOut && <p className="text-xs text-muted-foreground">This can take a minute or two.</p>}
+      {timedOut && pending && (
+        <button type="button" data-testid="button-ai-check-status" onClick={onCheckStatus}
+          className="rounded-lg border border-primary/50 px-3 py-2 text-sm font-semibold text-white hover:bg-primary/10">
+          Check status
+        </button>
+      )}
+    </div>
+  );
+  return floating
+    ? <div className="absolute inset-0 z-10 flex items-start justify-center px-4"><div className="sticky top-[30vh] mt-16 w-full">{card}</div></div>
+    : <div className="py-24">{card}</div>;
+}
+
 function formatRanked(value: string | null | undefined) {
   if (!value) return "";
   const date = new Date(value);
@@ -67,6 +102,7 @@ export default function AiMatchesSection({ version, data, loading, error, refres
   // 30 brands per page, in rank order. A new search, niche choice or tab starts again at page 1.
   const [page, setPage] = useState(1);
   const gridTop = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const filterKey = JSON.stringify([search.trim(), niches, !!savedIds]);
   useEffect(() => { setPage(1); }, [filterKey]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / MATCHES_PER_PAGE));
@@ -77,6 +113,9 @@ export default function AiMatchesSection({ version, data, loading, error, refres
     gridTop.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   };
   const busy = refreshing || pending;
+  const ranking = version === "v3" && busy;
+  // The previous brands stay on screen, blurred and out of reach, until the new ranking is ready.
+  useEffect(() => { if (listRef.current) listRef.current.inert = ranking; });
   const ranked = formatRanked(data?.ranked_at);
   const meta = ranked ? `Ranked ${ranked} · ${data?.total ?? matches.length} brands` : "";
 
@@ -112,25 +151,7 @@ export default function AiMatchesSection({ version, data, loading, error, refres
         <p role="status" className="py-16 text-center text-muted-foreground">Loading AI matches…</p>
       ) : (
         <>
-          {busy && (version === "v3" ? (
-            <div role="status" aria-live="polite" data-testid="status-v3-updating"
-              className="mb-5 rounded-xl border border-primary/30 bg-primary/10 p-4">
-              <p className="flex items-center gap-2 text-sm font-semibold text-white">
-                {!timedOut && <Loader2 size={16} aria-hidden="true" className="animate-spin" />}
-                {timedOut ? "Still working — check back shortly" : "Updating your matches…"}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {timedOut ? "Automatic checks have paused. Your ranking continues in the background." : progressMessage}
-                {matches.length > 0 && " Previous results below are not final."}
-              </p>
-              {timedOut && pending && (
-                <button type="button" data-testid="button-ai-check-status" onClick={onCheckStatus}
-                  className="mt-3 rounded-lg border border-primary/50 px-3 py-2 text-sm font-semibold text-white hover:bg-primary/10">
-                  Check status
-                </button>
-              )}
-            </div>
-          ) : <AiRankingStatus message={progressMessage} hasPreviousMatches={matches.length > 0} />)}
+          {busy && version !== "v3" && <AiRankingStatus message={progressMessage} hasPreviousMatches={matches.length > 0} />}
           {status === "failed" && (
             <p role="alert" data-testid="text-ai-failed" className="mb-5 text-sm" style={{ color: "#f87171" }}>
               AI ranking failed: {data?.error ?? "Unknown error"}.
@@ -155,8 +176,13 @@ export default function AiMatchesSection({ version, data, loading, error, refres
           {version !== "v3" && status === "completed" && matches.length === 0 && (
             <p className="py-16 text-center text-muted-foreground">The AI ranking found no brands for your profile.</p>
           )}
+          {ranking && matches.length === 0 && (
+            <RankingOverlay message={progressMessage} timedOut={timedOut} pending={pending} onCheckStatus={onCheckStatus} floating={false} />
+          )}
           {matches.length > 0 && (
-            <>
+            <div className="relative min-h-[22rem]">
+            <div ref={listRef} data-testid="matches-list" aria-hidden={ranking || undefined}
+              className={ranking ? "pointer-events-none select-none opacity-60 blur-xl" : ""}>
               {(search.trim() || niches.length > 0) && (
                 <p role="status" className="mb-4 text-xs text-muted-foreground">
                   Showing {filtered.length} of {matches.length} brands{niches.length ? ` in ${niches.join(", ")}` : ""}
@@ -164,8 +190,8 @@ export default function AiMatchesSection({ version, data, loading, error, refres
               )}
               {filtered.length > 0 ? (
                 <>
-                <div ref={gridTop} aria-busy={version === "v3" && busy} data-testid="grid-matches"
-                  className={`scroll-mt-28 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 ${version === "v3" && busy ? "opacity-50" : ""}`}>
+                <div ref={gridTop} aria-busy={ranking} data-testid="grid-matches"
+                  className="scroll-mt-28 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                   {visible.map((match) => (
                     <AiMatchCard key={match.brand_raw_id} match={match} version={version}
                       expanded={expandedByBrand[match.brand_raw_id] ?? false}
@@ -181,7 +207,9 @@ export default function AiMatchesSection({ version, data, loading, error, refres
                   <p className="mt-1 text-sm">{search.trim() ? "Try a different search, other niches or clear the search." : "Try other niches."}</p>
                 </div>
               )}
-            </>
+            </div>
+            {ranking && <RankingOverlay message={progressMessage} timedOut={timedOut} pending={pending} onCheckStatus={onCheckStatus} floating />}
+            </div>
           )}
         </>
       )}

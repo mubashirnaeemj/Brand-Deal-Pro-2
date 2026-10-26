@@ -25,17 +25,30 @@ function mount(overrides: Partial<ComponentProps<typeof AiMatchesSection>> = {})
 }
 
 describe("V3 ranking presentation", () => {
+  it("shows only the progress line, with no list, when a first ranking runs and there are no previous brands", () => {
+    mount({ data: ranking("running", { matches: [], total: 0 }) });
+    expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Reading brand evidence…");
+    expect(screen.queryByTestId("matches-list")).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("article", { hidden: true })).toHaveLength(0);
+  });
+
   it.each(["queued", "running"] as const)("marks previous results as pending when %s", (status) => {
     mount({ data: ranking(status) });
     const notice = screen.getByTestId("status-v3-updating");
     expect(notice).toHaveAttribute("role", "status");
     expect(notice).toHaveAttribute("aria-live", "polite");
     expect(notice).toHaveTextContent("Updating your matches…");
-    expect(notice).toHaveTextContent("Previous results below are not final.");
-    const cards = screen.getAllByRole("article");
+    expect(notice).not.toHaveTextContent("Previous results below are not final.");
+    const cards = screen.getAllByRole("article", { hidden: true });
     expect(cards).toHaveLength(3);
     expect(cards[0].parentElement).toHaveAttribute("aria-busy", "true");
-    expect(cards[0].parentElement).toHaveClass("opacity-50");
+    // The previous brands are completely blurred and out of reach; the progress line is in the middle of the screen.
+    const list = screen.getByTestId("matches-list");
+    expect(list).toHaveClass("blur-xl");
+    expect(list).toHaveAttribute("aria-hidden", "true");
+    expect(list).toHaveClass("pointer-events-none");
+    expect(list.inert).toBe(true);
+    expect(within(notice).getByTestId("text-ranking-message")).toHaveTextContent("Reading brand evidence…");
     expect(screen.getByRole("button", { name: "Ranking…" })).toBeDisabled();
   });
 
@@ -45,26 +58,27 @@ describe("V3 ranking presentation", () => {
     expect(screen.getByTestId("status-v3-updating")).toHaveTextContent(
       "Automatic checks have paused. Your ranking continues in the background.",
     );
-    expect(screen.getAllByRole("article")[0].parentElement).toHaveAttribute("aria-busy", "true");
+    expect(screen.getAllByRole("article", { hidden: true })[0].parentElement).toHaveAttribute("aria-busy", "true");
   });
 
   it("renders backend array order unchanged and never hides unwanted preferences", () => {
     mount();
-    expect(screen.getAllByRole("article").map((card) => card.getAttribute("data-testid")))
+    expect(screen.getAllByRole("article", { hidden: true }).map((card) => card.getAttribute("data-testid")))
       .toEqual(rankedBrands.map((brand) => `card-ai-brand-${brand.brand_raw_id}`));
     expect(screen.getByTestId("card-brand-preferences")).toHaveTextContent("Avoid Unwanted Amplifiers");
     expect(screen.getByTestId("card-ai-brand-20")).toHaveTextContent("Unwanted Amplifiers");
     expect(screen.queryByTestId("status-v3-updating")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("article")[0].parentElement).toHaveAttribute("aria-busy", "false");
-    expect(screen.getAllByRole("article")[0].parentElement).not.toHaveClass("opacity-50");
+    expect(screen.getAllByRole("article", { hidden: true })[0].parentElement).toHaveAttribute("aria-busy", "false");
+    expect(screen.getByTestId("matches-list")).not.toHaveClass("blur-xl");
+    expect(screen.getByTestId("matches-list").inert).toBe(false);
   });
 
   it("searches without reordering the remaining brands or applying preferences as a filter", () => {
     const view = mount({ search: "Audio" });
-    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(screen.getAllByRole("article", { hidden: true })).toHaveLength(1);
     expect(screen.getByRole("article")).toHaveTextContent("Alpha Audio");
     view.rerender(<AiMatchesSection {...view.props} search="" />);
-    expect(screen.getAllByRole("article").map((card) => card.getAttribute("data-testid")))
+    expect(screen.getAllByRole("article", { hidden: true }).map((card) => card.getAttribute("data-testid")))
       .toEqual(rankedBrands.map((brand) => `card-ai-brand-${brand.brand_raw_id}`));
   });
 
@@ -84,7 +98,7 @@ describe("V3 ranking presentation", () => {
     const { props } = mount({ refreshing: true });
     fireEvent.click(screen.getByTestId("button-ai-rerank"));
     expect(props.onRefresh).not.toHaveBeenCalled();
-    expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Previous results below are not final.");
+    expect(screen.getByTestId("status-v3-updating")).not.toHaveTextContent("Previous results below are not final.");
   });
 
   it("distinguishes loading and completed empty states from a pending job", () => {
@@ -103,7 +117,7 @@ describe("V2 presentation remains separate", () => {
     expect(screen.getByTestId("status-ai-pending")).toHaveTextContent("your previous ranking is shown below");
     expect(screen.queryByTestId("status-v3-updating")).not.toBeInTheDocument();
     expect(screen.queryByTestId("card-brand-preferences")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("article")[0].parentElement).toHaveAttribute("aria-busy", "false");
+    expect(screen.getAllByRole("article", { hidden: true })[0].parentElement).toHaveAttribute("aria-busy", "false");
   });
 
   it("retains the V2 failure instructions rather than a V3 retry button", () => {

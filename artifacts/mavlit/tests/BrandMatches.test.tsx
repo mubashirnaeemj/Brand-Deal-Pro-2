@@ -547,26 +547,65 @@ describe("Matches page V3 integration", () => {
     mountMatches();
     await settle();
     const cardButton = () => within(screen.getByTestId("card-ai-brand-10")).getByTestId("button-save-brand-10");
-    expect(cardButton()).toHaveTextContent("Save");
+    expect(cardButton()).toHaveTextContent(/^$/);                                        // the bookmark icon only, no text
+    expect(cardButton()).toHaveAccessibleName("Save Alpha Audio");
     expect(cardButton()).toHaveAttribute("aria-pressed", "false");
 
     fireEvent.click(cardButton());
     await settle();
-    expect(cardButton()).toHaveTextContent("Saved");
+    expect(cardButton()).toHaveTextContent(/^$/);
+    expect(cardButton()).toHaveAccessibleName("Remove Alpha Audio from saved brands");
     expect(cardButton()).toHaveAttribute("aria-pressed", "true");
     expect(fixture.savedBrands.map((brand) => brand.brand_id)).toEqual([10]);           // POST /saved-brands reached the server
-    expect(screen.queryByText("Contact Intel")).not.toBeInTheDocument();                // clicking Save does not open the details
+    expect(screen.queryByText("Contact Intel", { selector: "p" })).not.toBeInTheDocument();                // clicking Save does not open the details
 
     // The details panel shows the same state and can unsave.
     fireEvent.click(screen.getByTestId("card-ai-brand-10"));
     await settle();
     const panelButton = () => screen.getAllByTestId("button-save-brand-10").find((button) => !screen.getByTestId("card-ai-brand-10").contains(button))!;
-    expect(panelButton()).toHaveTextContent("Saved");
+    expect(panelButton()).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(panelButton());
     await settle();
     expect(fixture.savedBrands).toEqual([]);                                             // DELETE /saved-brands/10
-    expect(cardButton()).toHaveTextContent("Save");
+    expect(cardButton()).toHaveAttribute("aria-pressed", "false");
     expect(fixture.savedCalls).toEqual(["GET me", "POST", "DELETE 10"]);                 // one list request, shared by every button
+  });
+
+  it("shows the fit as a circle around the percentage, not a bar", async () => {
+    mountMatches();
+    await settle();
+    const card = within(screen.getByTestId("card-ai-brand-10"));
+    const ring = card.getByTestId("ring-fit");
+    expect(ring).toHaveAttribute("role", "progressbar");
+    expect(ring).toHaveAttribute("aria-valuenow", "96");
+    expect(ring).toHaveTextContent("96%");
+    expect(ring).toHaveTextContent("fit");
+    const arc = ring.querySelectorAll("circle")[1];
+    const [filled, total] = arc.getAttribute("stroke-dasharray")!.split(" ").map(Number);
+    expect(filled / total).toBeCloseTo(0.96, 2);                       // 96% of the circle is drawn
+    expect(card.queryByText("96% fit")).not.toBeInTheDocument();       // the old text badge is gone
+    expect(card.getAllByRole("progressbar")).toHaveLength(1);          // and so is the straight bar
+  });
+
+  it("has a Contact Intel button that opens the details, then a Create pitch email button last on the card", async () => {
+    stubBrandDetail();
+    mountMatches();
+    await settle();
+    const card = screen.getByTestId("card-ai-brand-10");
+    const intel = within(card).getByTestId("button-contact-intel-10");
+    const pitch = within(card).getByTestId("button-pitch-10");
+    expect(intel).toHaveTextContent("Contact Intel");
+    expect(intel).toHaveTextContent("Open match for available details");
+    expect(pitch).toHaveTextContent("Create pitch email →");
+    expect(intel.compareDocumentPosition(pitch) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(card.lastElementChild).toContainElement(pitch);              // the last thing in the card
+    fireEvent.click(intel);
+    await settle();
+    expect(screen.getByText("Contact Intel", { selector: "p" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    await settle();
+    fireEvent.click(pitch);
+    expect(window.location.pathname + window.location.search).toBe("/pitch?brand=Alpha%20Audio");
   });
 
   it("labels brands with a fit above 80% as the most relevant brand", async () => {
@@ -606,10 +645,10 @@ describe("Matches page V3 integration", () => {
     mountMatches();
     await settle();
     expect(screen.getByTestId("card-ai-brand-10").className).toContain("cursor-pointer");
-    expect(screen.queryByText("Contact Intel")).not.toBeInTheDocument();
+    expect(screen.queryByText("Contact Intel", { selector: "p" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("text-ai-reason-10"));   // plain text inside the card
     await settle();
-    expect(screen.getByText("Contact Intel")).toBeInTheDocument();
+    expect(screen.getByText("Contact Intel", { selector: "p" })).toBeInTheDocument();
   });
 
   it("links and buttons inside a card keep their own action and do not open the details", async () => {
@@ -623,10 +662,10 @@ describe("Matches page V3 integration", () => {
     fireEvent.click(screen.getByTestId("button-ai-brand-10"));          // the brand name is a link to its website
     fireEvent.click(screen.getByTestId("button-ai-reasons-10"));        // "Show all reasons"
     await settle();
-    expect(screen.queryByText("Contact Intel")).not.toBeInTheDocument();
+    expect(screen.queryByText("Contact Intel", { selector: "p" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "View brand details" }));
     await settle();
-    expect(screen.getByText("Contact Intel")).toBeInTheDocument();
+    expect(screen.getByText("Contact Intel", { selector: "p" })).toBeInTheDocument();
   });
 
   it("renders backend order including unwanted brands and restores it after search", async () => {

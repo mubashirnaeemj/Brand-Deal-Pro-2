@@ -822,13 +822,6 @@ function RateEstimator({ dealContext, brand }: { dealContext: DealContext; brand
                 </div>
               )}
 
-              <p className="text-[11px] text-muted-foreground leading-relaxed" data-testid="rate-data-used">
-                {details.creator_niche ? `${details.creator_niche} creators` : "Creators"}
-                {details.follower_bucket ? ` with ${details.follower_bucket} followers` : ""}
-                {details.data_row ? ` · ${details.data_row.creators} creators, ${details.data_row.points} prices, median ${money(details.data_row.median, "USD")}` : " · no matching rate data"}
-                {details.brand_followers && !/unknown/i.test(details.brand_followers) ? ` · brand: ${details.brand_followers} Instagram followers` : ""}
-                {` · ${details.partner_creators?.length ?? 0} creator${details.partner_creators?.length === 1 ? "" : "s"} the brand has paid`}
-              </p>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <button type="button" onClick={() => void estimate()} disabled={loading}
                   className="text-xs font-semibold text-primary hover:underline disabled:opacity-50">

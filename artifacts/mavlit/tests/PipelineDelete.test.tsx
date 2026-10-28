@@ -180,7 +180,7 @@ describe("Deal Tools", () => {
     expect(screen.getByTestId("rate-confidence")).toHaveTextContent("Medium confidence");
     expect(screen.getByText("Anchored on the median of creators your size.")).toBeInTheDocument();
     expect(screen.getByText(/Adds about 35% for paid usage/)).toBeInTheDocument();
-    expect(screen.getByTestId("rate-data-used")).toHaveTextContent("Beauty creators with 50k-100k followers · 29 creators, 34 prices, median $442 · brand: 1,631,664 Instagram followers · 2 creators the brand has paid");
+    expect(screen.queryByTestId("rate-data-used")).not.toBeInTheDocument();
 
     // Changing a deal term makes the shown estimate stale.
     fireEvent.click(screen.getByRole("button", { name: "Story" }));

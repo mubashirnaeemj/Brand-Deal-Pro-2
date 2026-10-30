@@ -16,19 +16,21 @@ import Pipeline from "@/pages/Pipeline";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
 import Login from "@/pages/Login";
+import PasswordChangeRequired from "@/components/PasswordChangeRequired";
 import { AuthProvider, isProfileComplete, useAuth } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
 function Router() {
   const [location] = useLocation();
-  const { user, isLoading, authError } = useAuth();
+  const { user, isLoading, authError, passwordChangeRequired } = useAuth();
 
   if (isLoading) return (
     <div className="min-h-screen bg-background flex items-center justify-center" aria-label="Checking your session">
       <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   );
+  if (passwordChangeRequired) return <PasswordChangeRequired />;
   if (authError) return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 text-white">
       <p role="alert">{authError}</p>

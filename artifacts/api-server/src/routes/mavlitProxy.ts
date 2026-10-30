@@ -5,6 +5,30 @@ import { pipeline } from "node:stream/promises";
 const router: IRouter = Router();
 const UPSTREAM = "https://api.mavlit.com";
 
+// Only the MAVLIT API routes the app uses are proxied. Everything else (/docs, /redoc, /openapi.json, /admin, /static, /health*, the operator
+// routes, the API's own HTML pages) answers 404 here without calling the API.
+export const ALLOWED_PATH = /^\/(auth|creator-profile|matches|brands|dashboard|pitches|rate-intelligence|contract-advice|own-brands|saved-brands|brand-niches|brand-niche-tags|brand-category-niches|brand-category-tags|creator-sub-niches)(\/|$)/;
+
+const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;   // a proxied (non-stream) response is held in memory: refuse anything larger
+const NORMAL_TIMEOUT_MS = 20_000;
+const ADVISORY_TIMEOUT_MS = 90_000;           // one LLM call: rate estimate, contract review
+const PITCH_TIMEOUT_MS = 180_000;             // a pitch (or a new profile post) can take ~2 minutes when MAVLIT first scrapes an Instagram post
+
+async function readCapped(body: ReadableStream<Uint8Array> | null): Promise<Buffer | null> {
+  if (!body) return Buffer.alloc(0);
+  const chunks: Buffer[] = [];
+  let size = 0;
+  const reader = body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_RESPONSE_BYTES) { await reader.cancel(); return null; }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks, size);
+}
+
 // Re-issue the upstream session cookie for the browser. Domain stays unset (host-only). Path is limited to this proxy because the app only
 // sends credentials to /api/mavlit. SameSite=Lax: the app and the proxy are the same site, so no cross-site request needs the cookie.
 // Max-Age/Expires come from the API untouched (the API sets them, 30 days by default). A delete from the API (Max-Age=0) goes through the
@@ -47,11 +71,17 @@ router.use(async (req, res): Promise<void> => {
 
   const target = new URL(UPSTREAM);
   target.pathname = req.path;
+  // Test the path AFTER the URL parser has resolved "..", "%2e%2e" and backslashes: "/auth/../docs" must not get past the allow-list.
+  if (!ALLOWED_PATH.test(target.pathname)) {
+    res.status(404).json({ detail: "Not found" });
+    return;
+  }
   target.search = new URL(req.originalUrl, "http://localhost").search;
 
   const streaming = req.method === "POST" && req.path === "/pitches/stream";
-  // A pitch or a new profile post can take ~2 minutes when MAVLIT first scrapes an Instagram post.
   const slowPitch = streaming || (req.method === "POST" && ["/pitches", "/creator-profile/me/posts"].includes(req.path));
+  const advisory = req.method === "POST" && ["/contract-advice", "/rate-intelligence"].includes(req.path);
+  const timeoutMs = slowPitch ? PITCH_TIMEOUT_MS : advisory ? ADVISORY_TIMEOUT_MS : NORMAL_TIMEOUT_MS;
   // Post thumbnails are images that MAVLIT caches; let the browser keep them too.
   const thumbnail = req.method === "GET" && /^\/creator-profile\/me\/posts\/[^/]+\/thumbnail$/.test(req.path);
   const headers = new Headers({ Accept: streaming ? "text/event-stream" : thumbnail ? "image/*,*/*;q=0.8" : "application/json" });
@@ -70,7 +100,7 @@ router.use(async (req, res): Promise<void> => {
       headers,
       body: hasBody ? JSON.stringify(req.body ?? {}) : undefined,
       redirect: "manual",
-      signal: AbortSignal.any([disconnected.signal, AbortSignal.timeout(slowPitch ? 180_000 : 20_000)]),
+      signal: AbortSignal.any([disconnected.signal, AbortSignal.timeout(timeoutMs)]),
     });
 
     const upstreamCache = upstream.headers.get("cache-control");
@@ -88,7 +118,13 @@ router.use(async (req, res): Promise<void> => {
       await pipeline(Readable.fromWeb(upstream.body), res);
       return;
     }
-    const body = Buffer.from(await upstream.arrayBuffer());
+    const declared = Number(upstream.headers.get("content-length") ?? 0);
+    const body = declared > MAX_RESPONSE_BYTES ? null : await readCapped(upstream.body);
+    if (body === null) {
+      res.removeHeader("Set-Cookie");
+      res.status(502).json({ detail: "MAVLIT API response was too large" });
+      return;
+    }
     res.status(upstream.status).send(body);
   } catch (err) {
     if (disconnected.signal.aborted) return;

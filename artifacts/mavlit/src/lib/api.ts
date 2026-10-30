@@ -5,10 +5,23 @@ export const API_BASE = "/api/mavlit";
 type ApiErrorBody = { detail?: unknown; message?: unknown; error?: unknown };
 
 export class ApiRequestError extends Error {
-  constructor(message: string, public readonly status: number) {
+  constructor(message: string, public readonly status: number, public readonly code?: string) {
     super(message);
     this.name = "ApiRequestError";
   }
+}
+
+// Routes that spend LLM / Apify money have a per-user daily cap (429) and allow one pitch at a time (409). The server's own wording stays in the
+// logs; the user gets one short sentence.
+const COST_CAPPED = /^\/(pitches|pitches\/stream|rate-intelligence|contract-advice|own-brands|matches\/me\/v[23]\/refresh|creator-profile\/me\/generate-description)$/;
+const ONE_PITCH_AT_A_TIME = /^\/pitches(\/stream)?$/;
+
+function friendlyMessage(path: string, method: string, status: number): string | null {
+  const route = path.split("?")[0];
+  if (method.toUpperCase() !== "POST") return null;
+  if (status === 429 && COST_CAPPED.test(route)) return "Daily limit reached, try again tomorrow";
+  if (status === 409 && ONE_PITCH_AT_A_TIME.test(route)) return "Another request is already running";
+  return null;
 }
 
 export async function apiResponse(path: string, options: RequestInit = {}): Promise<Response> {
@@ -29,10 +42,14 @@ export async function apiResponse(path: string, options: RequestInit = {}): Prom
       err.detail === "profile_incomplete" ||
       (typeof err.detail === "object" && err.detail !== null && "error" in err.detail && err.detail.error === "profile_incomplete")
     )) window.dispatchEvent(new Event("mavlit:profile-incomplete"));
+    if (res.status === 403 && typeof err.detail === "object" && err.detail !== null && "code" in err.detail && err.detail.code === "password_change_required") {
+      window.dispatchEvent(new Event("mavlit:password-change-required"));
+      throw new ApiRequestError("You must change your password before you can continue.", 403, "password_change_required");
+    }
     const validationDetail = Array.isArray(err.detail) ? err.detail.map((item) =>
       item && typeof item === "object" && "msg" in item ? String(item.msg) : "").filter(Boolean).join("; ") : null;
     const detail = typeof err.detail === "string" ? err.detail : validationDetail || (typeof err.message === "string" ? err.message : null);
-    throw new ApiRequestError(detail ?? `Request failed (${res.status})`, res.status);
+    throw new ApiRequestError(friendlyMessage(path, options.method ?? "GET", res.status) ?? detail ?? `Request failed (${res.status})`, res.status);
   }
   return res;
 }

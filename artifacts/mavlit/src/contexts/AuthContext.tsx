@@ -95,6 +95,8 @@ interface AuthContextValue {
   user: CreatorProfile | null;
   isLoading: boolean;
   authError: string | null;
+  /** The server asked for a password change before anything else (403 password_change_required): the app shows a blocking message with Log out. */
+  passwordChangeRequired: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   /** Ends every session of this account. Resolves once the browser is signed out; rejects (stays signed in) on any error but 401. */
@@ -108,6 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<CreatorProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [passwordChangeRequired, setPasswordChangeRequired] = useState(false);
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
 
@@ -122,9 +125,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser((current) => current ? { ...current, onboarding_completed: false } : current);
       navigate("/creator-profile");
     };
+    const passwordChange = () => setPasswordChangeRequired(true);
     window.addEventListener("mavlit:unauthorized", unauthorized);
     window.addEventListener("mavlit:profile-incomplete", incomplete);
+    window.addEventListener("mavlit:password-change-required", passwordChange);
     return () => {
+      window.removeEventListener("mavlit:password-change-required", passwordChange);
       window.removeEventListener("mavlit:unauthorized", unauthorized);
       window.removeEventListener("mavlit:profile-incomplete", incomplete);
     };
@@ -142,7 +148,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .catch((error) => {
         if (cancelled) return;
         setUser(null);
-        if (!(error instanceof ApiRequestError && error.status === 401)) {
+        const passwordChange = error instanceof ApiRequestError && error.code === "password_change_required";
+        if (!(error instanceof ApiRequestError && error.status === 401) && !passwordChange) {
           setAuthError("Couldn't check your session. Please try again.");
         }
       })
@@ -159,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       profile = await api.get<CreatorProfile>("/creator-profile/me");
     } catch (err) {
+      if (err instanceof ApiRequestError && err.code === "password_change_required") return;   // the blocking message is shown (event handled above)
       if (err instanceof ApiRequestError && err.status === 401) {
         throw new Error("Sign-in succeeded, but your browser did not keep the session. Open MAVLIT in its own tab and try again.");
       }
@@ -174,6 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try { await api.post("/auth/logout", {}); } catch { /* ignore — clear locally regardless */ }
     queryClient.clear();
     setUser(null);
+    setPasswordChangeRequired(false);
     navigate("/signin");
   }, [navigate, queryClient]);
 
@@ -189,6 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     queryClient.clear();
     setUser(null);
+    setPasswordChangeRequired(false);
     navigate("/signin");
   }, [navigate, queryClient]);
 
@@ -218,7 +228,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient]);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, authError, login, logout, logoutEverywhere, updateProfile }}>
+    <AuthContext.Provider value={{ user, isLoading, authError, passwordChangeRequired, login, logout, logoutEverywhere, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

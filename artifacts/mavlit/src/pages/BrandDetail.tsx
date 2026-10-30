@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Mail, Linkedin, Zap, DollarSign, Star, TrendingUp,
   Activity, CheckCircle2, Copy, ChevronRight, MessageSquare,
-  Headphones, Music, Cpu, Camera, ShoppingBag, Building2, Users,
+  Headphones, Music, Cpu, Camera, ShoppingBag, Users,
   Clock, BarChart2, AlertTriangle, Info, Sparkles, Bookmark,
 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
@@ -23,8 +23,6 @@ const SLUG_TO_BRAND_ID: Record<string, number> = {
 };
 
 // ── Brand database ─────────────────────────────────────────────────────────────
-
-type ContactType = "agency" | "in-house";
 
 interface Review {
   id: number; author: string; handle: string; avatar: string; avatarColor: string;
@@ -51,8 +49,6 @@ interface BrandData {
   creatorTier: { avg: number; min: number; max: number };
   retailPresence?: string[];
   recentLaunches?: string[];
-  contactType: ContactType;
-  contact: { email: string; linkedin: string; responseTime: string; verifiedAt?: string };
   reviews: Review[];
   platformSignals: { instagram: PlatformSignal; tiktok: PlatformSignal; youtube: PlatformSignal };
 }
@@ -80,13 +76,6 @@ const BRANDS: Record<string, BrandData> = {
       "Audiences in the 18–34 producer/engineer demographic with demonstrated purchase intent.",
       "Authentic product stories over scripted ad reads — they want creators who have used the gear.",
     ],
-    contactType: "agency",
-    contact: {
-      email: "sarah.chen@edelman.com",
-      linkedin: "linkedin.com/in/sarah-chen-edelman",
-      responseTime: "Typically responds in 3–7 business days via Edelman",
-      verifiedAt: "2026-06-12",
-    },
     platformSignals: {
       youtube:   { level: "Strong" },
       instagram: { level: "Moderate" },
@@ -135,13 +124,6 @@ const BRANDS: Record<string, BrandData> = {
       "Educational or discovery-led content formats: production walkthroughs, playlist deep-dives, listening sessions.",
       "Creators who speak authentically to both the creative and business side of the music industry.",
     ],
-    contactType: "in-house",
-    contact: {
-      email: "m.williams@spotify.com",
-      linkedin: "linkedin.com/in/marcus-williams-spotify",
-      responseTime: "Typically responds in 2–4 business days",
-      verifiedAt: "2026-06-20",
-    },
     platformSignals: {
       instagram: { level: "Strong" },
       tiktok:    { level: "Strong" },
@@ -185,13 +167,6 @@ const BRANDS: Record<string, BrandData> = {
       "Producer audiences skewed toward beatmakers, sound designers, and home studio owners.",
       "Creators with average view duration above 7 minutes — their product integrations require time to land.",
     ],
-    contactType: "agency",
-    contact: {
-      email: "p.sharma@fleishman.com",
-      linkedin: "linkedin.com/in/priya-sharma-fleishman",
-      responseTime: "Typically responds in 4–8 business days via Fleishman Hillard",
-      verifiedAt: "2026-06-08",
-    },
     platformSignals: {
       youtube:   { level: "Strong" },
       instagram: { level: "Moderate" },
@@ -235,13 +210,6 @@ const BRANDS: Record<string, BrandData> = {
       "Engagement-heavy creators — their internal benchmark is 4× the platform average engagement rate.",
       "Creators open to longer-term ambassador relationships, not just one-off sponsored posts.",
     ],
-    contactType: "in-house",
-    contact: {
-      email: "j.torres@gopro.com",
-      linkedin: "linkedin.com/in/jake-torres-gopro",
-      responseTime: "Typically responds in 2–5 business days",
-      verifiedAt: "2026-06-15",
-    },
     platformSignals: {
       youtube:   { level: "Strong" },
       instagram: { level: "Strong" },
@@ -284,13 +252,6 @@ const BRANDS: Record<string, BrandData> = {
       "Audiences with high purchase intent — active musicians and home studio builders, not casual listeners.",
       "Creators with engaged comment sections where followers ask gear questions — Sweetwater tracks this.",
     ],
-    contactType: "in-house",
-    contact: {
-      email: "d.kim@sweetwater.com",
-      linkedin: "linkedin.com/in/dana-kim-sweetwater",
-      responseTime: "Typically responds in 2–4 business days",
-      verifiedAt: "2026-06-18",
-    },
     platformSignals: {
       youtube:   { level: "Strong" },
       instagram: { level: "Moderate" },
@@ -334,13 +295,6 @@ const BRANDS: Record<string, BrandData> = {
       "Creators whose audiences are deeply engaged with music culture, not just casual fans.",
       "A genuine perspective and authentic voice — Red Bull Music's brand is culture-driven, not product-driven.",
     ],
-    contactType: "agency",
-    contact: {
-      email: "a.rivera@edelman.com",
-      linkedin: "linkedin.com/in/alex-rivera-edelman",
-      responseTime: "Typically responds in 5–10 business days via Edelman",
-      verifiedAt: "2026-05-29",
-    },
     platformSignals: {
       instagram: { level: "Strong" },
       youtube:   { level: "Strong" },
@@ -447,12 +401,6 @@ function CopyButton({ value }: { value: string }) {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function fmtVerifiedDate(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
 function fmtTierK(n: number): string {
   if (n >= 1_000_000) return `${Number.isInteger(n / 1_000_000) ? Math.round(n / 1_000_000) : (n / 1_000_000).toFixed(1)}M`;
   return `${Math.round(n / 1_000)}K`;
@@ -510,7 +458,7 @@ export default function BrandDetail() {
   const brandId = SLUG_TO_BRAND_ID[slug] ?? null;
 
   // Fetch live API data for this brand (overlay on hardcoded base)
-  const { data: apiBrand } = useQuery<ApiBrand>({
+  const { data: apiBrand, isLoading: brandLoading } = useQuery<ApiBrand>({
     queryKey: ["brand", brandId],
     queryFn: () => api.get(`/brands/${brandId}`),
     enabled: brandId !== null,
@@ -560,10 +508,8 @@ export default function BrandDetail() {
           youtube:   { level: (apiBrand.platform_signals["youtube"]   ?? "Unknown") as SignalLevel },
         }
       : brand.platformSignals,
-    contact: apiBrand.top_contact
-      ? { ...brand.contact, email: apiBrand.top_contact.email ?? brand.contact.email }
-      : brand.contact,
   } : brand;
+  const contact = apiBrand?.top_contact ?? null;
 
   const creatorFollowers = useMemo((): number | null => {
     try {
@@ -709,40 +655,39 @@ export default function BrandDetail() {
                 <CreatorTierFitCard tier={b.creatorTier} creatorFollowers={creatorFollowers} />
               </motion.div>
 
-              {/* Contact bundle */}
+              {/* Contact bundle: only what the API returned for this brand (it withholds contacts for a brand the creator may not see) */}
               <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, delay: 0.19 }}
                 className="bg-card border border-border rounded-2xl p-6" data-testid="card-contact">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-white">Contact Bundle</h3>
-                  {b.contactType === "agency"
-                    ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary border border-primary/30"><Building2 size={10} />Agency-side</span>
-                    : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"><Users size={10} />In-house</span>
-                  }
-                </div>
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary border border-border">
-                    <Mail size={15} className="text-primary shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground mb-0.5">Email</p>
-                      <p className="text-sm font-semibold text-white truncate" data-testid="text-contact-email">{b.contact.email}</p>
-                      <p className="text-xs text-muted-foreground/60 mt-0.5">
-                        {b.contact.verifiedAt ? `Verified ${fmtVerifiedDate(b.contact.verifiedAt)}` : "Verification pending"}
-                      </p>
+                <h3 className="text-sm font-bold text-white mb-4">Contact Bundle</h3>
+                {contact?.email ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary border border-border">
+                      <Mail size={15} className="text-primary shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground mb-0.5">Email</p>
+                        <p className="text-sm font-semibold text-white truncate" data-testid="text-contact-email">{contact.email}</p>
+                        <p className="text-xs text-muted-foreground/60 mt-0.5">
+                          {contact.apollo_verified || contact.hunter_verified ? "Verified" : "Verification pending"}
+                        </p>
+                      </div>
+                      <CopyButton value={contact.email} />
                     </div>
-                    <CopyButton value={b.contact.email} />
+                    {contact.linkedin_url && (
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary border border-border">
+                        <Linkedin size={15} className="text-[#0a66c2] shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-muted-foreground mb-0.5">LinkedIn</p>
+                          <p className="text-sm font-semibold text-white truncate" data-testid="text-contact-linkedin">{contact.linkedin_url}</p>
+                        </div>
+                        <CopyButton value={contact.linkedin_url} />
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary border border-border">
-                    <Linkedin size={15} className="text-[#0a66c2] shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground mb-0.5">LinkedIn</p>
-                      <p className="text-sm font-semibold text-white truncate" data-testid="text-contact-linkedin">{b.contact.linkedin}</p>
-                      <p className="text-xs text-muted-foreground/60 mt-0.5">
-                        {b.contact.verifiedAt ? `Verified ${fmtVerifiedDate(b.contact.verifiedAt)}` : "Verification pending"}
-                      </p>
-                    </div>
-                    <CopyButton value={b.contact.linkedin} />
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground" data-testid="text-no-contact">
+                    {brandLoading ? "Loading contact…" : "No contact available"}
+                  </p>
+                )}
               </motion.div>
 
               {/* Pitch CTA */}

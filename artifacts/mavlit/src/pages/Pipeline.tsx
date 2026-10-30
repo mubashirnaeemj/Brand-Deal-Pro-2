@@ -563,7 +563,6 @@ function MyPitchesTab({
                          {([
                            { value: "sent", label: "Waiting for reply" },
                            ...(deal.sentAt ? [
-                           { value: "conversation", label: "In conversation" },
                            { value: "negotiating", label: "Negotiating" },
                            { value: "close", label: "Close deal…" },
                            ] : []),
@@ -1342,7 +1341,7 @@ export default function Pipeline() {
           localStorage.setItem("mavlit_pitches", JSON.stringify(all.map(item => item.id === old.id ? { ...item, serverId } : item)));
         }
         if (old.status === "conversation") {
-          await api.patch<ApiPitch>(`/pitches/${serverId}`, { status: "conversation" });
+          await api.patch<ApiPitch>(`/pitches/${serverId}`, { status: "negotiating" });   // the server has no "conversation" status; that is its "negotiating"
         } else if (old.status === "closed" && old.agreedRate) {
           const amount = Number(old.agreedRate.replace(/[$,\s]/g, ""));
           if (!Number.isFinite(amount) || amount < 0) throw new Error(`Couldn't import the rate for ${old.brand}. The server entry is saved; correct the browser entry and retry.`);

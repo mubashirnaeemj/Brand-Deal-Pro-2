@@ -29,10 +29,10 @@ async function withProxy(upstream, run) {
   app.use("/api/mavlit", router);
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
-  const send = (path = "/api/mavlit/pitches/stream", method = "POST") => new Promise((resolve, reject) => {
+  const send = (path = "/api/mavlit/pitches/stream", method = "POST", extraHeaders = {}) => new Promise((resolve, reject) => {
     const req = request({
       host: "127.0.0.1", port: server.address().port, path, method,
-      headers: { "Content-Type": "application/json", Cookie: "access_token=synthetic-fixture" },
+      headers: { "Content-Type": "application/json", Cookie: "access_token=synthetic-fixture", ...extraHeaders },
     }, resolve);
     req.on("error", reject);
     req.end(method === "POST" ? JSON.stringify({ is_custom: false, brand_id: 7, story: "Synthetic story" }) : undefined);
@@ -136,4 +136,73 @@ test("other responses, including thumbnail errors, are never cached", async () =
     for await (const _ of response); // drain
     assert.equal(response.headers["cache-control"], "no-store");
   });
+});
+
+const parseCookie = header => {
+  const [pair, ...attrs] = header.split(";").map(part => part.trim());
+  return { pair, attrs: attrs.map(a => a.toLowerCase()), raw: header };
+};
+const setCookieOf = async (upstreamCookies, path = "/api/mavlit/auth/login") => {
+  let cookies;
+  await withProxy(async () => {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    for (const cookie of upstreamCookies) headers.append("Set-Cookie", cookie);
+    return new Response("{}", { headers });
+  }, async send => {
+    const response = await send(path, "POST");
+    for await (const _ of response); // drain
+    cookies = response.headers["set-cookie"].map(parseCookie);
+  });
+  return cookies;
+};
+
+test("login cookie reaches the browser as Lax, Secure, HttpOnly, host-only, with the API's 30-day Max-Age", async () => {
+  const [cookie] = await setCookieOf(["access_token=jwt; Domain=api.mavlit.com; Max-Age=2592000; Path=/; SameSite=None; Partitioned; Secure; HttpOnly"]);
+  assert.equal(cookie.pair, "access_token=jwt");
+  assert.ok(cookie.attrs.includes("max-age=2592000"));
+  assert.ok(cookie.attrs.includes("samesite=lax"));
+  assert.ok(cookie.attrs.includes("secure") && cookie.attrs.includes("httponly") && cookie.attrs.includes("path=/api/mavlit"));
+  assert.ok(!cookie.attrs.some(a => a.startsWith("domain") || a === "partitioned" || a === "samesite=none"));
+  assert.equal(cookie.attrs.filter(a => a.startsWith("samesite")).length, 1);
+});
+
+test("logout deletes with exactly the attributes the cookie was set with, and clears the old partitioned cookie too", async () => {
+  const upstreamSet = "access_token=jwt; Max-Age=2592000; Path=/; SameSite=lax; Secure; HttpOnly";
+  const upstreamClear = 'access_token=""; Max-Age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; SameSite=lax; Secure; HttpOnly';
+  const [set] = await setCookieOf([upstreamSet]);
+  const [clear, legacy] = await setCookieOf([upstreamClear], "/api/mavlit/auth/logout");
+  const identity = c => c.attrs.filter(a => /^(path|samesite|secure|httponly|domain)/.test(a)).sort();
+  assert.deepEqual(identity(clear), identity(set));
+  assert.ok(clear.attrs.includes("max-age=0"));
+  assert.ok(legacy.attrs.includes("max-age=0") && legacy.attrs.includes("partitioned") && legacy.attrs.includes("samesite=none"));
+  assert.equal(legacy.pair, "access_token=");
+});
+
+test("only access_token triggers the legacy cleanup", async () => {
+  const cookies = await setCookieOf(["other=1; Path=/"]);
+  assert.equal(cookies.length, 1);
+});
+
+test("Origin, Sec-Fetch-Site and client address are passed to the API", async () => {
+  let headers;
+  await withProxy(async (_url, options) => { headers = options.headers; return new Response("{}"); }, async send => {
+    const response = await send("/api/mavlit/auth/logout", "POST", {
+      Origin: "https://mavlit.com", "Sec-Fetch-Site": "same-origin", "CF-Connecting-IP": "203.0.113.9", "X-Forwarded-For": "203.0.113.9",
+    });
+    for await (const _ of response); // drain
+  });
+  assert.equal(headers.get("Origin"), "https://mavlit.com");
+  assert.equal(headers.get("Sec-Fetch-Site"), "same-origin");
+  assert.equal(headers.get("CF-Connecting-IP"), "203.0.113.9");
+  assert.match(headers.get("X-Forwarded-For"), /^203\.0\.113\.9, 127\.0\.0\.1$/);
+});
+
+test("requests without those headers do not invent them", async () => {
+  let headers;
+  await withProxy(async (_url, options) => { headers = options.headers; return new Response("{}"); }, async send => {
+    const response = await send("/api/mavlit/auth/me", "GET");
+    for await (const _ of response); // drain
+  });
+  assert.equal(headers.get("Origin"), null);
+  assert.equal(headers.get("CF-Connecting-IP"), null);
 });

@@ -1,15 +1,40 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 const router: IRouter = Router();
 const UPSTREAM = "https://api.mavlit.com";
 
-// Keep the upstream session cookie scoped to this same-origin proxy. The
-// partitioned attribute lets it work when the app is shown in an iframe.
+// Re-issue the upstream session cookie for the browser. Domain stays unset (host-only). Path is limited to this proxy because the app only
+// sends credentials to /api/mavlit. SameSite=Lax: the app and the proxy are the same site, so no cross-site request needs the cookie.
+// Max-Age/Expires come from the API untouched (the API sets them, 30 days by default). A delete from the API (Max-Age=0) goes through the
+// same function, so it always carries exactly the attributes the cookie was set with.
+const COOKIE_ATTRIBUTES = ["Path=/api/mavlit", "SameSite=Lax", "Secure", "HttpOnly"];
+
 function localCookie(cookie: string): string {
   const parts = cookie.split(";").filter((part) => !/^\s*(domain|path|samesite|secure|partitioned|httponly)(?:\s*=|$)/i.test(part));
-  return [...parts, "Path=/api/mavlit", "SameSite=None", "Secure", "Partitioned", "HttpOnly"].join("; ");
+  return [...parts, ...COOKIE_ATTRIBUTES].join("; ");
+}
+
+// Earlier versions set the cookie as SameSite=None; Partitioned. That is a different cookie to the browser, so it would linger next to the
+// new one and could be sent first. Every time the API sets or clears access_token, also delete that old one. Safe to remove after ~7 days.
+const LEGACY_ACCESS_TOKEN_DELETE =
+  "access_token=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/api/mavlit; SameSite=None; Secure; Partitioned; HttpOnly";
+
+export function localCookies(upstreamCookies: string[]): string[] {
+  const rewritten = upstreamCookies.map(localCookie);
+  return upstreamCookies.some((cookie) => /^\s*access_token=/i.test(cookie)) ? [...rewritten, LEGACY_ACCESS_TOKEN_DELETE] : rewritten;
+}
+
+// The API's CSRF check and login lockout look at Origin / Sec-Fetch-Site and the client address; pass what the browser sent.
+function forwardedHeaders(req: Request, headers: Headers): void {
+  for (const name of ["origin", "sec-fetch-site", "cf-connecting-ip"]) {
+    const value = req.headers[name];
+    if (typeof value === "string" && value) headers.set(name, value);
+  }
+  const peer = req.socket.remoteAddress;
+  const chain = [req.headers["x-forwarded-for"], peer].flat().filter((value): value is string => typeof value === "string" && value !== "");
+  if (chain.length) headers.set("X-Forwarded-For", chain.join(", "));
 }
 
 router.use(async (req, res): Promise<void> => {
@@ -32,6 +57,7 @@ router.use(async (req, res): Promise<void> => {
   if (typeof accessToken === "string") headers.set("Cookie", `access_token=${accessToken}`);
   const hasBody = !["GET", "HEAD", "DELETE"].includes(req.method);
   if (hasBody) headers.set("Content-Type", "application/json");
+  forwardedHeaders(req, headers);
 
   const disconnected = new AbortController();
   const onClose = () => { if (!res.writableEnded) disconnected.abort(); };
@@ -51,7 +77,7 @@ router.use(async (req, res): Promise<void> => {
     const contentType = upstream.headers.get("content-type");
     if (contentType) res.setHeader("Content-Type", contentType);
     const cookies = upstream.headers.getSetCookie();
-    if (cookies.length) res.setHeader("Set-Cookie", cookies.map(localCookie));
+    if (cookies.length) res.setHeader("Set-Cookie", localCookies(cookies));
     if (streaming && upstream.ok && contentType?.includes("text/event-stream") && upstream.body) {
       res.status(upstream.status);
       res.setHeader("Cache-Control", "no-cache, no-transform");

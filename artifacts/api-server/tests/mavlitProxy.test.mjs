@@ -187,14 +187,30 @@ test("Origin, Sec-Fetch-Site and client address are passed to the API", async ()
   let headers;
   await withProxy(async (_url, options) => { headers = options.headers; return new Response("{}"); }, async send => {
     const response = await send("/api/mavlit/auth/logout", "POST", {
-      Origin: "https://mavlit.com", "Sec-Fetch-Site": "same-origin", "CF-Connecting-IP": "203.0.113.9", "X-Forwarded-For": "203.0.113.9",
+      Origin: "https://mavlit.com", "Sec-Fetch-Site": "same-origin", "X-Forwarded-For": "203.0.113.9",
     });
     for await (const _ of response); // drain
   });
   assert.equal(headers.get("Origin"), "https://mavlit.com");
   assert.equal(headers.get("Sec-Fetch-Site"), "same-origin");
-  assert.equal(headers.get("CF-Connecting-IP"), "203.0.113.9");
   assert.match(headers.get("X-Forwarded-For"), /^203\.0\.113\.9, 127\.0\.0\.1$/);
+});
+
+test("no Cloudflare-reserved header is ever sent upstream", async () => {
+  let headers;
+  await withProxy(async (_url, options) => { headers = options.headers; return new Response("{}"); }, async send => {
+    const response = await send("/api/mavlit/auth/login", "POST", {
+      Origin: "https://mavlit.com", "CF-Connecting-IP": "203.0.113.9", "CF-IPCountry": "US", "CF-Ray": "abc-LHR", "CF-Visitor": '{"scheme":"https"}',
+      "CDN-Loop": "cloudflare", "True-Client-IP": "203.0.113.9", "X-Forwarded-Host": "mavlit.com", "X-Forwarded-Proto": "https", "X-Real-IP": "203.0.113.9",
+      "X-Forwarded-For": "203.0.113.9",
+    });
+    for await (const _ of response); // drain
+  });
+  const names = [...headers.keys()];
+  assert.deepEqual(names.filter(n => n.startsWith("cf-")), []);
+  for (const reserved of ["true-client-ip", "x-forwarded-host", "x-forwarded-proto", "x-real-ip", "cdn-loop"]) assert.ok(!names.includes(reserved), reserved);
+  assert.equal(headers.get("Origin"), "https://mavlit.com");
+  assert.match(headers.get("X-Forwarded-For"), /^203\.0\.113\.9, /);
 });
 
 test("requests without those headers do not invent them", async () => {
@@ -204,5 +220,5 @@ test("requests without those headers do not invent them", async () => {
     for await (const _ of response); // drain
   });
   assert.equal(headers.get("Origin"), null);
-  assert.equal(headers.get("CF-Connecting-IP"), null);
+  assert.equal(headers.get("X-Forwarded-For"), "127.0.0.1");
 });

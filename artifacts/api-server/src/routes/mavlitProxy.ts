@@ -26,9 +26,11 @@ export function localCookies(upstreamCookies: string[]): string[] {
   return upstreamCookies.some((cookie) => /^\s*access_token=/i.test(cookie)) ? [...rewritten, LEGACY_ACCESS_TOKEN_DELETE] : rewritten;
 }
 
-// The API's CSRF check and login lockout look at Origin / Sec-Fetch-Site and the client address; pass what the browser sent.
+// The API's CSRF check looks at Origin / Sec-Fetch-Site, its login lockout at the client address; pass what the browser sent.
+// Never send Cloudflare's own headers (cf-*, true-client-ip, x-forwarded-host...): api.mavlit.com sits behind Cloudflare, which answers 403
+// to a request that carries them. Only the allow-list below is ever copied from the browser request.
 function forwardedHeaders(req: Request, headers: Headers): void {
-  for (const name of ["origin", "sec-fetch-site", "cf-connecting-ip"]) {
+  for (const name of ["origin", "sec-fetch-site"]) {
     const value = req.headers[name];
     if (typeof value === "string" && value) headers.set(name, value);
   }

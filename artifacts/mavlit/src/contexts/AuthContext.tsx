@@ -97,6 +97,8 @@ interface AuthContextValue {
   authError: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  /** Ends every session of this account. Resolves once the browser is signed out; rejects (stays signed in) on any error but 401. */
+  logoutEverywhere: () => Promise<void>;
   updateProfile: (patch: Partial<CreatorProfile>, options?: { commit?: boolean }) => Promise<CreatorProfile>;
 }
 
@@ -175,6 +177,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     navigate("/signin");
   }, [navigate, queryClient]);
 
+  const logoutEverywhere = useCallback(async () => {
+    try {
+      await api.post("/auth/logout-all", {});
+    } catch (err) {
+      // 401: the session is already gone, which is what was asked for.
+      if (!(err instanceof ApiRequestError && err.status === 401)) {
+        if (err instanceof ApiRequestError && err.status === 429) throw new Error("Too many attempts, try again later.");
+        throw err instanceof Error ? err : new Error("Couldn't sign you out everywhere. Please try again.");
+      }
+    }
+    queryClient.clear();
+    setUser(null);
+    navigate("/signin");
+  }, [navigate, queryClient]);
+
   const updateProfile = useCallback(async (patch: Partial<CreatorProfile>, options?: { commit?: boolean }) => {
     // PUT replaces the whole profile, including fields outside the current editor.
     const current = await api.get<CreatorProfile>("/creator-profile/me");
@@ -201,7 +218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient]);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, authError, login, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, isLoading, authError, login, logout, logoutEverywhere, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

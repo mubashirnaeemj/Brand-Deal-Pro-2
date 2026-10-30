@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation, Link } from "wouter";
 import { LayoutDashboard, Users, Zap, UserCircle, Briefcase, LogOut } from "lucide-react";
 import { isProfileComplete, useAuth } from "@/contexts/AuthContext";
+import LogoutEverywhereButton from "@/components/LogoutEverywhereButton";
 
 const NAV_LINKS = [
   { label: "Dashboard", href: "/dashboard",     Icon: LayoutDashboard },
@@ -85,6 +86,7 @@ export default function Navbar() {
                 <LogOut size={13} />
                 <span className="hidden md:inline">Sign out</span>
               </button>
+              <LogoutEverywhereButton />
             </div>
           ) : !isApp ? (
             <Link href="/login">

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type SavedBrand } from "@/lib/api";
+import { api, SAVED_BRANDS_LIST_PATH, type SavedBrand } from "@/lib/api";
 
 const KEY = ["saved-brands"];
 
@@ -8,7 +8,7 @@ export default function useSavedBrands() {
   const queryClient = useQueryClient();
   const { data: saved = [] } = useQuery<SavedBrand[]>({
     queryKey: KEY,
-    queryFn: () => api.get("/saved-brands/me"),
+    queryFn: () => api.get(SAVED_BRANDS_LIST_PATH),
     staleTime: 60_000,
     retry: 1,
   });

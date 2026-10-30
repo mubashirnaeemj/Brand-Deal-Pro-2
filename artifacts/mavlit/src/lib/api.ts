@@ -2,6 +2,10 @@ import { profileWriteBody } from "./audience";
 
 export const API_BASE = "/api/mavlit";
 
+// GET /saved-brands/me returns 100 rows unless told otherwise; 500 is the server's page maximum and also the most brands one user can save, so
+// this always gets the whole list ("is this brand saved" checks look through it).
+export const SAVED_BRANDS_LIST_PATH = "/saved-brands/me?limit=500";
+
 type ApiErrorBody = { detail?: unknown; message?: unknown; error?: unknown };
 
 export class ApiRequestError extends Error {

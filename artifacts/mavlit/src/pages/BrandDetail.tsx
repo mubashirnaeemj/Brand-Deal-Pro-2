@@ -10,7 +10,7 @@ import {
 import { useLocation, useParams } from "wouter";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { api, type ApiBrand, type SavedBrand } from "@/lib/api";
+import { api, SAVED_BRANDS_LIST_PATH, type ApiBrand, type SavedBrand } from "@/lib/api";
 
 // Slug → brand ID mapping for API calls
 const SLUG_TO_BRAND_ID: Record<string, number> = {
@@ -468,7 +468,7 @@ export default function BrandDetail() {
   // Saved brands list from API
   const { data: savedBrandsList = [] } = useQuery<SavedBrand[]>({
     queryKey: ["saved-brands"],
-    queryFn: () => api.get("/saved-brands/me"),
+    queryFn: () => api.get(SAVED_BRANDS_LIST_PATH),
     staleTime: 60_000,
   });
 

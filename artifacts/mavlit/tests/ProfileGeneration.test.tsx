@@ -233,6 +233,29 @@ describe("Instagram wizard generation", () => {
     expect(fixture.requests.filter((request) => request.method === "POST")).toHaveLength(2);
   });
 
+  it("shows the server's own message for a job lost in a restart, and for a job that took too long", async () => {
+    await mount();
+    fixture.replaceOnServer({ ...fixture.persisted, instagram_description_status: "failed", instagram_description_error: "The server restarted, please try again" });
+    await tick(1500);
+    expect(screen.getByText("The server restarted, please try again", { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeEnabled();
+  });
+
+  it("shows the server's message when starting a description is refused with 409 (two clicks at once)", async () => {
+    await mount(false);
+    const wrapped = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (new URL(String(input), window.location.origin).pathname.endsWith("/generate-description")) {
+        return new Response(JSON.stringify({ detail: "A description is already being generated. Wait for it to finish." }),
+          { status: 409, headers: { "Content-Type": "application/json" } });
+      }
+      return wrapped(input, init);
+    }));
+    fireEvent.click(screen.getByTestId("button-generate"));
+    await settle();
+    expect(screen.getByText(/A description is already being generated\. Wait for it to finish\./)).toBeInTheDocument();
+  });
+
   it("animates over one minute but never reveals fields or claims 100% before the backend finishes", async () => {
     await mount();
     await tick(30000);

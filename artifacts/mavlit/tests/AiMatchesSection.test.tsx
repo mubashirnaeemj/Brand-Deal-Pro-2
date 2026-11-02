@@ -127,3 +127,15 @@ describe("V2 presentation remains separate", () => {
     expect(screen.getByRole("button", { name: "Re-rank with AI" })).toBeEnabled();
   });
 });
+
+describe("a failed ranking shows the server's message", () => {
+  it.each([
+    ["The server restarted, please try again", "AI ranking failed: The server restarted, please try again."],
+    ["This took too long and was stopped. Please try again.", "AI ranking failed: This took too long and was stopped. Please try again."],
+    ["The server is busy, refresh your matches in a moment", "AI ranking failed: The server is busy, refresh your matches in a moment."],
+  ])("%s", (message, shown) => {
+    mount({ data: ranking("failed", { error: message }) });
+    expect(screen.getByTestId("text-ai-failed")).toHaveTextContent(shown);
+    expect(screen.getByTestId("text-ai-failed").textContent).not.toContain("..");
+  });
+});

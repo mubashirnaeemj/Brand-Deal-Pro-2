@@ -154,7 +154,7 @@ export default function AiMatchesSection({ version, data, loading, error, refres
           {busy && version !== "v3" && <AiRankingStatus message={progressMessage} hasPreviousMatches={matches.length > 0} />}
           {status === "failed" && (
             <p role="alert" data-testid="text-ai-failed" className="mb-5 text-sm" style={{ color: "#f87171" }}>
-              AI ranking failed: {data?.error ?? "Unknown error"}.
+              AI ranking failed: {(data?.error ?? "Unknown error").trim().replace(/[.!]+$/, "")}.
               {version === "v3" ? (
                 <button type="button" onClick={onRefresh} disabled={busy} className="ml-2 font-semibold underline">Try again</button>
               ) : ' Try "Re-rank with AI".'}

@@ -28,16 +28,49 @@ function friendlyMessage(path: string, method: string, status: number): string |
   return null;
 }
 
+// 503 with Retry-After: the server is busy (too many slow requests, a full job queue, a busy database). A read is repeated ONCE after that wait,
+// at most 10 s; anything that writes or starts work (POST, PUT, PATCH, DELETE) is never repeated by the client.
+export const SERVER_BUSY_MESSAGE = "Server is busy, please try again in a few seconds";
+const MAX_RETRY_WAIT_SECONDS = 10;
+const DEFAULT_RETRY_WAIT_SECONDS = 5;
+
+function retryAfterMs(res: Response): number | null {
+  const raw = res.headers.get("Retry-After");
+  if (raw === null) return null;
+  const seconds = Number(raw.trim());
+  // a number of seconds; an HTTP date (or anything else) falls back to 5 s
+  return Math.min(Number.isFinite(seconds) && seconds >= 0 ? seconds : DEFAULT_RETRY_WAIT_SECONDS, MAX_RETRY_WAIT_SECONDS) * 1000;
+}
+
+function wait(ms: number, signal?: AbortSignal | null): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new DOMException("Aborted", "AbortError")); return; }
+    const onAbort = () => { clearTimeout(timer); reject(new DOMException("Aborted", "AbortError")); };
+    const timer = setTimeout(() => { signal?.removeEventListener("abort", onAbort); resolve(); }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 export async function apiResponse(path: string, options: RequestInit = {}): Promise<Response> {
   const headers = new Headers(options.headers);
   if (options.body !== undefined && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const res = await fetch(`${API_BASE}${path}`, {
+  const send = () => fetch(`${API_BASE}${path}`, {
     ...options,
     credentials: "include",
     headers,
   });
+  let res = await send();
+  const method = (options.method ?? "GET").toUpperCase();
+  if (res.status === 503 && (method === "GET" || method === "HEAD")) {
+    const delay = retryAfterMs(res);
+    if (delay !== null) {
+      await res.body?.cancel().catch(() => undefined);
+      await wait(delay, options.signal);
+      res = await send();
+    }
+  }
   if (!res.ok) {
     const err: ApiErrorBody = await res.json().catch(() => ({}));
     if (res.status === 401) window.dispatchEvent(new Event("mavlit:unauthorized"));
@@ -53,7 +86,8 @@ export async function apiResponse(path: string, options: RequestInit = {}): Prom
     const validationDetail = Array.isArray(err.detail) ? err.detail.map((item) =>
       item && typeof item === "object" && "msg" in item ? String(item.msg) : "").filter(Boolean).join("; ") : null;
     const detail = typeof err.detail === "string" ? err.detail : validationDetail || (typeof err.message === "string" ? err.message : null);
-    throw new ApiRequestError(friendlyMessage(path, options.method ?? "GET", res.status) ?? detail ?? `Request failed (${res.status})`, res.status);
+    const busy = res.status === 503 && res.headers.get("Retry-After") !== null ? SERVER_BUSY_MESSAGE : null;
+    throw new ApiRequestError(busy ?? friendlyMessage(path, options.method ?? "GET", res.status) ?? detail ?? `Request failed (${res.status})`, res.status);
   }
   return res;
 }

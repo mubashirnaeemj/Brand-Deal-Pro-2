@@ -131,7 +131,7 @@ export default function Login() {
           Don't have an account?{" "}
           <a href={WAITING_ROOM_URL} data-testid="link-waiting-room"
             className="font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">
-            Join the waiting room →
+            Join the waiting list →
           </a>
         </p>
       </motion.div>

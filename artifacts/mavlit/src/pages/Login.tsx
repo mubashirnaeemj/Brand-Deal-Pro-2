@@ -3,6 +3,9 @@ import { motion } from "framer-motion";
 import { Mail, Lock, AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
+// MAVLIT is invite-only for now: new creators join the waiting list on the main site (mavlit.com).
+const WAITING_ROOM_URL = "https://mavlit.com/#early-access";
+
 const inputCls =
   "w-full px-4 py-3 rounded-xl bg-secondary border border-border text-white placeholder:text-muted-foreground/50 text-sm font-medium focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all";
 
@@ -123,6 +126,14 @@ export default function Login() {
             )}
           </button>
         </form>
+
+        <p className="mt-6 border-t border-border pt-5 text-center text-sm text-muted-foreground">
+          Don't have an account?{" "}
+          <a href={WAITING_ROOM_URL} data-testid="link-waiting-room"
+            className="font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">
+            Join the waiting room →
+          </a>
+        </p>
       </motion.div>
 
       <p className="mt-8 text-xs text-muted-foreground/50 text-center">

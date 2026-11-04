@@ -239,11 +239,3 @@ export interface RateIntelligenceResult {
   reasoning: string;
   created_at: string;
 }
-
-export interface ContractAdviceResult {
-  id: number;
-  looks_good: boolean;
-  issues: string[];
-  summary: string;
-  created_at: string;
-}

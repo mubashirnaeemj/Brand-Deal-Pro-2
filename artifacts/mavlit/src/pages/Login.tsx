@@ -137,7 +137,7 @@ export default function Login() {
       </motion.div>
 
       <p className="mt-8 text-xs text-muted-foreground/50 text-center">
-        MAVLIT · For music creators
+        MAVLIT · For active creators
       </p>
     </div>
   );

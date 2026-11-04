@@ -7,7 +7,7 @@ const UPSTREAM = "https://api.mavlit.com";
 
 // Only the MAVLIT API routes the app uses are proxied. Everything else (/docs, /redoc, /openapi.json, /admin, /static, /health*, the operator
 // routes, the API's own HTML pages) answers 404 here without calling the API.
-export const ALLOWED_PATH = /^\/(auth|creator-profile|matches|brands|dashboard|pitches|rate-intelligence|contract-advice|own-brands|saved-brands|brand-niches|brand-niche-tags|brand-category-niches|brand-category-tags|creator-sub-niches)(\/|$)/;
+export const ALLOWED_PATH = /^\/(auth|creator-profile|matches|brands|dashboard|pitches|rate-intelligence|contract-advice|own-brands|saved-brands|brand-niches|brand-niche-tags|brand-category-niches|brand-category-tags|creator-sub-niches|early-access)(\/|$)/;
 
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;   // a proxied (non-stream) response is held in memory: refuse anything larger
 const NORMAL_TIMEOUT_MS = 20_000;

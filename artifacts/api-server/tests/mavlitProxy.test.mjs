@@ -222,3 +222,18 @@ test("requests without those headers do not invent them", async () => {
   assert.equal(headers.get("Origin"), null);
   assert.equal(headers.get("X-Forwarded-For"), "127.0.0.1");
 });
+
+test("the landing page's early-access sign-up is forwarded to the API, and other paths stay blocked", async () => {
+  let upstreamUrl = null;
+  await withProxy(async url => { upstreamUrl = String(url); return new Response('{"ok":true}', { status: 201, headers: { "Content-Type": "application/json" } }); }, async send => {
+    const signup = await send("/api/mavlit/early-access", "POST");
+    for await (const _ of signup); // drain
+    assert.equal(signup.statusCode, 201);
+    assert.equal(upstreamUrl, "https://api.mavlit.com/early-access");
+    upstreamUrl = null;
+    const blocked = await send("/api/mavlit/docs", "GET");
+    for await (const _ of blocked); // drain
+    assert.equal(blocked.statusCode, 404);
+    assert.equal(upstreamUrl, null);
+  });
+});

@@ -26,9 +26,11 @@ export default function ProfileSettings() {
   const [pollError, setPollError] = useState<string | null>(null);
   const [step, setStep] = useState<ProfileStep>(1);
   const [generatedFor, setGeneratedFor] = useState<string | null>(null);
-  // False right after a generation finishes; any edit to the profile makes it true again. While false,
-  // "Fetch profile details with MAVLIT" stays greyed out so the same details are not generated twice.
+  // False right after a generation finishes; adding or deleting a post makes it true again. While false,
+  // "Fetch profile details with MAVLIT" stays greyed out: only new posts can change what it generates.
   const [editedSinceGeneration, setEditedSinceGeneration] = useState(true);
+  // The form as the saved profile has it. "Save Profile" stays greyed out while the form still equals it.
+  const [savedForm, setSavedForm] = useState<string | null>(null);
   const generationStarting = useRef(false);
   const [posts, setPosts] = useState<CreatorPostsList | null>(null);
   const postsRequest = useRef(0);
@@ -75,13 +77,16 @@ export default function ProfileSettings() {
             setStartedAt(typeof timestamp === "number" && Number.isFinite(timestamp) && timestamp > 0 && timestamp <= Date.now()
               ? timestamp : isDescriptionPending(response.instagram_description_status) ? Date.now() : null);
           }
+          const saved = restoreWizardForm(response, null);
+          setSavedForm(JSON.stringify(completed && saved.instagram.descriptionMode === "generate"
+            ? applyProfileGeneration(saved, response, "instagram") : saved));
           setGeneratedFor(completed && usable ? profileGenerationKey(response) : null);
           // Locked only when the generation is current and the saved draft (if any) recorded no edit since.
           setEditedSinceGeneration(!(completed && usable) || (!!draft && draft.editedSinceGeneration !== false));
           if ([1, 2, 3].includes(draft?.wizardStep)) setStep(draft.wizardStep);
           if (isDescriptionPending(response.instagram_description_status)) setStep(3);
           setForm(restored);
-        } catch { setForm(initial); }
+        } catch { setSavedForm(JSON.stringify(initial)); setForm(initial); }
       })
       .catch((cause) => {
         if (active) setError(cause instanceof Error ? cause.message : "Could not load your profile.");
@@ -179,7 +184,6 @@ export default function ProfileSettings() {
         setGeneratedFor(null);
       }
     } else setForm(next);
-    setEditedSinceGeneration(true);
     setSaved(false);
     setError(null);
   };
@@ -418,6 +422,7 @@ export default function ProfileSettings() {
       }
       setProfile(updated);
       setForm(restoreWizardForm(updated, null));
+      setSavedForm(JSON.stringify(restoreWizardForm(updated, null)));
       try {
         sessionStorage.removeItem(`mavlit_profile_draft:${profile.id}`);
         localStorage.removeItem(`mavlit_profile_draft:${profile.id}`);
@@ -449,14 +454,15 @@ export default function ProfileSettings() {
             onContinue={continueStep} onBack={() => { setError(null); setStep(step === 3 ? 2 : 1); }}
             onExit={exit} onGenerate={() => void generateInstagram()} onSave={() => void save()}
             saving={saving} generating={generatingCount > 0 || jobPending}
-            canSave={!audienceError(form.instagram) &&
+            canSave={(!user || !isProfileComplete(user) || savedForm === null || JSON.stringify(form) !== savedForm) &&
+              !audienceError(form.instagram) &&
               form.instagram.audienceDescription.length <= 1500 && form.brandPreferences.length <= 1000 &&
               form.pitchStylePreferences.length <= 1000 &&
               (form.instagram.descriptionMode === "manual" || generationComplete)}
             generationComplete={generationComplete} fetchLocked={generationComplete && !editedSinceGeneration && !!form.instagram.audienceDescription.trim()} status={instagramStatus}
             generationProgress={generationProgress.progress} showGenerationProgress={generationProgress.showProgress}
             error={error} pollError={pollError || profile.instagram_description_error || null} saved={saved}
-            postsCard={<RecentPostsCard posts={posts} onPostsChange={setPosts} />} />
+            postsCard={<RecentPostsCard posts={posts} onPostsChange={setPosts} onPostAddedOrDeleted={() => setEditedSinceGeneration(true)} />} />
         )}
       </div>
     </div>

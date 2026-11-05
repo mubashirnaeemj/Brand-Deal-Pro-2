@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ProfileSettings from "@/pages/ProfileSettings";
 import OnboardingPage from "@/pages/OnboardingPage";
@@ -200,7 +200,7 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByTestId("input-followers")).toHaveValue(12000);
     expect(screen.getByTestId("input-description")).toHaveValue("Keep my correction");
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
     await settle();
     expect(fixture.persisted).toMatchObject({ instagram_handle: "changed_username", instagram_followers: 12000, instagram_description: "Keep my correction" });
@@ -440,7 +440,7 @@ describe("Instagram wizard generation", () => {
     });
   });
 
-  it("greys out Fetch after a generation finishes until a field is edited", async () => {
+  it("greys out Fetch after a generation finishes; editing fields does not unlock it, adding or deleting a post does", async () => {
     await mount();
     finish();
     await tick(1500);
@@ -448,23 +448,43 @@ describe("Instagram wizard generation", () => {
     const fetch = () => screen.getByRole("button", { name: "Fetch profile details with MAVLIT" });
     expect(fetch()).toBeDisabled();
     fireEvent.change(screen.getByTestId("input-description"), { target: { value: "Edited description" } });
+    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "another_name" } });
+    expect(fetch()).toBeDisabled();
+    fixture.setPosts(Array.from({ length: 12 }, (_, index) => fixturePost(12 - index)));
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "View your recent Instagram posts" }));
+    await settle();
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Instagram post link"), { target: { value: "https://www.instagram.com/p/NEWPOST1/" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add post" }));
+    await settle();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await settle();
     expect(fetch()).toBeEnabled();
   });
 
-  it("keeps Fetch greyed out after a reload until a field is edited", async () => {
+  it("keeps Fetch greyed out after a reload until a post is added or deleted", async () => {
     const rendered = await mount();
     finish();
     await tick(1500);
     await tick(450);
     const fetch = () => screen.getByRole("button", { name: "Fetch profile details with MAVLIT" });
     rendered.unmount();
-    const second = renderProfile(<ProfileSettings />);
-    await settle();
-    expect(fetch()).toBeDisabled();
-    fireEvent.change(screen.getByTestId("input-description"), { target: { value: "Edited description" } });
-    second.unmount();
     renderProfile(<ProfileSettings />);
     await settle();
-    expect(fetch()).toBeEnabled();
+    expect(fetch()).toBeDisabled();
+  });
+
+  it("keeps Save Profile greyed out until a field differs from the saved profile", async () => {
+    fixture = installProfileApi(creatorProfile({ primary_platform: "instagram" }));
+    renderProfile(<ProfileSettings />);
+    await settle();
+    details("manual");
+    const save = () => screen.getByRole("button", { name: "Save Profile" });
+    expect(save()).toBeDisabled();
+    fireEvent.change(screen.getByTestId("input-description"), { target: { value: "A different description" } });
+    expect(save()).toBeEnabled();
+    fireEvent.change(screen.getByTestId("input-description"), { target: { value: (fixture.persisted as { instagram_description?: string }).instagram_description ?? "" } });
+    expect(save()).toBeDisabled();
   });
 });

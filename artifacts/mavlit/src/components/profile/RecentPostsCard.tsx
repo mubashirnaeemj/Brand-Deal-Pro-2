@@ -10,7 +10,12 @@ import {
 } from "@/lib/creatorPosts";
 
 type Message = { kind: "error" | "success"; text: string };
-type Props = { posts: CreatorPostsList | null; onPostsChange: Dispatch<SetStateAction<CreatorPostsList | null>> };
+type Props = {
+  posts: CreatorPostsList | null;
+  onPostsChange: Dispatch<SetStateAction<CreatorPostsList | null>>;
+  /** Called after a post was added or deleted (not for partnership toggles or searches). */
+  onPostAddedOrDeleted?: () => void;
+};
 
 const MAX_QUERY = 100;
 const SEARCH_DELAY_MS = 300;
@@ -20,7 +25,7 @@ const btnGhost = "rounded-xl border border-border px-4 py-2 text-sm font-semibol
 const btnView = "rounded-lg border border-primary/50 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 /** The creator's Instagram posts. Shown whenever the list loaded, also empty, so a new creator can add posts. */
-export default function RecentPostsCard({ posts, onPostsChange }: Props) {
+export default function RecentPostsCard({ posts, onPostsChange, onPostAddedOrDeleted }: Props) {
   const [open, setOpen] = useState(false);
   if (!posts) return null;
   const empty = posts.total <= 0;
@@ -33,13 +38,14 @@ export default function RecentPostsCard({ posts, onPostsChange }: Props) {
           : "The posts MAVLIT has read from your Instagram. Mark the ones that were paid partnerships, remove posts you don't want to use, or add a post by its link."}
       </p>
       <button type="button" className={`${btnGhost} mt-4`} onClick={() => setOpen(true)}>View your recent Instagram posts</button>
-      <PostsDialog open={open} onOpenChange={setOpen} posts={posts} onPostsChange={onPostsChange} />
+      <PostsDialog open={open} onOpenChange={setOpen} posts={posts} onPostsChange={onPostsChange} onPostAddedOrDeleted={onPostAddedOrDeleted} />
     </section>
   );
 }
 
-function PostsDialog({ open, onOpenChange, posts, onPostsChange }: {
+function PostsDialog({ open, onOpenChange, posts, onPostsChange, onPostAddedOrDeleted }: {
   open: boolean; onOpenChange: (open: boolean) => void; posts: CreatorPostsList; onPostsChange: Props["onPostsChange"];
+  onPostAddedOrDeleted?: () => void;
 }) {
   const [message, setMessage] = useState<Message | null>(null);
   const [toggling, setToggling] = useState<ReadonlySet<CreatorPost["id"]>>(new Set());
@@ -116,6 +122,7 @@ function PostsDialog({ open, onOpenChange, posts, onPostsChange }: {
     try {
       const updated = await deleteCreatorPost(post.id);
       if (!isPostsList(updated)) throw new Error("MAVLIT returned an unexpected response. Please reload.");
+      onPostAddedOrDeleted?.();
       if (activeQuery) {
         // The DELETE response lists every post; show the matches again.
         try { await reload(activeQuery); }
@@ -136,6 +143,7 @@ function PostsDialog({ open, onOpenChange, posts, onPostsChange }: {
     setAdding(true);
     try {
       await addCreatorPost(postUrl);
+      onPostAddedOrDeleted?.();
     } catch (cause) {
       setMessage({ kind: "error", text: errorText(cause, "Could not add this post.") });
       setAdding(false);

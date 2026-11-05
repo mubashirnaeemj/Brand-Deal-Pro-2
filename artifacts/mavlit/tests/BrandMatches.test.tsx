@@ -195,7 +195,7 @@ describe("Matches page V3 integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     fireEvent.change(screen.getByTestId("input-brand-preferences"), {
-      target: { value: "Avoid Unwanted Amplifiers" },
+      target: { value: "Avoid Unwanted Amplifiers and cheap gear" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
     await settle();

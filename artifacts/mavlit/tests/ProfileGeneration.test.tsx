@@ -487,4 +487,20 @@ describe("Instagram wizard generation", () => {
     fireEvent.change(screen.getByTestId("input-description"), { target: { value: (fixture.persisted as { instagram_description?: string }).instagram_description ?? "" } });
     expect(save()).toBeDisabled();
   });
+
+  it("keeps Save Profile greyed out after a reload when nothing changed", async () => {
+    fixture = installProfileApi(creatorProfile({ primary_platform: "instagram" }));
+    const first = renderProfile(<ProfileSettings />);
+    await settle();
+    details("manual");
+    expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
+    first.unmount();
+    const second = renderProfile(<ProfileSettings />);   // the draft written by the first visit is restored
+    await settle();
+    expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
+    second.unmount();
+    renderProfile(<ProfileSettings />);
+    await settle();
+    expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
+  });
 });

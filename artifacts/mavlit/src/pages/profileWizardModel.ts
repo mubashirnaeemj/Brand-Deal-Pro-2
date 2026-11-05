@@ -74,7 +74,9 @@ export function restoreWizardForm(profile: CreatorProfile, draft: unknown): Prof
       },
     });
   }
-  const value = draft as Partial<ProfileForm>;
+  // A draft also carries wizard bookkeeping (step, generation flags); only the profile fields belong in the form.
+  const { wizardStep: _step, generatedFor: _for, generationStartedAt: _at, generationPending: _pending, editedSinceGeneration: _edited, ...value } =
+    draft as Partial<ProfileForm> & Record<string, unknown>;
   if (typeof value.fullName !== "string" || !value.instagram || !value.youtube) return instagramForm(initial);
   const restored = instagramForm({
     ...initial, ...value,

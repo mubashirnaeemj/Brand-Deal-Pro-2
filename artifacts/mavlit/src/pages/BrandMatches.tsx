@@ -309,7 +309,7 @@ export default function BrandMatches() {
           </div>
           <section id="matches-panel-v3" aria-label="Brand matches">
             <AiMatchesSection version="v3" data={v3Matches.data} loading={v3Matches.loading} error={v3Matches.error}
-              refreshing={v3Matches.refreshing} onRefresh={v3Matches.refresh} onOpen={setSelectedAiMatch}
+              refreshing={v3Matches.refreshing} onRefresh={v3Matches.refresh} showRefresh={false} onOpen={setSelectedAiMatch}
               timedOut={v3Matches.timedOut} onCheckStatus={v3Matches.checkStatus} preferences={user?.brand_preferences}
               progressMessage={progressMessage} expandedByBrand={expandedAiReasons}
               search={search} niches={niches} onNichesChange={setNicheChoices} onToggleReasons={toggleAiReasons}

@@ -27,6 +27,8 @@ interface Props {
   savedIds?: ReadonlySet<number> | null;
   timedOut?: boolean;
   preferences?: string | null;
+  /** The manual "Refresh matches" / "Re-rank with AI" button. The matches page hides it for v3. */
+  showRefresh?: boolean;
 }
 
 function AiRankingStatus({ message, hasPreviousMatches }: { message: string; hasPreviousMatches: boolean }) {
@@ -92,7 +94,7 @@ function formatRanked(value: string | null | undefined) {
 }
 
 export default function AiMatchesSection({ version, data, loading, error, refreshing, onRefresh, onCheckStatus, onOpen,
-  progressMessage, expandedByBrand, onToggleReasons, search, niches = [], onNichesChange, savedIds = null, timedOut = false, preferences }: Props) {
+  progressMessage, expandedByBrand, onToggleReasons, search, niches = [], onNichesChange, savedIds = null, timedOut = false, preferences, showRefresh = true }: Props) {
   const status = data?.status;
   const pending = status === "queued" || status === "running";
   const allMatches = data?.matches ?? [];
@@ -139,11 +141,13 @@ export default function AiMatchesSection({ version, data, loading, error, refres
       {onNichesChange && !ranking && <BrandMatchNicheChips matches={matches} value={niches} onChange={onNichesChange} />}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm text-muted-foreground" data-testid="text-ai-meta">{meta}</span>
-        <button type="button" data-testid="button-ai-rerank" onClick={onRefresh} disabled={busy || loading}
-          className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-white transition hover:border-primary/50 hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50">
-          <RefreshCw size={15} className={busy ? "animate-spin" : ""} />
-          {busy ? "Ranking…" : version === "v3" ? "Refresh matches" : "Re-rank with AI"}
-        </button>
+        {showRefresh && (
+          <button type="button" data-testid="button-ai-rerank" onClick={onRefresh} disabled={busy || loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-white transition hover:border-primary/50 hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50">
+            <RefreshCw size={15} className={busy ? "animate-spin" : ""} />
+            {busy ? "Ranking…" : version === "v3" ? "Refresh matches" : "Re-rank with AI"}
+          </button>
+        )}
       </div>
       {version === "v3" && preferences?.trim() && (
         <aside data-testid="card-brand-preferences" className="mb-5 rounded-2xl border border-border bg-card p-5">

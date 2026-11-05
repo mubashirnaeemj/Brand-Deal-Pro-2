@@ -42,13 +42,13 @@ describe("Matches page request errors and expired sessions", () => {
     await settle();
     expect(screen.getByRole("status")).toHaveTextContent("Loading AI matches");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
+    expect(screen.queryByTestId("button-ai-rerank")).not.toBeInTheDocument();
     await tick(999);
     expect(fixture.calls("GET")).toHaveLength(1);
     await tick(1);
     expect(cardOrder()).toEqual(previousCards);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Refresh matches" })).not.toBeInTheDocument();
     await tick(180_000);
     expect(fixture.calls("GET")).toHaveLength(2);
     expect(fixture.calls("POST")).toHaveLength(0);
@@ -68,7 +68,7 @@ describe("Matches page request errors and expired sessions", () => {
     expect(screen.queryByTestId("status-v3-updating")).not.toBeInTheDocument();
     expect(screen.queryByTestId("text-ai-failed")).not.toBeInTheDocument();
     expect(screen.queryByRole("article")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Refresh matches" })).not.toBeInTheDocument();
     await tick(180_000);
     expect(fixture.calls("GET")).toHaveLength(2);
     expect(fixture.calls("POST")).toHaveLength(0);
@@ -87,56 +87,15 @@ describe("Matches page request errors and expired sessions", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(message);
     expect(cardOrder()).toEqual(previousCards);
     expect(screen.getByTestId("text-ai-meta")).toHaveTextContent("3 brands");
-    expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Refresh matches" })).not.toBeInTheDocument();
     await tick(180_000);
     expect(fixture.calls("GET")).toHaveLength(3);
     expect(fixture.calls("POST")).toHaveLength(0);
   });
 
   it.each([
-    { name: "network failure", fail: () => { throw new TypeError("Failed to fetch"); }, message: "Failed to fetch" },
-    { name: "HTTP 503", fail: () => ({ body: { detail: "Unable to refresh matches right now" }, status: 503 }), message: "Unable to refresh matches right now" },
-    { name: "invalid ranking", fail: () => ({ body: { status: "queued", matches: "not-an-array" } }), message: "Invalid AI ranking response" },
-  ])("retains cards after a refresh POST $name and recovers on the next explicit refresh", async ({ fail, message }) => {
-    mountMatches();
-    await settle();
-    fixture.handle("POST", fail);
-    fireEvent.click(screen.getByRole("button", { name: "Refresh matches" }));
-    await settle();
-    expect(screen.getByRole("alert")).toHaveTextContent(message);
-    expect(cardOrder()).toEqual(previousCards);
-    expect(screen.queryByTestId("text-ai-failed")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("status-v3-updating")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
-    await tick(180_000);
-    expect(fixture.calls("POST")).toHaveLength(1);
-
-    fixture.respond("POST", ranking("queued"));
-    fixture.respond("GET", ranking("queued"));
-    fireEvent.click(screen.getByRole("button", { name: "Refresh matches" }));
-    await settle();
-    expect(fixture.calls("POST")).toHaveLength(2);
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(cardOrder()).toEqual(previousCards);
-    expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
-    expect(screen.getByTestId("status-v3-updating")).not.toHaveTextContent("Previous results below are not final.");
-    fixture.respond("GET", ranking("completed", { matches: rankedBrands.slice(1), total: 2 }));
-    await tick(3_000);
-    expect(cardOrder()).toEqual(previousCards.slice(1));
-    expect(screen.getByTestId("text-ai-meta")).toHaveTextContent("2 brands");
-    expect(screen.queryByTestId("status-v3-updating")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
-    const reads = fixture.calls("GET").length;
-    await tick(180_000);
-    expect(fixture.calls("POST")).toHaveLength(2);
-    expect(fixture.calls("GET")).toHaveLength(reads);
-  });
-
-  it.each([
     { method: "GET", status: 401 },
     { method: "GET", status: 403 },
-    { method: "POST", status: 401 },
-    { method: "POST", status: 403 },
   ] as const)("$method $status redirects through the real auth listener without retrying or leaving stale matches", async ({ method, status }) => {
     const dispatch = vi.spyOn(window, "dispatchEvent");
     const body = status === 401
@@ -152,12 +111,6 @@ describe("Matches page request errors and expired sessions", () => {
       </Switch>,
     );
     await settle();
-    if (method === "POST") {
-      expect(cardOrder()).toEqual(previousCards);
-      fixture.respond("POST", body, "v3", status);
-      fireEvent.click(screen.getByRole("button", { name: "Refresh matches" }));
-      await settle();
-    }
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
       type: status === 401 ? "mavlit:unauthorized" : "mavlit:profile-incomplete",
     }));
@@ -247,7 +200,7 @@ describe("Matches page V3 integration", () => {
     expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Automatic checks have paused.");
     expect(screen.getByTestId("status-v3-updating")).not.toHaveTextContent("Previous results below are not final.");
     expect(screen.getByRole("button", { name: "Check status" })).toBeEnabled();
-    expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
+    expect(screen.queryByTestId("button-ai-rerank")).not.toBeInTheDocument();
     const reads = fixture.calls("GET").length;
     await tick(30_000);
     expect(fixture.calls("GET")).toHaveLength(reads);
@@ -270,7 +223,7 @@ describe("Matches page V3 integration", () => {
     expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Updating your matches");
     expect(screen.getByTestId("status-v3-updating")).not.toHaveTextContent("Previous results below are not final.");
     expect(screen.getAllByRole("article", { hidden: true })[0].parentElement).toHaveAttribute("aria-busy", "true");
-    expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
+    expect(screen.queryByTestId("button-ai-rerank")).not.toBeInTheDocument();
 
     fixture.respond("GET", ranking(status, {
       matches: rankedBrands.slice(1), total: 2,
@@ -278,7 +231,7 @@ describe("Matches page V3 integration", () => {
     await tick(3_000);
     expect(screen.queryByTestId("status-v3-updating")).not.toBeInTheDocument();
     expect(screen.getAllByRole("article", { hidden: true })[0].parentElement).toHaveAttribute("aria-busy", "false");
-    expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Refresh matches" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("article", { hidden: true })).toHaveLength(2);
     if (status === "failed") {
       expect(screen.getByTestId("text-ai-failed")).toHaveTextContent("Fixture ranking failed");
@@ -302,25 +255,23 @@ describe("Matches page V3 integration", () => {
     expect(screen.queryByRole("article")).not.toBeInTheDocument();
     await tick(180_000);
     expect(screen.getByRole("button", { name: "Check status" })).toBeEnabled();
-    expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
+    expect(screen.queryByTestId("button-ai-rerank")).not.toBeInTheDocument();
     expect(fixture.calls("POST")).toHaveLength(0);
   });
 
-  it.each(["retry", "manual refresh"] as const)("%s sends one POST and resumes polling through completion", async (action) => {
-    fixture.respond("GET", ranking(action === "retry" ? "failed" : "completed"));
+  it.each(["retry"] as const)("%s sends one POST and resumes polling through completion", async (action) => {
+    fixture.respond("GET", ranking("failed"));
     mountMatches();
     await settle();
     expect(fixture.calls("POST")).toHaveLength(0);
     await tick(6_000);
     expect(fixture.calls("GET")).toHaveLength(1);
     fixture.respond("GET", ranking("queued"));
-    fireEvent.click(screen.getByRole("button", { name: action === "retry" ? "Try again" : "Refresh matches" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await settle();
     expect(fixture.calls("POST")).toHaveLength(1);
-    expect(screen.getByTestId("button-ai-rerank")).toBeDisabled();
+    expect(screen.queryByTestId("button-ai-rerank")).not.toBeInTheDocument();
     expect(screen.getByTestId("status-v3-updating")).not.toHaveTextContent("Previous results below are not final.");
-    fireEvent.click(screen.getByTestId("button-ai-rerank"));
-    await settle();
     expect(fixture.calls("POST")).toHaveLength(1);
     const reads = fixture.calls("GET").length;
     fixture.respond("GET", ranking("running"));
@@ -333,7 +284,7 @@ describe("Matches page V3 integration", () => {
     }));
     await tick(3_000);
     expect(screen.queryByTestId("status-v3-updating")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Refresh matches" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Refresh matches" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("article", { hidden: true }).map((card) => card.getAttribute("data-testid")))
       .toEqual(["card-ai-brand-10", "card-ai-brand-20"]);
     await tick(12_000);
@@ -522,9 +473,9 @@ describe("Matches page V3 integration", () => {
       .toEqual(["Music3", "Beauty2", "Tech2", "Finance1", "Fitness1", "Travel1"]);   // ties: A to Z
     expect(screen.queryByTestId("button-niches-more")).not.toBeInTheDocument();
     expect(screen.queryByText("View more")).not.toBeInTheDocument();
-    // The old intro sentence is gone; the chips come before the refresh row.
+    // The old intro sentence is gone.
     expect(screen.queryByText(/MAVLIT AI ranking using your profile/)).not.toBeInTheDocument();
-    expect(screen.getByTestId("match-niches").compareDocumentPosition(screen.getByTestId("button-ai-rerank")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId("match-niches").compareDocumentPosition(screen.getByTestId("text-ai-meta")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // The chips use the default text colour; only the brand cards keep the niche colours.
     for (const chip of group.getAllByTestId("chip-niche")) {
       expect(chip.innerHTML).not.toMatch(/text-(violet|sky|pink|orange|emerald|fuchsia|amber|lime|yellow|red|cyan|teal|green|slate|indigo|blue|purple|rose)-/);

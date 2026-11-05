@@ -21,6 +21,8 @@ export interface CreatorPostsList {
   shown?: number;
   min_keep: number;
   can_delete: boolean;
+  /** The Instagram username the saved posts were read from; null/absent when there are none. */
+  instagram_handle?: string | null;
   posts: CreatorPost[];
 }
 

@@ -64,9 +64,8 @@ export default function ProfileSettings() {
           const draft = JSON.parse(sessionStorage.getItem(key) ?? localStorage.getItem(key) ??
             localStorage.getItem(`mavlit_onboarding_draft_${response.id}`) ?? "null");
           let restored = restoreWizardForm(response, draft);
-          // A saved username can't be edited, so the server's value always wins over an older draft
-          // (for example after the username was corrected in the database).
-          if (isProfileComplete(response) && response.instagram_handle?.trim()) {
+          // The saved username (changed in the admin, or saved by an earlier Fetch) always wins over an older draft.
+          if (response.instagram_handle?.trim()) {
             restored = { ...restored, instagram: { ...restored.instagram, username: initial.instagram.username } };
           }
           const completed = response.instagram_description_status === "completed" && response.instagram_description_mode === "generate" &&
@@ -114,6 +113,18 @@ export default function ProfileSettings() {
   useEffect(() => { document.title = "Your Profile | MAVLIT"; }, []);
   useEffect(() => { void refreshPosts(); }, [refreshPosts, retry]);
 
+  // The username is "verified" once MAVLIT generated the profile from it AND holds posts read from that same username.
+  // A username that does not exist on Instagram (no posts, or a failed run), or that was changed afterwards (for example
+  // in the admin), is not verified: it stays editable and "Fetch profile details" stays available.
+  const handleKey = (value: string | null | undefined) => (value ?? "").trim().replace(/^@/, "").toLowerCase();
+  const usernameVerified = !!profile && profile.instagram_description_status === "completed" && !!posts && posts.total > 0 &&
+    !!handleKey(profile.instagram_handle) && handleKey(posts.instagram_handle) === handleKey(profile.instagram_handle);
+  // A verified username can't be edited: show the saved one, never an older draft.
+  useEffect(() => {
+    if (!usernameVerified || !profile) return;
+    setForm((current) => current && handleKey(current.instagram.username) !== handleKey(profile.instagram_handle)
+      ? { ...current, instagram: { ...current.instagram, username: profileToForm(profile).instagram.username } } : current);
+  }, [usernameVerified, profile]);
   const instagramStatus = profile?.instagram_description_status;
   const youtubeStatus = profile?.youtube_description_status;
   const instagramJobId = profile?.instagram_description_job_id;
@@ -464,7 +475,7 @@ export default function ProfileSettings() {
               form.instagram.audienceDescription.length <= 1500 && form.brandPreferences.length <= 1000 &&
               form.pitchStylePreferences.length <= 1000 &&
               (form.instagram.descriptionMode === "manual" || generationComplete)}
-            generationComplete={generationComplete} usernameLocked={!!user && isProfileComplete(user) && !!profile.instagram_handle?.trim()} fetchLocked={generationComplete && !editedSinceGeneration && !!form.instagram.audienceDescription.trim()} status={instagramStatus}
+            generationComplete={generationComplete} usernameLocked={usernameVerified} fetchLocked={generationComplete && !editedSinceGeneration && !!form.instagram.audienceDescription.trim() && usernameVerified} status={instagramStatus}
             generationProgress={generationProgress.progress} showGenerationProgress={generationProgress.showProgress}
             error={error} pollError={pollError || profile.instagram_description_error || null} saved={saved}
             postsCard={<RecentPostsCard posts={posts} onPostsChange={setPosts} onPostAddedOrDeleted={() => setEditedSinceGeneration(true)} />} />

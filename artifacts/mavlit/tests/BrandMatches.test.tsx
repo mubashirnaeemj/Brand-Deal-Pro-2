@@ -129,7 +129,7 @@ describe("Matches page request errors and expired sessions", () => {
     }
     await tick(180_000);
     expect(fixture.calls("GET")).toHaveLength(1);
-    expect(fixture.calls("POST")).toHaveLength(method === "POST" ? 1 : 0);
+    expect(fixture.calls("POST")).toHaveLength(0);
   });
 });
 

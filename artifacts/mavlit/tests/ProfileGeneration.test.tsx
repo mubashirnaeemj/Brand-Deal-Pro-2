@@ -136,7 +136,7 @@ describe("Instagram wizard generation", () => {
 
   it("shows only username and primary niches with both Generate and disabled Save Profile", async () => {
     await mount(false);
-    expect(screen.getByTestId("input-username")).toBeDisabled();   // the username was saved with the profile
+    expect(screen.getByTestId("input-username")).toBeEnabled();   // no posts were read from it yet, so it is not verified
     expect(screen.getByText("Primary niches")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "2 selected" })).toBeEnabled();
     expect(screen.queryByTestId("input-brand-preferences")).not.toBeInTheDocument();
@@ -517,6 +517,8 @@ describe("Instagram wizard generation", () => {
 
   it("shows the username from the database, not an older draft, once the username is saved", async () => {
     fixture = installProfileApi(creatorProfile({ primary_platform: "instagram", instagram_handle: "corrected_in_db" }));
+    fixture.setPosts(Array.from({ length: 20 }, (_, index) => fixturePost(20 - index)));   // posts read from that username
+    fixture.replaceOnServer({ ...fixture.persisted, instagram_description_status: "completed", instagram_description_mode: "generate", instagram_description: "d" } as never);
     const key = `mavlit_profile_draft:${(fixture.persisted as { id: number }).id}`;
     const stale = { ...JSON.parse(JSON.stringify(profileToForm(fixture.persisted as never))), wizardStep: 3, generatedFor: null, generationPending: false };
     stale.instagram.username = "old_name_from_draft";
@@ -525,5 +527,38 @@ describe("Instagram wizard generation", () => {
     await settle();
     expect(screen.getByTestId("input-username")).toHaveValue("corrected_in_db");
     expect(screen.getByTestId("input-username")).toBeDisabled();
+  });
+
+  it("locks the username once its posts were read, but not after a failed run for a username that does not exist", async () => {
+    await mount();   // clicks Fetch
+    fixture.replaceOnServer({ ...fixture.persisted, instagram_description_status: "failed", instagram_description_error: "Instagram content could not be fetched" });
+    await tick(1500);
+    expect(screen.getByTestId("input-username")).toBeEnabled();
+    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "real_handle" } });
+    expect(screen.getByTestId("input-username")).toHaveValue("real_handle");
+    fireEvent.click(screen.getByTestId("button-generate"));
+    await settle();
+    finish();
+    await tick(1500);
+    await tick(450);
+    expect(screen.getByTestId("input-username")).toBeDisabled();   // generated, and its 20 posts are saved
+    expect(screen.getByTestId("input-username")).toHaveValue("real_handle");
+  });
+
+  it("makes Fetch clickable and the username editable again when the username is changed in the admin", async () => {
+    await mount();
+    finish();
+    await tick(1500);
+    await tick(450);
+    expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeDisabled();
+    expect(screen.getByTestId("input-username")).toBeDisabled();
+    // The admin changes instagram_handle in the database; the saved posts still belong to the old username.
+    fixture.replaceOnServer({ ...fixture.persisted, instagram_handle: "changed_in_admin" });
+    cleanup();
+    renderProfile(<ProfileSettings />);
+    await settle();
+    expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeEnabled();
+    expect(screen.getByTestId("input-username")).toBeEnabled();
+    expect(screen.getByTestId("input-username")).toHaveValue("changed_in_admin");
   });
 });

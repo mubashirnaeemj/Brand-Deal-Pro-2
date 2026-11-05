@@ -26,10 +26,14 @@ export function installProfileApi(initial: CreatorProfile) {
   let nextPostId = 1000;
   const missingPictures = new Set<number>();
   const publicPost = ({ full_caption: _caption, ...post }: FixturePost) => post;
+  // The username the saved posts were read from: fixed when they first appear, so changing the profile's username later leaves it behind.
+  let postsHandle: string | null = null;
   const postsList = (q = "") => {
+    if (!posts.length) postsHandle = null;
+    else if (postsHandle === null) postsHandle = persisted.instagram_handle as string | null;
     const needle = q.toLowerCase();
     const shown = posts.filter((post) => !needle || (post.full_caption ?? post.caption_preview ?? "").toLowerCase().includes(needle));
-    return { total: posts.length, shown: shown.length, min_keep: MIN_KEEP, can_delete: posts.length > MIN_KEEP, posts: shown.map(publicPost) };
+    return { total: posts.length, shown: shown.length, min_keep: MIN_KEEP, can_delete: posts.length > MIN_KEEP, instagram_handle: postsHandle, posts: shown.map(publicPost) };
   };
   const requests: RequestRecord[] = [];
   const unexpected: string[] = [];
@@ -50,6 +54,8 @@ export function installProfileApi(initial: CreatorProfile) {
         [`${platform}_description_job_id`]: `fixture-${platform}-audience-job`,
         [`${platform}_description_error`]: null,
       };
+      // Like the real job, a first generation saves the username's latest posts for the creator.
+      if (platform === "instagram" && !posts.length) posts = Array.from({ length: 20 }, (_, index) => fixturePost(20 - index));
       // The real endpoint need not echo platform or return a description yet.
       return reply({ status: "queued", job_id: `fixture-${platform}-audience-job` });
     }

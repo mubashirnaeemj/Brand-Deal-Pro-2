@@ -136,7 +136,7 @@ export default function AiMatchesSection({ version, data, loading, error, refres
           V2 — AI ranking: an LLM compares your profile (niche, tags, description) with each brand's description and tags.
         </p>
       )}
-      {onNichesChange && <BrandMatchNicheChips matches={matches} value={niches} onChange={onNichesChange} />}
+      {onNichesChange && !ranking && <BrandMatchNicheChips matches={matches} value={niches} onChange={onNichesChange} />}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm text-muted-foreground" data-testid="text-ai-meta">{meta}</span>
         <button type="button" data-testid="button-ai-rerank" onClick={onRefresh} disabled={busy || loading}

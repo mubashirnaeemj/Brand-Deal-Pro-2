@@ -61,6 +61,13 @@ describe("V3 ranking presentation", () => {
     expect(document.body.style.overflow).toBe("");
   });
 
+  it("hides the niche filter while the ranking runs and shows it again after", () => {
+    const view = mount({ data: ranking("running"), onNichesChange: () => {} });
+    expect(screen.queryByTestId("match-niches")).not.toBeInTheDocument();
+    view.rerender(<AiMatchesSection {...view.props} data={ranking("completed")} />);
+    expect(screen.getByTestId("match-niches")).toBeInTheDocument();
+  });
+
   it("does not lock scrolling once the automatic checks have paused", () => {
     mount({ data: ranking("running"), timedOut: true });
     expect(document.body.style.overflow).toBe("");

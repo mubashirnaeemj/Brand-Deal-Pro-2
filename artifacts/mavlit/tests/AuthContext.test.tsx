@@ -97,3 +97,21 @@ describe("AuthContext.updateProfile full-replacement contract", () => {
     expect(fixture.persisted).toEqual(creatorProfile());
   });
 });
+
+describe("signed-out visitors on the set-password page", () => {
+  const visit = async (path: string) => {
+    window.history.replaceState(null, "", path);
+    await mountAuth();
+    await act(async () => { window.dispatchEvent(new Event("mavlit:unauthorized")); });   // what a 401 from the session check does
+    return window.location.pathname;
+  };
+  afterEach(() => window.history.replaceState(null, "", "/"));
+
+  it("are not sent to /signin by the failed session check", async () => {
+    expect(await visit("/set-password?token=T")).toBe("/set-password");
+  });
+
+  it("other pages still go to /signin", async () => {
+    expect(await visit("/dashboard")).toBe("/signin");
+  });
+});

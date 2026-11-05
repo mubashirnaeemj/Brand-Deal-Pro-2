@@ -118,6 +118,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unauthorized = () => {
       queryClient.clear();
       setUser(null);
+      // The early-access link page is public: the failed session check of a signed-out visitor must not take them to /signin.
+      if (window.location.pathname === "/set-password") return;
       const matchesPage = /\/(?:brand-matches|matches)\/?$/.test(window.location.pathname);
       navigate(matchesPage ? "/signin?return_to=/matches" : "/signin");
     };

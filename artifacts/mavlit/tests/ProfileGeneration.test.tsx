@@ -184,26 +184,27 @@ describe("Instagram wizard generation", () => {
     expect(fixture.writes).toHaveLength(1);
   });
 
-  it("allows username corrections after generation and preserves unsaved corrections on reload", async () => {
+  it("keeps the saved username fixed and preserves other unsaved corrections on reload", async () => {
     const rendered = await mount();
     finish();
     await tick(1500);
     await tick(450);
-    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "changed_username" } });
+    const savedUsername = (screen.getByTestId("input-username") as HTMLInputElement).value;
+    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "changed_username" } });   // locked: ignored
     fireEvent.change(screen.getByTestId("input-followers"), { target: { value: "12000" } });
     fireEvent.change(screen.getByTestId("input-description"), { target: { value: "Keep my correction" } });
     await settle();
     rendered.unmount();
     renderProfile(<ProfileSettings />);
     await settle();
-    expect(screen.getByTestId("input-username")).toHaveValue("changed_username");
+    expect(screen.getByTestId("input-username")).toHaveValue(savedUsername);
     expect(screen.getByTestId("input-followers")).toHaveValue(12000);
     expect(screen.getByTestId("input-description")).toHaveValue("Keep my correction");
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
     await settle();
-    expect(fixture.persisted).toMatchObject({ instagram_handle: "changed_username", instagram_followers: 12000, instagram_description: "Keep my correction" });
+    expect(fixture.persisted).toMatchObject({ instagram_followers: 12000, instagram_description: "Keep my correction" });
   });
 
   it("stops when the watched job ID changes without adopting the replacement", async () => {
@@ -512,5 +513,17 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByTestId("input-username")).toBeEnabled();
     fireEvent.change(screen.getByTestId("input-username"), { target: { value: "first_choice" } });
     expect(screen.getByTestId("input-username")).toHaveValue("first_choice");
+  });
+
+  it("shows the username from the database, not an older draft, once the username is saved", async () => {
+    fixture = installProfileApi(creatorProfile({ primary_platform: "instagram", instagram_handle: "corrected_in_db" }));
+    const key = `mavlit_profile_draft:${(fixture.persisted as { id: number }).id}`;
+    const stale = { ...JSON.parse(JSON.stringify(profileToForm(fixture.persisted as never))), wizardStep: 3, generatedFor: null, generationPending: false };
+    stale.instagram.username = "old_name_from_draft";
+    sessionStorage.setItem(key, JSON.stringify(stale));
+    renderProfile(<ProfileSettings />);
+    await settle();
+    expect(screen.getByTestId("input-username")).toHaveValue("corrected_in_db");
+    expect(screen.getByTestId("input-username")).toBeDisabled();
   });
 });

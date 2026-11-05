@@ -64,6 +64,11 @@ export default function ProfileSettings() {
           const draft = JSON.parse(sessionStorage.getItem(key) ?? localStorage.getItem(key) ??
             localStorage.getItem(`mavlit_onboarding_draft_${response.id}`) ?? "null");
           let restored = restoreWizardForm(response, draft);
+          // A saved username can't be edited, so the server's value always wins over an older draft
+          // (for example after the username was corrected in the database).
+          if (isProfileComplete(response) && response.instagram_handle?.trim()) {
+            restored = { ...restored, instagram: { ...restored.instagram, username: initial.instagram.username } };
+          }
           const completed = response.instagram_description_status === "completed" && response.instagram_description_mode === "generate" &&
             !!response.instagram_description?.trim();
           const matches = generationKey(restored.instagram.username, restored.instagram.primaryNiches) === profileGenerationKey(response);

@@ -16,6 +16,7 @@ import Pipeline from "@/pages/Pipeline";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
 import Login from "@/pages/Login";
+import SetPassword from "@/pages/SetPassword";
 import PasswordChangeRequired from "@/components/PasswordChangeRequired";
 import { AuthProvider, isProfileComplete, useAuth } from "@/contexts/AuthContext";
 
@@ -37,6 +38,7 @@ function Router() {
       <button className="rounded-xl bg-primary px-5 py-2" onClick={() => window.location.reload()}>Retry</button>
     </div>
   );
+  if (location === "/set-password") return <SetPassword />;   // the early-access email link: public, and it redirects signed-in visitors itself
   if (!user) return location === "/signin" ? <Login /> : <Redirect to="/signin" />;
   if (!isProfileComplete(user)) {
     return location === "/creator-profile" ? <OnboardingPage /> : <Redirect to="/creator-profile" />;

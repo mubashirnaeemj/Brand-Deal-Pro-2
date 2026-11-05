@@ -22,6 +22,8 @@ export interface ProfileWizardProps {
   generating: boolean;
   canSave: boolean;
   generationComplete: boolean;
+  /** Details were just generated and nothing has been edited since: fetching again is greyed out. */
+  fetchLocked?: boolean;
   generationProgress: number;
   showGenerationProgress: boolean;
   status?: DescriptionStatus | null;
@@ -235,7 +237,8 @@ export default function ProfileWizard(p: ProfileWizardProps) {
             <>
             {gen && (
             <button type="button" data-testid="button-generate" className={`${btnPrimary} inline-flex items-center gap-2`}
-              onClick={p.onGenerate} disabled={busy || showProgress}>
+              onClick={p.onGenerate} disabled={busy || showProgress || !!p.fetchLocked}
+              title={p.fetchLocked ? "Edit a field in your profile to fetch again." : undefined}>
               {busy || showProgress ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Sparkles size={16} aria-hidden />}
               {busy || showProgress ? "Generating" : "Fetch profile details with MAVLIT"}
             </button>

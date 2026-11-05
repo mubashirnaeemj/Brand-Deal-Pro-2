@@ -26,6 +26,9 @@ export default function ProfileSettings() {
   const [pollError, setPollError] = useState<string | null>(null);
   const [step, setStep] = useState<ProfileStep>(1);
   const [generatedFor, setGeneratedFor] = useState<string | null>(null);
+  // False right after a generation finishes; any edit to the profile makes it true again. While false,
+  // "Fetch profile details with MAVLIT" stays greyed out so the same details are not generated twice.
+  const [editedSinceGeneration, setEditedSinceGeneration] = useState(true);
   const generationStarting = useRef(false);
   const [posts, setPosts] = useState<CreatorPostsList | null>(null);
   const postsRequest = useRef(0);
@@ -73,6 +76,10 @@ export default function ProfileSettings() {
               ? timestamp : isDescriptionPending(response.instagram_description_status) ? Date.now() : null);
           }
           setGeneratedFor(completed && usable ? profileGenerationKey(response) : null);
+          // A restored draft that differs from the generated details counts as edited.
+          const fresh = restoreWizardForm(response, null);
+          const baseline = fresh.instagram.descriptionMode === "generate" ? applyProfileGeneration(fresh, response, "instagram") : fresh;
+          setEditedSinceGeneration(!(completed && usable) || JSON.stringify(restored) !== JSON.stringify(baseline));
           if ([1, 2, 3].includes(draft?.wizardStep)) setStep(draft.wizardStep);
           if (isDescriptionPending(response.instagram_description_status)) setStep(3);
           setForm(restored);
@@ -147,6 +154,7 @@ export default function ProfileSettings() {
         });
         if (isDescriptionPending(instagramStatus) && latest.instagram_description_status === "completed") {
           setGeneratedFor(profileGenerationKey(latest));
+          setEditedSinceGeneration(false);
         }
         setProfile(latest);
         if (isDescriptionPending(latest.instagram_description_status) || isDescriptionPending(latest.youtube_description_status)) {
@@ -173,13 +181,14 @@ export default function ProfileSettings() {
         setGeneratedFor(null);
       }
     } else setForm(next);
+    setEditedSinceGeneration(true);
     setSaved(false);
     setError(null);
   };
 
   const generated = (platform: "instagram" | "youtube", completed: CreatorProfile) => {
     setForm((current) => current ? applyProfileGeneration(current, completed, platform) : current);
-    if (platform === "instagram") { setGeneratedFor(profileGenerationKey(completed)); void refreshPosts(); }
+    if (platform === "instagram") { setGeneratedFor(profileGenerationKey(completed)); setEditedSinceGeneration(false); void refreshPosts(); }
     setSaved(false);
     setError(null);
   };
@@ -287,6 +296,7 @@ export default function ProfileSettings() {
     setGeneratingCount(1);
     setStartedAt(Date.now());
     setGeneratedFor(null);
+    setEditedSinceGeneration(true);
     setError(null);
     try {
       const savedUsername = await saveUsernameForGeneration("instagram", username);
@@ -445,7 +455,7 @@ export default function ProfileSettings() {
               form.instagram.audienceDescription.length <= 1500 && form.brandPreferences.length <= 1000 &&
               form.pitchStylePreferences.length <= 1000 &&
               (form.instagram.descriptionMode === "manual" || generationComplete)}
-            generationComplete={generationComplete} status={instagramStatus}
+            generationComplete={generationComplete} fetchLocked={generationComplete && !editedSinceGeneration && !!form.instagram.audienceDescription.trim()} status={instagramStatus}
             generationProgress={generationProgress.progress} showGenerationProgress={generationProgress.showProgress}
             error={error} pollError={pollError || profile.instagram_description_error || null} saved={saved}
             postsCard={<RecentPostsCard posts={posts} onPostsChange={setPosts} />} />

@@ -364,7 +364,7 @@ describe("Instagram wizard generation", () => {
     await tick(450);
     expect(screen.getByLabelText("Instagram audience description")).toHaveValue("Newly generated audience description.");
     expect(screen.queryByTestId("audience-description-missing")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
     await settle();
     expect(fixture.persisted.instagram_audience_description).toBe("Newly generated audience description.");
@@ -438,5 +438,16 @@ describe("Instagram wizard generation", () => {
       primary_platform: "instagram", instagram_followers: 9876, gender: "Female",
       pitch_style_preferences: "Conversational and direct.",
     });
+  });
+
+  it("greys out Fetch after a generation finishes until a field is edited", async () => {
+    await mount();
+    finish();
+    await tick(1500);
+    await tick(450);
+    const fetch = () => screen.getByRole("button", { name: "Fetch profile details with MAVLIT" });
+    expect(fetch()).toBeDisabled();
+    fireEvent.change(screen.getByTestId("input-description"), { target: { value: "Edited description" } });
+    expect(fetch()).toBeEnabled();
   });
 });

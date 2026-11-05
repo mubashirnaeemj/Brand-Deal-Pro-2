@@ -136,7 +136,7 @@ describe("Instagram wizard generation", () => {
 
   it("shows only username and primary niches with both Generate and disabled Save Profile", async () => {
     await mount(false);
-    expect(screen.getByTestId("input-username")).toBeEnabled();
+    expect(screen.getByTestId("input-username")).toBeDisabled();   // the username was saved with the profile
     expect(screen.getByText("Primary niches")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "2 selected" })).toBeEnabled();
     expect(screen.queryByTestId("input-brand-preferences")).not.toBeInTheDocument();
@@ -502,5 +502,15 @@ describe("Instagram wizard generation", () => {
     renderProfile(<ProfileSettings />);
     await settle();
     expect(screen.getByRole("button", { name: "Save Profile" })).toBeDisabled();
+  });
+
+  it("lets a creator who has not saved a username yet type one", async () => {
+    fixture = installProfileApi(creatorProfile({ primary_platform: "instagram", instagram_handle: null, onboarding_completed: false } as never));
+    renderProfile(<ProfileSettings />);
+    await settle();
+    details("manual");
+    expect(screen.getByTestId("input-username")).toBeEnabled();
+    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "first_choice" } });
+    expect(screen.getByTestId("input-username")).toHaveValue("first_choice");
   });
 });

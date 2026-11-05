@@ -459,7 +459,7 @@ export default function ProfileSettings() {
               form.instagram.audienceDescription.length <= 1500 && form.brandPreferences.length <= 1000 &&
               form.pitchStylePreferences.length <= 1000 &&
               (form.instagram.descriptionMode === "manual" || generationComplete)}
-            generationComplete={generationComplete} fetchLocked={generationComplete && !editedSinceGeneration && !!form.instagram.audienceDescription.trim()} status={instagramStatus}
+            generationComplete={generationComplete} usernameLocked={!!user && isProfileComplete(user) && !!profile.instagram_handle?.trim()} fetchLocked={generationComplete && !editedSinceGeneration && !!form.instagram.audienceDescription.trim()} status={instagramStatus}
             generationProgress={generationProgress.progress} showGenerationProgress={generationProgress.showProgress}
             error={error} pollError={pollError || profile.instagram_description_error || null} saved={saved}
             postsCard={<RecentPostsCard posts={posts} onPostsChange={setPosts} onPostAddedOrDeleted={() => setEditedSinceGeneration(true)} />} />

@@ -24,6 +24,8 @@ export interface ProfileWizardProps {
   generationComplete: boolean;
   /** Details were just generated and no post was added or deleted since: fetching again is greyed out. */
   fetchLocked?: boolean;
+  /** The Instagram username was saved with the profile: it can no longer be changed. */
+  usernameLocked?: boolean;
   generationProgress: number;
   showGenerationProgress: boolean;
   status?: DescriptionStatus | null;
@@ -155,8 +157,11 @@ export default function ProfileWizard(p: ProfileWizardProps) {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className={labelCls}>Instagram username
-                <input data-testid="input-username" className={`${INPUT_CLASS} mt-1.5`} value={ig.username} disabled={pending || p.generating || p.saving}
+                <input data-testid="input-username" className={`${INPUT_CLASS} mt-1.5`} value={ig.username} disabled={pending || p.generating || p.saving || !!p.usernameLocked}
                   placeholder="yourhandle" onChange={(e) => setIg({ username: e.target.value.replace(/^@/, "") })} />
+                {p.usernameLocked && <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">
+                  Your Instagram username is saved and can’t be changed.
+                </span>}
               </label>
               {showAllFields && <label className={labelCls}>Follower count
                 <input data-testid="input-followers" type="number" min={0} step={1} className={`${INPUT_CLASS} mt-1.5`} value={ig.followers}

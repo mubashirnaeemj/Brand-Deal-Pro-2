@@ -27,11 +27,18 @@ describe("early-access set-password page", () => {
     expect(get).toHaveBeenCalledWith("/auth/invite/TOKEN123");
 
     fireEvent.change(screen.getByTestId("input-invite-password"), { target: { value: "short" } });
+    fireEvent.change(screen.getByTestId("input-invite-confirm"), { target: { value: "short" } });
     fireEvent.click(screen.getByTestId("button-set-password"));
     expect(await screen.findByRole("alert")).toHaveTextContent("at least 12 characters");
     expect(post).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByTestId("input-invite-password"), { target: { value: "a long enough password" } });
+    fireEvent.change(screen.getByTestId("input-invite-confirm"), { target: { value: "a different password!" } });
+    fireEvent.click(screen.getByTestId("button-set-password"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("do not match");
+    expect(post).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByTestId("input-invite-confirm"), { target: { value: "a long enough password" } });
     fireEvent.click(screen.getByTestId("button-set-password"));
     await waitFor(() => expect(login).toHaveBeenCalledWith("new@example.test", "a long enough password"));
     expect(post).toHaveBeenCalledWith("/auth/invite/accept", { token: "TOKEN123", password: "a long enough password" });
@@ -67,6 +74,7 @@ describe("early-access set-password page", () => {
     render(<SetPassword />);
     await screen.findByTestId("input-invite-password");
     fireEvent.change(screen.getByTestId("input-invite-password"), { target: { value: "a long enough password" } });
+    fireEvent.change(screen.getByTestId("input-invite-confirm"), { target: { value: "a long enough password" } });
     await act(async () => { fireEvent.click(screen.getByTestId("button-set-password")); });
     await waitFor(() => expect(window.location.pathname).toBe("/"));
     expect(login).not.toHaveBeenCalled();

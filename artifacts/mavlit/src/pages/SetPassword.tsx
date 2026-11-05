@@ -22,6 +22,7 @@ export default function SetPassword() {
   const [invite, setInvite] = useState<InviteStatus | null>(null);
   const [leave, setLeave] = useState(!token);
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -49,6 +50,7 @@ export default function SetPassword() {
     event.preventDefault();
     if (!invite?.email || saving) return;
     if (password.length < MIN_PASSWORD_LENGTH) { setError(`Choose a password of at least ${MIN_PASSWORD_LENGTH} characters.`); return; }
+    if (password !== confirm) { setError("The two passwords do not match."); return; }
     setError(null);
     setSaving(true);
     try {
@@ -111,6 +113,16 @@ export default function SetPassword() {
               </div>
             </div>
 
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="invite-confirm" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Confirm password</label>
+              <div className="relative">
+                <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/60" />
+                <input id="invite-confirm" data-testid="input-invite-confirm" type="password" autoComplete="new-password" value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)} placeholder="Type it again" required disabled={saving}
+                  className={`${inputCls} pl-10`} />
+              </div>
+            </div>
+
             {error && (
               <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} role="alert"
                 className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
@@ -119,7 +131,7 @@ export default function SetPassword() {
               </motion.div>
             )}
 
-            <button type="submit" data-testid="button-set-password" disabled={saving || !password}
+            <button type="submit" data-testid="button-set-password" disabled={saving || !password || !confirm}
               className="mt-1 flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 active:translate-y-0">
               {saving ? <><Loader2 size={15} className="animate-spin" />Creating your account…</> : "Create account and sign in"}
             </button>

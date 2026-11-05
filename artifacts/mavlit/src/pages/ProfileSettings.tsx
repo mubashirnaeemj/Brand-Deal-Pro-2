@@ -76,10 +76,8 @@ export default function ProfileSettings() {
               ? timestamp : isDescriptionPending(response.instagram_description_status) ? Date.now() : null);
           }
           setGeneratedFor(completed && usable ? profileGenerationKey(response) : null);
-          // A restored draft that differs from the generated details counts as edited.
-          const fresh = restoreWizardForm(response, null);
-          const baseline = fresh.instagram.descriptionMode === "generate" ? applyProfileGeneration(fresh, response, "instagram") : fresh;
-          setEditedSinceGeneration(!(completed && usable) || JSON.stringify(restored) !== JSON.stringify(baseline));
+          // Locked only when the generation is current and the saved draft (if any) recorded no edit since.
+          setEditedSinceGeneration(!(completed && usable) || (!!draft && draft.editedSinceGeneration !== false));
           if ([1, 2, 3].includes(draft?.wizardStep)) setStep(draft.wizardStep);
           if (isDescriptionPending(response.instagram_description_status)) setStep(3);
           setForm(restored);
@@ -97,11 +95,11 @@ export default function ProfileSettings() {
     try {
       const key = `mavlit_profile_draft:${profile.id}`;
       const draft = serializeWizardDraft(form, step, generatedFor, generationProgress.startedAt,
-        isDescriptionPending(profile.instagram_description_status));
+        isDescriptionPending(profile.instagram_description_status), editedSinceGeneration);
       sessionStorage.setItem(key, draft);
       if (!user || !isProfileComplete(user)) localStorage.setItem(key, draft);
     } catch { /* The in-memory draft remains available. */ }
-  }, [form, profile, user, step, generatedFor, generationProgress.startedAt, saved]);
+  }, [form, profile, user, step, generatedFor, generationProgress.startedAt, saved, editedSinceGeneration]);
 
   useEffect(() => { document.title = "Your Profile | MAVLIT"; }, []);
   useEffect(() => { void refreshPosts(); }, [refreshPosts, retry]);

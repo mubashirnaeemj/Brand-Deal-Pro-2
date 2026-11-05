@@ -450,4 +450,21 @@ describe("Instagram wizard generation", () => {
     fireEvent.change(screen.getByTestId("input-description"), { target: { value: "Edited description" } });
     expect(fetch()).toBeEnabled();
   });
+
+  it("keeps Fetch greyed out after a reload until a field is edited", async () => {
+    const rendered = await mount();
+    finish();
+    await tick(1500);
+    await tick(450);
+    const fetch = () => screen.getByRole("button", { name: "Fetch profile details with MAVLIT" });
+    rendered.unmount();
+    const second = renderProfile(<ProfileSettings />);
+    await settle();
+    expect(fetch()).toBeDisabled();
+    fireEvent.change(screen.getByTestId("input-description"), { target: { value: "Edited description" } });
+    second.unmount();
+    renderProfile(<ProfileSettings />);
+    await settle();
+    expect(fetch()).toBeEnabled();
+  });
 });

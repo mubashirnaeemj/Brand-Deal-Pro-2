@@ -7,9 +7,9 @@ import { normalizeSubNiches } from "@/lib/subNiches";
 export type ProfileStep = 1 | 2 | 3;
 export function serializeWizardDraft(
   form: ProfileForm, wizardStep: ProfileStep, generatedFor: string | null,
-  generationStartedAt: number | null, generationPending: boolean,
+  generationStartedAt: number | null, generationPending: boolean, editedSinceGeneration = true,
 ): string {
-  return JSON.stringify({ ...form, wizardStep, generatedFor, generationStartedAt, generationPending });
+  return JSON.stringify({ ...form, wizardStep, generatedFor, generationStartedAt, generationPending, editedSinceGeneration });
 }
 export const generationKey = (username: string, niches: string[]) =>
   JSON.stringify([username.trim().replace(/^@/, "").toLowerCase(), niches]);

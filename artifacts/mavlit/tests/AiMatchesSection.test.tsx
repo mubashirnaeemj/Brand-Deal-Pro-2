@@ -52,6 +52,20 @@ describe("V3 ranking presentation", () => {
     expect(screen.getByRole("button", { name: "Ranking…" })).toBeDisabled();
   });
 
+  it("stops the page from scrolling while 'Updating your matches…' shows, and restores it after", () => {
+    const view = mount({ data: ranking("running") });
+    expect(document.documentElement.style.overflow).toBe("hidden");
+    expect(document.body.style.overflow).toBe("hidden");
+    view.rerender(<AiMatchesSection {...view.props} data={ranking("completed")} />);
+    expect(document.documentElement.style.overflow).toBe("");
+    expect(document.body.style.overflow).toBe("");
+  });
+
+  it("does not lock scrolling once the automatic checks have paused", () => {
+    mount({ data: ranking("running"), timedOut: true });
+    expect(document.body.style.overflow).toBe("");
+  });
+
   it("shows the paused-check message without implying the backend job stopped", () => {
     mount({ data: ranking("running"), timedOut: true });
     expect(screen.getByTestId("status-v3-updating")).toHaveTextContent("Still working — check back shortly");

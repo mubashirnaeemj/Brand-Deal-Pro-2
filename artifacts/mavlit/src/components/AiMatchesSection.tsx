@@ -116,6 +116,16 @@ export default function AiMatchesSection({ version, data, loading, error, refres
   const ranking = version === "v3" && busy;
   // The previous brands stay on screen, blurred and out of reach, until the new ranking is ready.
   useEffect(() => { if (listRef.current) listRef.current.inert = ranking; });
+  // While "Updating your matches…" is on screen the page itself does not scroll; it scrolls again as soon as it goes away.
+  const lockScroll = ranking && !timedOut;
+  useEffect(() => {
+    if (!lockScroll) return;
+    const html = document.documentElement, body = document.body;
+    const before = { html: html.style.overflow, body: body.style.overflow };
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => { html.style.overflow = before.html; body.style.overflow = before.body; };
+  }, [lockScroll]);
   const ranked = formatRanked(data?.ranked_at);
   const meta = ranked ? `Ranked ${ranked} · ${data?.total ?? matches.length} brands` : "";
 

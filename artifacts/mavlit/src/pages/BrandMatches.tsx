@@ -1,3 +1,4 @@
+import BrandSocialLinks from "@/components/BrandSocialLinks";
 import { useEffect, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -215,6 +216,7 @@ function ContactPanel({ match, onClose, fitConfidence }: { match: ApiMatch; onCl
                   )}
                 </>
               ) : <p className="text-sm text-muted-foreground">Contact details are not available for this brand.</p>}
+              {!isLoading && <BrandSocialLinks links={detail?.social_links} brandName={match.brand_name} />}
             </div>
           </div>
           <div>

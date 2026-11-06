@@ -229,6 +229,8 @@ export interface ApiBrand {
   sponsorship_activity_score: number | null;
   top_contact: ApiContact | null;
   other_contacts?: ApiContact[];
+  /** The brand's own pages (full https addresses), null where not known. */
+  social_links?: { instagram: string | null; facebook: string | null; youtube: string | null };
 }
 
 export interface RateIntelligenceResult {

@@ -320,6 +320,31 @@ describe("Matches page V3 integration", () => {
     expect(screen.queryByTestId("button-view-more-contacts")).not.toBeInTheDocument();
   });
 
+  it("Contact Intel ends with the brand's social logos, linking to its pages", async () => {
+    const aiFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input), window.location.origin).pathname;
+      if (path === "/api/mavlit/brands/10") {
+        return new Response(JSON.stringify({ brand_id: 10, name: "Alpha Audio", top_contact: null, other_contacts: [],
+          social_links: { instagram: "https://www.instagram.com/alphaaudio", facebook: "https://www.facebook.com/AlphaAudio", youtube: null } }),
+          { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (path === "/api/mavlit/matches/me/brands/10/posts") {
+        return new Response(JSON.stringify({ brand_raw_id: 10, brand_name: "Alpha Audio", posts: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return aiFetch(input, init);
+    }));
+    mountMatches();
+    await settle();
+    fireEvent.click(screen.getByTestId("button-ai-brand-10"));
+    await settle();
+    const socials = screen.getByTestId("brand-socials");
+    expect(within(socials).getByTestId("link-social-instagram")).toHaveAttribute("href", "https://www.instagram.com/alphaaudio");
+    expect(within(socials).getByTestId("link-social-facebook")).toHaveAttribute("href", "https://www.facebook.com/AlphaAudio");
+    expect(within(socials).queryByTestId("link-social-youtube")).not.toBeInTheDocument();
+    expect(socials).not.toHaveTextContent("instagram.com");
+  });
+
   it("Contact Intel shows the best contact and lists the other contacts under View more", async () => {
     const aiFetch = globalThis.fetch;
     const contact = (name: string, email: string, extra = {}) => ({ name, email, title: "Partnerships", apollo_verified: false, hunter_verified: false, still_at_brand: null, ...extra });

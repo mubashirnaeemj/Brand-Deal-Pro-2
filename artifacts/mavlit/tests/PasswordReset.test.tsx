@@ -27,7 +27,7 @@ describe("sign-in page", () => {
 });
 
 describe("forgot password page", () => {
-  it("asks for the email, sends it and shows the same message whatever the address", async () => {
+  it("asks for the email, sends it and confirms where the link went", async () => {
     post.mockResolvedValue({ status: "ok" });
     render(<ForgotPassword />);
     expect(screen.getByTestId("button-send-reset")).toBeDisabled();
@@ -35,9 +35,37 @@ describe("forgot password page", () => {
     fireEvent.click(screen.getByTestId("button-send-reset"));
     await waitFor(() => expect(screen.getByTestId("forgot-sent")).toHaveTextContent("ali@example.com"));
     expect(post).toHaveBeenCalledWith("/auth/forgot-password", { email: "ali@example.com" });
-    expect(screen.getByTestId("forgot-sent")).toHaveTextContent("If there is a MAVLIT account");   // never says whether it exists
+    expect(screen.getByTestId("forgot-sent")).toHaveTextContent("We've sent a link to reset your password");
+    expect(screen.queryByTestId("forgot-not-registered")).not.toBeInTheDocument();
     expect(screen.getByTestId("link-back-to-signin")).toHaveAttribute("href", "/signin");
   });
+
+  it("tells the visitor an unregistered email is not registered, offers the waiting list and lets them correct it", async () => {
+    post.mockResolvedValue({ status: "not_registered" });
+    render(<ForgotPassword />);
+    fireEvent.change(screen.getByTestId("input-forgot-email"), { target: { value: "stranger@example.com" } });
+    fireEvent.click(screen.getByTestId("button-send-reset"));
+    const notice = await screen.findByTestId("forgot-not-registered");
+    expect(notice).toHaveTextContent("This email isn't registered with MAVLIT");
+    expect(screen.getByTestId("link-waiting-room")).toHaveAttribute("href", "https://mavlit.com/#early-access");
+    expect(screen.queryByTestId("forgot-sent")).not.toBeInTheDocument();          // no "we sent a link" claim
+    expect(screen.getByTestId("input-forgot-email")).toBeEnabled();                // the form stays so the address can be fixed
+    post.mockResolvedValue({ status: "ok" });
+    fireEvent.change(screen.getByTestId("input-forgot-email"), { target: { value: "right@example.com" } });
+    fireEvent.click(screen.getByTestId("button-send-reset"));
+    await waitFor(() => expect(screen.getByTestId("forgot-sent")).toHaveTextContent("right@example.com"));
+    expect(screen.queryByTestId("forgot-not-registered")).not.toBeInTheDocument();
+  });
+
+  it.each([["inactive", "deactivated"], ["limited", "already sent several"], ["invalid_email", "valid email"]])(
+    "shows a message for the %s answer", async (status, words) => {
+      post.mockResolvedValue({ status });
+      render(<ForgotPassword />);
+      fireEvent.change(screen.getByTestId("input-forgot-email"), { target: { value: "a@b.co" } });
+      fireEvent.click(screen.getByTestId("button-send-reset"));
+      expect(await screen.findByRole("alert")).toHaveTextContent(words);
+      expect(screen.queryByTestId("forgot-sent")).not.toBeInTheDocument();
+    });
 
   it("shows the server's message when too many requests were made", async () => {
     post.mockRejectedValue(new ApiRequestError("Too many requests. Please try again later.", 429));

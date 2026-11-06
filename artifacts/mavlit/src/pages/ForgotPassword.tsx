@@ -4,6 +4,11 @@ import { Mail, AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
 import { Link } from "wouter";
 import { api, ApiRequestError } from "@/lib/api";
 
+// MAVLIT is invite-only for now: new creators join the waiting list on the main site (mavlit.com), as on the sign-in page.
+const WAITING_ROOM_URL = "https://mavlit.com/#early-access";
+
+type ForgotStatus = { status: "ok" | "not_registered" | "inactive" | "limited" | "invalid_email" };
+
 const inputCls =
   "w-full px-4 py-3 rounded-xl bg-secondary border border-border text-white placeholder:text-muted-foreground/50 text-sm font-medium focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all";
 
@@ -12,6 +17,7 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notRegistered, setNotRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const submit = async (event: React.FormEvent) => {
@@ -19,10 +25,15 @@ export default function ForgotPassword() {
     const address = email.trim();
     if (!address || loading) return;
     setError(null);
+    setNotRegistered(false);
     setLoading(true);
     try {
-      await api.post("/auth/forgot-password", { email: address });
-      setSent(address);
+      const result = await api.post<ForgotStatus>("/auth/forgot-password", { email: address });
+      if (result.status === "ok") setSent(address);
+      else if (result.status === "not_registered") setNotRegistered(true);
+      else if (result.status === "inactive") setError("This account has been deactivated. Please contact contact@mavlit.com.");
+      else if (result.status === "limited") setError("We already sent several reset links to this address. Please check your inbox (and spam) or try again in an hour.");
+      else setError("Enter a valid email address.");
     } catch (cause) {
       setError(cause instanceof ApiRequestError && cause.status === 429 ? cause.message : "Something went wrong. Please try again.");
     } finally {
@@ -51,7 +62,7 @@ export default function ForgotPassword() {
         {sent ? (
           <div role="status" data-testid="forgot-sent" className="flex items-start gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
             <CheckCircle2 size={15} className="mt-0.5 shrink-0" />
-            <span>If there is a MAVLIT account for <strong className="break-all">{sent}</strong>, we've sent a link to reset the password. It works once and expires in 1 hour.</span>
+            <span>We've sent a link to reset your password to <strong className="break-all">{sent}</strong>. It works once and expires in 1 hour. If you don't see it, check your spam folder.</span>
           </div>
         ) : (
           <form onSubmit={submit} noValidate className="flex flex-col gap-4">
@@ -63,6 +74,15 @@ export default function ForgotPassword() {
                   onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required disabled={loading} className={`${inputCls} pl-10`} />
               </div>
             </div>
+            {notRegistered && (
+              <div role="alert" data-testid="forgot-not-registered" className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                <span>
+                  This email isn't registered with MAVLIT. Check the address, or{" "}
+                  <a href={WAITING_ROOM_URL} data-testid="link-waiting-room" className="font-semibold underline">join the waiting list</a>.
+                </span>
+              </div>
+            )}
             {error && (
               <div role="alert" className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
                 <AlertCircle size={14} className="shrink-0 mt-0.5" />

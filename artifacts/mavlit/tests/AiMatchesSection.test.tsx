@@ -61,6 +61,15 @@ describe("V3 ranking presentation", () => {
     expect(document.body.style.overflow).toBe("");
   });
 
+  it("keeps the 'Updating your matches…' card fixed in the window so it is in view wherever the page is scrolled", () => {
+    mount({ data: ranking("running") });
+    const overlay = screen.getByTestId("status-v3-updating").parentElement!.parentElement!;   // the card sits in a fixed, centered layer
+    expect(overlay).toHaveClass("fixed", "inset-0", "items-center", "justify-center");
+    expect(overlay.className).not.toMatch(/\bsticky\b/);
+    expect(screen.getByTestId("status-v3-updating").parentElement).not.toHaveClass("sticky");
+    expect(screen.getByTestId("matches-list")).not.toContainElement(screen.getByTestId("status-v3-updating"));
+  });
+
   it("hides the niche filter while the ranking runs and shows it again after", () => {
     const view = mount({ data: ranking("running"), onNichesChange: () => {} });
     expect(screen.queryByTestId("match-niches")).not.toBeInTheDocument();

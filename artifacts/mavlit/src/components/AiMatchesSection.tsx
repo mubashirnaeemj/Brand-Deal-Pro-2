@@ -81,8 +81,11 @@ function RankingOverlay({ message, timedOut, pending, onCheckStatus, floating }:
       )}
     </div>
   );
+  // Centered in the window, not stuck inside the list: the matches page wraps its content in an overflow-x-hidden box, which stops a
+  // sticky child from sticking, so a card placed inside the list ended up out of sight (only the blurred brands showed) whenever the
+  // page was scrolled. A fixed card is always in view, wherever the page is scrolled to.
   return floating
-    ? <div className="absolute inset-0 z-10 flex items-start justify-center px-4"><div className="sticky top-[30vh] mt-16 w-full">{card}</div></div>
+    ? <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center px-4"><div className="pointer-events-auto w-full">{card}</div></div>
     : <div className="py-24">{card}</div>;
 }
 

@@ -29,7 +29,7 @@ describe("early-access set-password page", () => {
     fireEvent.change(screen.getByTestId("input-invite-password"), { target: { value: "short" } });
     fireEvent.change(screen.getByTestId("input-invite-confirm"), { target: { value: "short" } });
     fireEvent.click(screen.getByTestId("button-set-password"));
-    expect(await screen.findByRole("alert")).toHaveTextContent("at least 12 characters");
+    expect(await screen.findByRole("alert")).toHaveTextContent("at least 6 characters");
     expect(post).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByTestId("input-invite-password"), { target: { value: "a long enough password" } });
@@ -42,6 +42,18 @@ describe("early-access set-password page", () => {
     fireEvent.click(screen.getByTestId("button-set-password"));
     await waitFor(() => expect(login).toHaveBeenCalledWith("new@example.test", "a long enough password"));
     expect(post).toHaveBeenCalledWith("/auth/invite/accept", { token: "TOKEN123", password: "a long enough password" });
+  });
+
+  it("accepts a password of exactly 6 characters", async () => {
+    open();
+    get.mockResolvedValue({ status: "valid", email: "new@example.test" });
+    post.mockResolvedValue({ status: "ok", email: "new@example.test" });
+    render(<SetPassword />);
+    await screen.findByTestId("input-invite-password");
+    fireEvent.change(screen.getByTestId("input-invite-password"), { target: { value: "abc123" } });
+    fireEvent.change(screen.getByTestId("input-invite-confirm"), { target: { value: "abc123" } });
+    fireEvent.click(screen.getByTestId("button-set-password"));
+    await waitFor(() => expect(login).toHaveBeenCalledWith("new@example.test", "abc123"));
   });
 
   it.each(["used", "expired", "invalid"] as const)("sends a %s link to the app", async (status) => {

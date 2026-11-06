@@ -111,6 +111,10 @@ describe("signed-out visitors on the set-password page", () => {
     expect(await visit("/set-password?token=T")).toBe("/set-password");
   });
 
+  it.each(["/forgot-password", "/reset-password?token=T"])("%s is public too", async (path) => {
+    expect(await visit(path)).toBe(path.split("?")[0]);
+  });
+
   it("other pages still go to /signin", async () => {
     expect(await visit("/dashboard")).toBe("/signin");
   });

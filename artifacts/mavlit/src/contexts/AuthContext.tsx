@@ -91,6 +91,9 @@ export function isProfileComplete(profile: CreatorProfile): boolean {
   );
 }
 
+/** Public pages: a signed-out visitor stays on them when the session check answers 401. */
+const PUBLIC_PATHS = ["/set-password", "/forgot-password", "/reset-password"];
+
 interface AuthContextValue {
   user: CreatorProfile | null;
   isLoading: boolean;
@@ -118,8 +121,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unauthorized = () => {
       queryClient.clear();
       setUser(null);
-      // The early-access link page is public: the failed session check of a signed-out visitor must not take them to /signin.
-      if (window.location.pathname === "/set-password") return;
+      // The password pages are public: the failed session check of a signed-out visitor must not take them to /signin.
+      if (PUBLIC_PATHS.includes(window.location.pathname)) return;
       const matchesPage = /\/(?:brand-matches|matches)\/?$/.test(window.location.pathname);
       navigate(matchesPage ? "/signin?return_to=/matches" : "/signin");
     };

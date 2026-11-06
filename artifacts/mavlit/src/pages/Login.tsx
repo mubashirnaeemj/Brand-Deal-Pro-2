@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Mail, Lock, AlertCircle, Loader2 } from "lucide-react";
+import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 
 // MAVLIT is invite-only for now: new creators join the waiting list on the main site (mavlit.com).
@@ -128,6 +129,13 @@ export default function Login() {
         </form>
 
         <p className="mt-6 border-t border-border pt-5 text-center text-sm text-muted-foreground">
+          Forgot your password?{" "}
+          <Link href="/forgot-password" data-testid="link-forgot-password"
+            className="font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">
+            Reset it →
+          </Link>
+        </p>
+        <p className="mt-3 text-center text-sm text-muted-foreground">
           Don't have an account?{" "}
           <a href={WAITING_ROOM_URL} data-testid="link-waiting-room"
             className="font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded">

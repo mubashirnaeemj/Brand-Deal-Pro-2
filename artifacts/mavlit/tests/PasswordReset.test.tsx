@@ -1,0 +1,105 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
+import Login from "@/pages/Login";
+import { ApiRequestError } from "@/lib/api";
+
+const login = vi.fn();
+const get = vi.fn();
+const post = vi.fn();
+vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: null, login }) }));
+vi.mock("@/lib/api", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/api")>()), api: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a) } }));
+
+const open = (path: string) => window.history.replaceState(null, "", path);
+beforeEach(() => { login.mockReset(); get.mockReset(); post.mockReset(); });
+afterEach(() => { cleanup(); window.history.replaceState(null, "", "/"); });
+
+describe("sign-in page", () => {
+  it("has a 'Forgot your password?' line above the waiting-list line, linking to the reset page", () => {
+    render(<Login />);
+    const link = screen.getByTestId("link-forgot-password");
+    expect(link).toHaveAttribute("href", "/forgot-password");
+    expect(screen.getByText(/Forgot your password\?/)).toBeInTheDocument();
+    expect(screen.getByText(/Don't have an account\?/)).toBeInTheDocument();
+    expect(link.compareDocumentPosition(screen.getByTestId("link-waiting-room")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe("forgot password page", () => {
+  it("asks for the email, sends it and shows the same message whatever the address", async () => {
+    post.mockResolvedValue({ status: "ok" });
+    render(<ForgotPassword />);
+    expect(screen.getByTestId("button-send-reset")).toBeDisabled();
+    fireEvent.change(screen.getByTestId("input-forgot-email"), { target: { value: "  ali@example.com " } });
+    fireEvent.click(screen.getByTestId("button-send-reset"));
+    await waitFor(() => expect(screen.getByTestId("forgot-sent")).toHaveTextContent("ali@example.com"));
+    expect(post).toHaveBeenCalledWith("/auth/forgot-password", { email: "ali@example.com" });
+    expect(screen.getByTestId("forgot-sent")).toHaveTextContent("If there is a MAVLIT account");   // never says whether it exists
+    expect(screen.getByTestId("link-back-to-signin")).toHaveAttribute("href", "/signin");
+  });
+
+  it("shows the server's message when too many requests were made", async () => {
+    post.mockRejectedValue(new ApiRequestError("Too many requests. Please try again later.", 429));
+    render(<ForgotPassword />);
+    fireEvent.change(screen.getByTestId("input-forgot-email"), { target: { value: "a@b.co" } });
+    fireEvent.click(screen.getByTestId("button-send-reset"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests");
+  });
+});
+
+describe("reset password page", () => {
+  it("shows the account email (not editable), checks the passwords, saves and signs in", async () => {
+    open("/reset-password?token=RT1");
+    get.mockResolvedValue({ status: "valid", email: "ali@example.com" });
+    post.mockResolvedValue({ status: "ok", email: "ali@example.com" });
+    render(<ResetPassword />);
+    const email = await screen.findByTestId("input-reset-email");
+    expect(email).toHaveValue("ali@example.com");
+    expect(email).toBeDisabled();
+    expect(get).toHaveBeenCalledWith("/auth/password-reset/RT1");
+
+    fireEvent.change(screen.getByTestId("input-reset-password"), { target: { value: "abc" } });
+    fireEvent.change(screen.getByTestId("input-reset-confirm"), { target: { value: "abc" } });
+    fireEvent.click(screen.getByTestId("button-reset-password"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("at least 6 characters");
+    fireEvent.change(screen.getByTestId("input-reset-password"), { target: { value: "new password" } });
+    fireEvent.click(screen.getByTestId("button-reset-password"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("do not match");
+    expect(post).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByTestId("input-reset-confirm"), { target: { value: "new password" } });
+    fireEvent.click(screen.getByTestId("button-reset-password"));
+    await waitFor(() => expect(login).toHaveBeenCalledWith("ali@example.com", "new password"));
+    expect(post).toHaveBeenCalledWith("/auth/password-reset", { token: "RT1", password: "new password" });
+  });
+
+  it.each(["used", "expired", "invalid"] as const)("a %s link says so and offers a new one", async (status) => {
+    open("/reset-password?token=RT1");
+    get.mockResolvedValue({ status, email: null });
+    render(<ResetPassword />);
+    expect(await screen.findByTestId("reset-dead")).toHaveTextContent("This link can't be used");
+    expect(screen.getByTestId("link-ask-new-reset")).toHaveAttribute("href", "/forgot-password");
+    expect(screen.queryByTestId("input-reset-password")).not.toBeInTheDocument();
+  });
+
+  it("a link without a token cannot be used", async () => {
+    open("/reset-password");
+    render(<ResetPassword />);
+    expect(await screen.findByTestId("reset-dead")).toBeInTheDocument();
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it("a link used up between opening and saving shows the same message", async () => {
+    open("/reset-password?token=RT1");
+    get.mockResolvedValue({ status: "valid", email: "ali@example.com" });
+    post.mockRejectedValue(new ApiRequestError("This link can no longer be used.", 410));
+    render(<ResetPassword />);
+    await screen.findByTestId("input-reset-password");
+    fireEvent.change(screen.getByTestId("input-reset-password"), { target: { value: "new password" } });
+    fireEvent.change(screen.getByTestId("input-reset-confirm"), { target: { value: "new password" } });
+    fireEvent.click(screen.getByTestId("button-reset-password"));
+    expect(await screen.findByTestId("reset-dead")).toBeInTheDocument();
+    expect(login).not.toHaveBeenCalled();
+  });
+});

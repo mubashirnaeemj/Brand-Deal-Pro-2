@@ -17,6 +17,8 @@ import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
 import Login from "@/pages/Login";
 import SetPassword from "@/pages/SetPassword";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 import PasswordChangeRequired from "@/components/PasswordChangeRequired";
 import { AuthProvider, isProfileComplete, useAuth } from "@/contexts/AuthContext";
 
@@ -38,6 +40,8 @@ function Router() {
       <button className="rounded-xl bg-primary px-5 py-2" onClick={() => window.location.reload()}>Retry</button>
     </div>
   );
+  if (location === "/forgot-password") return <ForgotPassword />;   // public pages of the password flows (also for someone signed in)
+  if (location === "/reset-password") return <ResetPassword />;
   if (location === "/set-password") return <SetPassword />;   // the early-access email link: opens for anyone, signed in or not; the page itself sends unusable links to the app
   if (!user) return location === "/signin" ? <Login /> : <Redirect to="/signin" />;
   if (!isProfileComplete(user)) {

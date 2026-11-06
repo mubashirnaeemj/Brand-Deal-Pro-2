@@ -17,6 +17,7 @@ const pitch = (id: number, brand: string) => ({
 let pitches: ReturnType<typeof pitch>[];
 let rateRequests: Record<string, unknown>[];
 let savedEstimates: Record<string, unknown>[];   // what the server has kept (GET /rate-intelligence/latest)
+let latestReads: number;                         // how often the page asked the server for a kept estimate
 let deleteCalls: string[];
 let deleteStatus: number;
 let profileApi: ReturnType<typeof installProfileApi>;
@@ -26,6 +27,7 @@ beforeEach(() => {
   deleteCalls = [];
   rateRequests = [];
   savedEstimates = [];
+  latestReads = 0;
   deleteStatus = 200;
   profileApi = installProfileApi(creatorProfile());
   const base = globalThis.fetch;
@@ -34,6 +36,7 @@ beforeEach(() => {
     const url = new URL(String(input), window.location.origin);
     if (url.pathname === "/api/mavlit/pitches/me") return json({ pitches, total: pitches.length });
     if (url.pathname === "/api/mavlit/rate-intelligence/latest") {
+      latestReads += 1;
       const q = url.searchParams;
       if (!q.get("deliverable_type")) return json(savedEstimates.at(-1) ?? null);            // the newest estimate of all
       const hit = [...savedEstimates].reverse().find((e) =>
@@ -194,37 +197,48 @@ describe("Deal Tools", () => {
     expect(rateRequests[1]).not.toHaveProperty("duration_months");
   });
 
-  it("keeps the estimate on the server: after a reload the last brand, deal terms and estimate come back", async () => {
+  it("an estimate is one-time: after a reload the brand, deal terms and estimate are gone, and nothing is read back from the server", async () => {
     const input = await openDealTools();
     fireEvent.click(screen.getByText("Rate Intelligence"));
     fireEvent.change(input, { target: { value: "Alpha" } });
     fireEvent.mouseDown(within(screen.getByTestId("list-deal-brands")).getByRole("option", { name: "Alpha Audio" }));
     fireEvent.click(screen.getByRole("button", { name: "Reel" }));
-    fireEvent.click(screen.getByRole("button", { name: /Broad/ }));
-    fireEvent.change(screen.getByPlaceholderText("Duration (months)"), { target: { value: "6" } });
-    fireEvent.click(screen.getByRole("button", { name: "Includes paid usage or whitelisting" }));
     fireEvent.click(await screen.findByTestId("button-estimate-rate"));
-    await screen.findByTestId("rate-estimate");
+    expect(await screen.findByTestId("rate-estimate")).toBeInTheDocument();
+    expect(screen.queryByTestId("rate-saved-at")).not.toBeInTheDocument();
     expect(rateRequests).toHaveLength(1);
+    expect(savedEstimates).toHaveLength(1);                       // the server still has its own record ...
 
-    // "Reload": the page and its state are gone, the server still has the estimate.
+    // "Reload": the page and its state are gone.
     cleanup();
     const reloaded = await openDealTools();
-    await waitFor(() => expect(reloaded).toHaveValue("Alpha Audio"));                         // brand restored (after the server answers)
-    const pill = (name: string | RegExp) => screen.getByRole("button", { name }).className;
-    expect(pill("Reel")).toContain("text-primary");                                           // deal terms restored
-    expect(pill(/Broad/)).toContain("text-primary");
-    expect(pill("Includes paid usage or whitelisting")).toContain("text-primary");
-    expect(screen.getByPlaceholderText("Duration (months)")).toHaveValue(6);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(reloaded).toHaveValue("");                              // ... but the brand is not brought back
+    const pill = (name: string) => screen.getByRole("button", { name }).className;
+    expect(pill("Reel")).not.toContain("text-primary");           // nor the deal terms
     fireEvent.click(screen.getByText("Rate Intelligence"));
-    expect(await screen.findByTestId("rate-estimate")).toBeInTheDocument();                  // the estimate is shown again
-    expect(screen.getByTestId("rate-typical")).toHaveTextContent("$420");
-    expect(screen.getByTestId("rate-saved-at")).toHaveTextContent("Saved estimate from");
-    expect(rateRequests).toHaveLength(1);                                                     // nothing was estimated again
+    expect(screen.queryByTestId("rate-estimate")).not.toBeInTheDocument();   // nor the estimate
+    expect(screen.getByText(/Choose the/)).toBeInTheDocument();
+    expect(latestReads).toBe(0);                                   // and the page never asks the server for a kept estimate
+    expect(rateRequests).toHaveLength(1);                          // nothing was estimated again
+  });
 
-    // Other deal terms have no saved estimate; the button comes back.
-    fireEvent.click(screen.getByRole("button", { name: "Story" }));
+  it("choosing the same brand and terms again after a reload shows the Estimate rate button, not an old estimate", async () => {
+    const input = await openDealTools();
+    fireEvent.click(screen.getByText("Rate Intelligence"));
+    fireEvent.change(input, { target: { value: "Alpha" } });
+    fireEvent.mouseDown(within(screen.getByTestId("list-deal-brands")).getByRole("option", { name: "Alpha Audio" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reel" }));
+    fireEvent.click(await screen.findByTestId("button-estimate-rate"));
+    await screen.findByTestId("rate-estimate");
+    cleanup();
+    const again = await openDealTools();
+    fireEvent.click(screen.getByText("Rate Intelligence"));
+    fireEvent.change(again, { target: { value: "Alpha" } });
+    fireEvent.mouseDown(within(screen.getByTestId("list-deal-brands")).getByRole("option", { name: "Alpha Audio" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reel" }));
     expect(await screen.findByTestId("button-estimate-rate")).toBeInTheDocument();
+    expect(screen.queryByTestId("rate-estimate")).not.toBeInTheDocument();
   });
 
   it("starts empty after a reload when no estimate was ever saved", async () => {

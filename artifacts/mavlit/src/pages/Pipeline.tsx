@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiRequestError, getAllPitches, type ApiPitch, type PitchUpdateRequest } from "@/lib/api";
 import { useLocation } from "wouter";
@@ -690,7 +690,6 @@ const CONFIDENCE_STYLE = {
  * creators the brand has paid (see pipeline/rate_intelligence.py).
  */
 function RateEstimator({ dealContext, brand }: { dealContext: DealContext; brand: { id: number | null; name: string } | null }) {
-  const queryClient = useQueryClient();
   const { deliverable, exclusivity, exclusivityMonths, usage } = dealContext;
   const [fresh, setFresh] = useState<RateEstimateResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -709,14 +708,8 @@ function RateEstimator({ dealContext, brand }: { dealContext: DealContext; brand
     ...dealTerms(dealContext),
   };
 
-  // The estimate already made for exactly these inputs is kept on the server, so it is still here after a reload.
-  const saved = useQuery({
-    queryKey: ["rate-estimate", inputKey],
-    enabled: ready,
-    retry: false,
-    queryFn: () => api.get<RateEstimateResult | null>(`/rate-intelligence/latest?${new URLSearchParams(Object.entries(inputs).map(([k, v]) => [k, String(v)]))}`),
-  });
-  const result = fresh ?? saved.data ?? null;
+  // An estimate is for one time only: it lives in this page's memory, so a reload (or leaving the page) clears it. Nothing is read back.
+  const result = fresh;
 
   const estimate = async () => {
     if (!ready || !brand) return;
@@ -725,8 +718,6 @@ function RateEstimator({ dealContext, brand }: { dealContext: DealContext; brand
     try {
       const made = await api.post<RateEstimateResult>("/rate-intelligence", { ...inputs, platform: DEAL_PLATFORM });
       setFresh(made);
-      queryClient.setQueryData(["rate-estimate", inputKey], made);
-      void queryClient.invalidateQueries({ queryKey: ["rate-latest"] });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't estimate the rate.");
     } finally { setLoading(false); }
@@ -769,8 +760,7 @@ function RateEstimator({ dealContext, brand }: { dealContext: DealContext; brand
             </div>
           )}
 
-          {!result && saved.isLoading && <p role="status" className="text-xs text-muted-foreground">Checking for a saved estimate…</p>}
-          {!result && !saved.isLoading && (
+          {!result && (
             <button type="button" onClick={() => void estimate()} disabled={loading} data-testid="button-estimate-rate"
               className="w-full py-3 rounded-xl text-sm font-bold bg-primary text-white hover:bg-primary/85 transition-colors disabled:opacity-50">
               {loading ? "Estimating…" : "Estimate rate"}
@@ -822,11 +812,6 @@ function RateEstimator({ dealContext, brand }: { dealContext: DealContext; brand
                   className="text-xs font-semibold text-primary hover:underline disabled:opacity-50">
                   {loading ? "Estimating…" : "Estimate again"}
                 </button>
-                {!fresh && result.created_at && (
-                  <span data-testid="rate-saved-at" className="text-[11px] text-muted-foreground">
-                    Saved estimate from {new Date(result.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
-                  </span>
-                )}
               </div>
             </motion.div>
           )}
@@ -1027,31 +1012,6 @@ function DealMakerTab({
   const [dealContext, setDealContext] = useState<DealContext>(EMPTY_DEAL_CONTEXT);
 
   const toggle = (id: string) => setOpenCard(prev => prev === id ? null : id);
-
-  // After a reload the page is empty; bring back the brand and deal terms of the creator's latest estimate (kept on the
-  // server), whose estimate then shows below. Skipped when the creator, or a pitch's "Use Deal Tools" link, chose first.
-  const latest = useQuery({
-    queryKey: ["rate-latest"],
-    retry: false,
-    queryFn: () => api.get<RateEstimateResult | null>("/rate-intelligence/latest"),
-  });
-  const restored = useRef(false);
-  useEffect(() => {
-    const last = latest.data;
-    if (restored.current || !last) return;
-    restored.current = true;
-    if (selectedBrand || dealContext.deliverable || !last.deliverable_type || !DELIVERABLE_TYPES.includes(last.deliverable_type)) return;
-    const pitched = pitches.find(p => (last.brand_id && p.brandId === last.brand_id) || p.brand.toLowerCase() === (last.brand_name ?? "").toLowerCase());
-    if (pitched) { onSelectBrand(pitched.brand); }
-    else if (last.brand_name) { onSelectBrand(CUSTOM_BRAND); setCustom(last.brand_name); }
-    else return;
-    setDealContext({
-      deliverable: last.deliverable_type,
-      exclusivity: last.exclusivity === "None" || last.exclusivity === "Narrow" || last.exclusivity === "Broad" ? last.exclusivity : "",
-      exclusivityMonths: last.duration_months ? String(last.duration_months) : "",
-      usage: last.usage === "Organic only" || last.usage === "Includes paid usage or whitelisting" ? last.usage : "",
-    });
-  }, [latest.data]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const uniqueOptions = [...new Set(pitches.filter(p => !p.status.startsWith("closed_") && p.status !== "closed").map(p => p.brand))];
 

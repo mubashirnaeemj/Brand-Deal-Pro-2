@@ -59,12 +59,28 @@ describe("early-access set-password page", () => {
     expect(get).not.toHaveBeenCalled();
   });
 
-  it("sends a signed-in visitor to the app without reading the link", async () => {
+  it("opens the password page for a usable link even when another account is signed in", async () => {
+    open();
+    auth.user = { id: 1, email: "someone-else@example.test" };
+    get.mockResolvedValue({ status: "valid", email: "new@example.test" });
+    post.mockResolvedValue({ status: "ok", email: "new@example.test" });
+    render(<SetPassword />);
+    expect(await screen.findByTestId("input-invite-email")).toHaveValue("new@example.test");
+    expect(screen.getByTestId("text-signed-in-notice")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/set-password");
+    fireEvent.change(screen.getByTestId("input-invite-password"), { target: { value: "a long enough password" } });
+    fireEvent.change(screen.getByTestId("input-invite-confirm"), { target: { value: "a long enough password" } });
+    fireEvent.click(screen.getByTestId("button-set-password"));
+    await waitFor(() => expect(login).toHaveBeenCalledWith("new@example.test", "a long enough password"));   // the new account replaces the old session
+  });
+
+  it("sends a signed-in visitor with a used link to the app", async () => {
     open();
     auth.user = { id: 1 };
+    get.mockResolvedValue({ status: "used", email: null });
     render(<SetPassword />);
     await waitFor(() => expect(window.location.pathname).toBe("/"));
-    expect(get).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("input-invite-password")).not.toBeInTheDocument();
   });
 
   it("leaves for the app when the link was used up between opening and saving", async () => {

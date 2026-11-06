@@ -13,8 +13,9 @@ type InviteStatus = { status: "valid" | "used" | "expired" | "invalid"; email: s
 
 /**
  * The page behind the link in the early-access email (/set-password?token=...). It shows the invited email (not editable) and asks for the
- * password the person wants. Saving creates the account, signs them in and uses the link up. A link that was already used, has expired or
- * is not valid sends the visitor to the app: straight in when they are signed in, otherwise to the sign-in page.
+ * password the person wants. Saving creates the account, signs them in (replacing any account already signed in on this browser) and uses
+ * the link up. A link that was already used, has expired or is not valid sends the visitor to the app: straight in when they are signed in,
+ * otherwise to the sign-in page.
  */
 export default function SetPassword() {
   const { user, login } = useAuth();
@@ -27,7 +28,7 @@ export default function SetPassword() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (user || !token) return;
+    if (!token) return;
     let active = true;
     api.get<InviteStatus>(`/auth/invite/${encodeURIComponent(token)}`)
       .then((result) => {
@@ -41,10 +42,11 @@ export default function SetPassword() {
         else setLeave(true);
       });
     return () => { active = false; };
-  }, [token, user]);
+  }, [token]);
 
-  // Signed in already, or a link that cannot be used: the app decides where this person goes.
-  if (user || leave) return <Redirect to="/" replace />;
+  // A link that cannot be used (used, expired, unknown, no token): the app decides where this person goes - straight in when
+  // signed in, otherwise the sign-in page. A link that CAN be used opens the password page even when another account is signed in.
+  if (leave) return <Redirect to="/" replace />;
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -94,6 +96,11 @@ export default function SetPassword() {
             : <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 size={15} className="animate-spin" />Checking your link…</p>
         ) : (
           <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+            {user && (
+              <p role="status" data-testid="text-signed-in-notice" className="rounded-xl border border-border bg-secondary px-4 py-3 text-xs text-muted-foreground">
+                You are signed in as another account. Creating this account signs you out of it.
+              </p>
+            )}
             <div className="flex flex-col gap-1.5">
               <label htmlFor="invite-email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Email</label>
               <div className="relative">

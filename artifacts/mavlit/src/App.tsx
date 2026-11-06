@@ -38,7 +38,7 @@ function Router() {
       <button className="rounded-xl bg-primary px-5 py-2" onClick={() => window.location.reload()}>Retry</button>
     </div>
   );
-  if (location === "/set-password") return <SetPassword />;   // the early-access email link: public, and it redirects signed-in visitors itself
+  if (location === "/set-password") return <SetPassword />;   // the early-access email link: opens for anyone, signed in or not; the page itself sends unusable links to the app
   if (!user) return location === "/signin" ? <Login /> : <Redirect to="/signin" />;
   if (!isProfileComplete(user)) {
     return location === "/creator-profile" ? <OnboardingPage /> : <Redirect to="/creator-profile" />;

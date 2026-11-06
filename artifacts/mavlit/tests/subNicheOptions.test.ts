@@ -31,4 +31,14 @@ describe("sub-niche choices", () => {
     expect(subNicheOptions(["Music", "Music"])).toHaveLength(50);
     expect(subNicheOptions(["Cooking"])).toEqual([]);
   });
+
+  it("lists the options in alphabetical order, for one niche and for several", () => {
+    const az = (list: string[]) => [...list].sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+    for (const niches of [["Music"], ["Health"], ["Beauty"], ["Fitness"], ["Music", "Fitness"], ["Fitness", "Beauty", "Health", "Music"]]) {
+      const options = subNicheOptions(niches);
+      expect(options, niches.join("+")).toEqual(az(options));
+    }
+    expect(subNicheOptions(["Music"])[0]).toBe("Acoustic Sessions");
+    expect(subNicheOptions(["Fitness", "Music"])).toEqual(subNicheOptions(["Music", "Fitness"]));   // the order of the choice does not matter
+  });
 });

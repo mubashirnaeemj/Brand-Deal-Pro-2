@@ -96,9 +96,11 @@ export const SUB_NICHES_BY_NICHE = {
 } as const;
 
 export const NICHE_OPTIONS = Object.keys(SUB_NICHES_BY_NICHE) as (keyof typeof SUB_NICHES_BY_NICHE)[];
+/** The sub-niches of the chosen niches, each once, in alphabetical order (A to Z, ignoring case). */
 export const subNicheOptions = (niches: string[]): string[] =>
   [...new Set(niches.flatMap((niche) =>
-    niche in SUB_NICHES_BY_NICHE ? [...SUB_NICHES_BY_NICHE[niche as keyof typeof SUB_NICHES_BY_NICHE]] : []))];
+    niche in SUB_NICHES_BY_NICHE ? [...SUB_NICHES_BY_NICHE[niche as keyof typeof SUB_NICHES_BY_NICHE]] : []))]
+    .sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
 
 export const EMPTY_ONBOARDING: OnboardingData = {
   instagramDescriptionMode: "manual",

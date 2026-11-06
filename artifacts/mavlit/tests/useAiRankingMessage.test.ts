@@ -16,17 +16,17 @@ describe("ranking progress lines", () => {
       previous = result.current;
       seen.add(previous);
     }
-    expect(seen.size).toBeGreaterThan(30);                                  // a big pool, not the original six
+    expect(seen.size).toBeGreaterThan(15);                                  // a big pool of lines
     expect([...seen].every((line) => line.length > 10 && /(…|\.\.\.)$/.test(line))).toBe(true);
   });
 
-  it("includes the original lines and the 50 added ones (56 in all)", () => {
+  it("rotates through all 23 lines", () => {
     // Collect the whole pool by running long enough.
     const { result } = renderHook(() => useAiRankingMessage(true));
     const seen = new Set<string>([result.current]);
     for (let i = 0; i < 4000; i += 1) { act(() => { vi.advanceTimersByTime(5_000); }); seen.add(result.current); }
-    expect(seen.size).toBe(56);
-    expect(seen.has("Polishing your top matches…")).toBe(true);
+    expect(seen.size).toBe(23);
+    expect(seen.has("Polishing your top matches…")).toBe(false);          // removed
     expect(seen.has("Getting to know your content style...")).toBe(true);
     expect(seen.has("Finding your next great brand partnership...")).toBe(true);
   });

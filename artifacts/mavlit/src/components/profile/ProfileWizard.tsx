@@ -230,7 +230,8 @@ export default function ProfileWizard(p: ProfileWizardProps) {
         )}
       </section>
 
-      {step === 3 && !showProgress && p.postsCard}
+      {/* With "Let MAVLIT generate", the posts section only appears once the profile details were fetched: before that there are no posts to show. */}
+      {step === 3 && !showProgress && (!gen || p.generationComplete) && p.postsCard}
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <button type="button" className={btnGhost} onClick={p.onExit} disabled={p.saving} data-testid="button-exit">Exit</button>

@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { INPUT_CLASS } from "@/components/onboarding/types";
 import {
   addCreatorPost, deleteCreatorPost, isPostsList, listCreatorPosts, setPostPartnership,
-  formatCount, openPost, postedAtLabel, type CreatorPost, type CreatorPostsList,
+  formatCount, openPost, postedAtLabel, thumbnailPath, type CreatorPost, type CreatorPostsList,
 } from "@/lib/creatorPosts";
 
 type Message = { kind: "error" | "success"; text: string };
@@ -29,6 +29,8 @@ export default function RecentPostsCard({ posts, onPostsChange, onPostAddedOrDel
   const [open, setOpen] = useState(false);
   if (!posts) return null;
   const empty = posts.total <= 0;
+  // Two of the creator's own pictures on the card itself, so they can see it holds their posts; the rest are in the dialog.
+  const preview = posts.posts.filter(post => thumbnailPath(post.thumbnail_url)).slice(0, 2);
   return (
     <section className="mt-6 rounded-2xl border border-border bg-card p-5 sm:p-6" aria-labelledby="recent-posts-title" data-testid="recent-posts-card">
       <h2 id="recent-posts-title" className="text-lg font-bold text-white">Your recent Instagram posts</h2>
@@ -37,7 +39,17 @@ export default function RecentPostsCard({ posts, onPostsChange, onPostAddedOrDel
           ? "MAVLIT hasn't read any posts from your Instagram yet. You can add a post by its link, and mark the ones that were paid partnerships."
           : "The posts MAVLIT has read from your Instagram. Mark the ones that were paid partnerships, remove posts you don't want to use, or add a post by its link."}
       </p>
-      <button type="button" className={`${btnGhost} mt-4`} onClick={() => setOpen(true)}>View your recent Instagram posts</button>
+      {preview.length > 0 && (
+        <div className="mt-4 flex gap-3" data-testid="recent-posts-preview">
+          {preview.map(post => (
+            <button key={post.id} type="button" onClick={() => setOpen(true)} aria-label="Open your recent Instagram posts"
+              className="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+              <PostThumbnail url={post.thumbnail_url} size={96} />
+            </button>
+          ))}
+        </div>
+      )}
+      <button type="button" className={`${btnGhost} mt-4`} onClick={() => setOpen(true)}>View more recent Instagram posts</button>
       <PostsDialog open={open} onOpenChange={setOpen} posts={posts} onPostsChange={onPostsChange} onPostAddedOrDeleted={onPostAddedOrDeleted} />
     </section>
   );

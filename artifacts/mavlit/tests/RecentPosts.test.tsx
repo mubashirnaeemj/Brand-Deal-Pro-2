@@ -22,13 +22,31 @@ async function mount(initialPosts = posts(14)) {
   return rendered;
 }
 const openDialog = async () => {
-  fireEvent.click(await screen.findByRole("button", { name: "View your recent Instagram posts" }));
+  fireEvent.click(await screen.findByRole("button", { name: "View more recent Instagram posts" }));
   return screen.findByRole("dialog");
 };
 const deleteButtons = () => screen.getAllByRole("button", { name: /^Delete / });
 const rows = () => screen.getAllByTestId("post-row");
 
 describe("recent Instagram posts on the profile page", () => {
+  it("shows two of the creator's pictures on the card and opens the full list from the button or a picture", async () => {
+    await mount(posts(14));
+    const card = await screen.findByTestId("recent-posts-card");
+    const preview = within(card).getByTestId("recent-posts-preview");
+    await waitFor(() => expect(within(preview).getAllByTestId("post-thumbnail")).toHaveLength(2));   // exactly two, not all 14
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(within(card).getByRole("button", { name: "View more recent Instagram posts" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(rows()).toHaveLength(14);   // all of them are in the dialog
+  });
+
+  it("shows no pictures on the card when the creator has no posts, only the add-a-post dialog", async () => {
+    await mount([]);
+    const card = await screen.findByTestId("recent-posts-card");
+    expect(within(card).queryByTestId("recent-posts-preview")).not.toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "View more recent Instagram posts" })).toBeInTheDocument();
+  });
+
   it("shows the card, empty, to a creator without posts so they can add their own", async () => {
     await mount([]);
     await waitFor(() => expect(fixture.requests.some((r) => r.path.endsWith("/creator-profile/me/posts"))).toBe(true));

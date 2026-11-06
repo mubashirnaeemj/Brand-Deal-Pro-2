@@ -453,7 +453,7 @@ describe("Instagram wizard generation", () => {
     expect(fetch()).toBeDisabled();
     fixture.setPosts(Array.from({ length: 12 }, (_, index) => fixturePost(12 - index)));
     await settle();
-    fireEvent.click(screen.getByRole("button", { name: "View your recent Instagram posts" }));
+    fireEvent.click(screen.getByRole("button", { name: "View more recent Instagram posts" }));
     await settle();
     const dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText("Instagram post link"), { target: { value: "https://www.instagram.com/p/NEWPOST1/" } });
@@ -560,5 +560,28 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeEnabled();
     expect(screen.getByTestId("input-username")).toBeEnabled();
     expect(screen.getByTestId("input-username")).toHaveValue("changed_in_admin");
+  });
+
+  it("shows 'Your recent Instagram posts' in generate mode only after the profile details were fetched", async () => {
+    await mount(false);   // step 3, "Let MAVLIT generate", nothing fetched yet
+    await settle();
+    expect(screen.queryByTestId("recent-posts-card")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("button-generate"));
+    await settle();
+    expect(screen.queryByTestId("recent-posts-card")).not.toBeInTheDocument();   // not while it is generating either
+    finish();
+    await tick(1500);
+    await tick(450);
+    expect(screen.getByTestId("recent-posts-card")).toBeInTheDocument();
+  });
+
+  it("keeps the posts section on the page when the creator writes the description themselves", async () => {
+    fixture = installProfileApi(creatorProfile({ primary_platform: "instagram" }));
+    fixture.setPosts(Array.from({ length: 12 }, (_, index) => fixturePost(12 - index)));
+    renderProfile(<ProfileSettings />);
+    await settle();
+    details("manual");
+    await settle();
+    expect(screen.getByTestId("recent-posts-card")).toBeInTheDocument();
   });
 });

@@ -121,7 +121,7 @@ export default function ProfileSettings() {
     !!handleKey(profile.instagram_handle) && handleKey(posts.instagram_handle) === handleKey(profile.instagram_handle);
   // A verified username can't be edited: show the saved one, never an older draft.
   useEffect(() => {
-    if (!usernameVerified || !profile) return;
+    if (true /* TEMP: username editable again; remove to restore lock */ || !usernameVerified || !profile) return;
     setForm((current) => current && handleKey(current.instagram.username) !== handleKey(profile.instagram_handle)
       ? { ...current, instagram: { ...current.instagram, username: profileToForm(profile).instagram.username } } : current);
   }, [usernameVerified, profile]);
@@ -475,7 +475,7 @@ export default function ProfileSettings() {
               form.instagram.audienceDescription.length <= 1500 && form.brandPreferences.length <= 1000 &&
               form.pitchStylePreferences.length <= 1000 &&
               (form.instagram.descriptionMode === "manual" || generationComplete)}
-            generationComplete={generationComplete} usernameLocked={usernameVerified} fetchLocked={generationComplete && !editedSinceGeneration && !!form.instagram.audienceDescription.trim() && usernameVerified} status={instagramStatus}
+            generationComplete={generationComplete} usernameLocked={false /* TEMP: username editable again; restore to usernameVerified */} fetchLocked={generationComplete && !editedSinceGeneration && !!form.instagram.audienceDescription.trim() && usernameVerified} status={instagramStatus}
             generationProgress={generationProgress.progress} showGenerationProgress={generationProgress.showProgress}
             error={error} pollError={pollError || profile.instagram_description_error || null} saved={saved}
             postsCard={<RecentPostsCard posts={posts} onPostsChange={setPosts} onPostAddedOrDeleted={() => setEditedSinceGeneration(true)} />} />

@@ -11,6 +11,7 @@ import { isPostsList, listCreatorPosts, type CreatorPostsList } from "@/lib/crea
 import { profilePatch, profileToForm, validateProfile, type ProfileForm } from "./profileForm";
 import { applyProfileGeneration, creatorInfoError, generationKey, profileGenerationKey, restoreWizardForm, serializeWizardDraft, type ProfileStep } from "./profileWizardModel";
 import { useProfileGenerationProgress } from "./useProfileGenerationProgress";
+import { INVALID_USERNAME_MESSAGE, isCleanSavedUsername, isValidInstagramUsername, isWrongUsernameError } from "@/lib/instagramUsername";
 
 /** Accounts that may keep editing their Instagram username after it was saved (everyone else types it once). */
 const EDITABLE_USERNAME_ACCOUNTS = ["alternativenationnet@gmail.com", "brett@gmail.com"];
@@ -125,7 +126,11 @@ export default function ProfileSettings() {
   // The Instagram username is typed once: as soon as one is saved on the profile it can no longer be edited. Only the accounts in
   // EDITABLE_USERNAME_ACCOUNTS may keep changing it. A locked field always shows the saved username, never an older draft.
   const accountEmail = (profile?.email ?? user?.email ?? "").trim().toLowerCase();
-  const usernameLocked = !!profile && !!handleKey(profile.instagram_handle) && !EDITABLE_USERNAME_ACCOUNTS.includes(accountEmail);
+  // It stays editable when the saved username is not a valid one (for example it has a space), and when Instagram has no such account, so a
+  // wrong username can be corrected. A correct username is locked for good.
+  const wrongUsername = profile?.instagram_description_status === "failed" && isWrongUsernameError(profile.instagram_description_error);
+  const usernameLocked = !!profile && !!handleKey(profile.instagram_handle) && !EDITABLE_USERNAME_ACCOUNTS.includes(accountEmail) &&
+    isCleanSavedUsername(profile.instagram_handle) && !wrongUsername;
   useEffect(() => {
     if (!usernameLocked || !profile) return;
     setForm((current) => current && handleKey(current.instagram.username) !== handleKey(profile.instagram_handle)
@@ -312,6 +317,7 @@ export default function ProfileSettings() {
     if (infoError) { setError(infoError); setStep(1); return; }
     const username = form.instagram.username.trim().replace(/^@/, "");
     const niche = form.instagram.primaryNiches[0];
+    if (username && !isValidInstagramUsername(username)) { setError(INVALID_USERNAME_MESSAGE); return; }   // e.g. a saved "my name": fix it first
     if (!username || !NICHE_OPTIONS.includes(niche as typeof NICHE_OPTIONS[number])) {
       setError("Enter your Instagram username and select a primary niche before generating.");
       return;

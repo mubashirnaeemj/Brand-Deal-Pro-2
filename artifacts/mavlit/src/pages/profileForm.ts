@@ -1,6 +1,7 @@
 import type { CreatorProfile } from "@/contexts/AuthContext";
 import { audienceError, audienceFromProfile, audiencePayload } from "@/lib/audience";
 import { normalizeSubNiches } from "@/lib/subNiches";
+import { INVALID_USERNAME_MESSAGE, isValidInstagramUsername } from "@/lib/instagramUsername";
 import type { DescriptionMode } from "@/components/onboarding/types";
 import { formatPlatforms, formatPrimaryNiches, NICHE_OPTIONS, parsePlatforms, parsePrimaryNiches, type PlatformKey } from "@/components/onboarding/types";
 
@@ -83,6 +84,7 @@ export function validateProfile(form: ProfileForm, profile: CreatorProfile): str
     if (error) return `${label}: ${error}`;
     if (form[platform].audienceDescription.length > 1500) return `${label}: Audience description must be 1500 characters or fewer.`;
   }
+  if (form.instagram.username.trim() && !isValidInstagramUsername(form.instagram.username.trim().replace(/^@/, ""))) return INVALID_USERNAME_MESSAGE;
   // The app still gates access on the required onboarding fields.
   if (!form.age.trim() || !form.gender.trim() || !form.instagram.username.trim() ||
       form.instagram.followers.trim() === "" || !form.instagram.primaryNiches.length) {

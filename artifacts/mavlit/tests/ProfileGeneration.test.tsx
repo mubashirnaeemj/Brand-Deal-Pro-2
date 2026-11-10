@@ -606,4 +606,59 @@ describe("Instagram wizard generation", () => {
     await settle();
     expect(screen.getByTestId("recent-posts-card")).toBeInTheDocument();
   });
+
+  const NOT_FOUND = "Instagram username not found. You may have typed the wrong username, or the account is private.";
+
+  it("the username box takes no spaces or other characters Instagram does not allow, and shows the rule", async () => {
+    fixture = installProfileApi(creatorProfile({ primary_platform: "instagram", instagram_handle: null, onboarding_completed: false } as never));
+    renderProfile(<ProfileSettings />);
+    await settle();
+    details("manual");
+    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "vinylgone virall" } });
+    expect(screen.getByTestId("input-username")).toHaveValue("vinylgonevirall");
+    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "https://www.instagram.com/some.name/" } });
+    expect(screen.getByTestId("input-username")).toHaveValue("some.name");
+    expect(screen.getByText(/Letters, numbers, periods and underscores only\. No spaces\./)).toBeInTheDocument();
+  });
+
+  it("Fetch refuses a saved username that has a space and the field stays editable so it can be fixed", async () => {
+    fixture = installProfileApi(creatorProfile({ primary_platform: "instagram", instagram_handle: "vinylgone virall" } as never));
+    fixture.allowGeneration();
+    renderProfile(<ProfileSettings />);
+    await settle();
+    details();
+    expect(screen.getByTestId("input-username")).toBeEnabled();                       // not a valid username, so not locked
+    fireEvent.click(screen.getByTestId("button-generate"));
+    await settle();
+    expect(screen.getByRole("alert")).toHaveTextContent("no spaces");
+    expect(fixture.requests.filter((r) => r.method === "POST")).toHaveLength(0);       // nothing was sent
+    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "vinylgoneviral" } });
+    expect(screen.getByTestId("input-username")).toHaveValue("vinylgoneviral");
+  });
+
+  it("a username that does not exist on Instagram shows the 'wrong username' message and can be edited; a correct one stays locked", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    fixture = installProfileApi(creatorProfile({ primary_platform: "instagram", instagram_handle: null, instagram_description: null, onboarding_completed: false } as never));
+    fixture.allowGeneration();
+    renderProfile(<ProfileSettings />);
+    await settle();
+    details();
+    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "doesnotexist123" } });
+    fireEvent.click(screen.getByTestId("button-generate"));
+    await settle();
+    fixture.replaceOnServer({ ...fixture.persisted, instagram_description_status: "failed", instagram_description_error: NOT_FOUND });
+    await tick(1500);
+    expect(screen.getByTestId("status-wrong-username")).toHaveTextContent("You added the wrong username");
+    expect(screen.queryByTestId("status-failed")).not.toBeInTheDocument();
+    expect(screen.getByTestId("input-username")).toBeEnabled();                       // wrong username: the creator may correct it
+    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "realaccount" } });
+    expect(screen.getByTestId("input-username")).toHaveValue("realaccount");
+    // another kind of failure (not "username not found") keeps a valid saved username locked
+    fixture.replaceOnServer({ ...fixture.persisted, instagram_description_status: "failed", instagram_description_error: "Instagram could not be read right now. Please try again in a minute." });
+    cleanup();
+    renderProfile(<ProfileSettings />);
+    await settle();
+    expect(screen.getByTestId("input-username")).toBeDisabled();
+    expect(screen.queryByTestId("status-wrong-username")).not.toBeInTheDocument();
+  });
 });

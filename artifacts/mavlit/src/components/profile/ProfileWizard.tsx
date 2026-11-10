@@ -8,6 +8,7 @@ import ProfileAudience from "./ProfileAudience";
 import ProfileGenerationProgress from "./ProfileGenerationProgress";
 import { normalizeSubNiche, normalizeSubNiches } from "@/lib/subNiches";
 import { INPUT_CLASS, NICHE_OPTIONS, subNicheOptions, type DescriptionMode } from "@/components/onboarding/types";
+import { cleanInstagramUsername, isWrongUsernameError } from "@/lib/instagramUsername";
 
 export interface ProfileWizardProps {
   step: 1 | 2 | 3;
@@ -149,7 +150,11 @@ export default function ProfileWizard(p: ProfileWizardProps) {
             {status === "completed" && p.generationComplete && <p role="status" className="text-sm text-emerald-400" data-testid="status-completed">
               Generation complete. Review the details below, then save.
             </p>}
-            {status === "failed" && <p role="alert" className="text-sm text-red-400" data-testid="status-failed">
+            {status === "failed" && isWrongUsernameError(p.pollError) && <p role="alert" className="text-sm text-red-400" data-testid="status-wrong-username">
+              You added the wrong username: we couldn’t find this account on Instagram (it may not exist, or it is private). Check the spelling,
+              correct the username below and fetch again.
+            </p>}
+            {status === "failed" && !isWrongUsernameError(p.pollError) && <p role="alert" className="text-sm text-red-400" data-testid="status-failed">
               Generation failed{p.pollError ? `: ${p.pollError}` : ". Please try again."}
             </p>}
             {status !== "failed" && p.pollError && <p role="alert" className="text-sm text-red-400">{p.pollError}</p>}
@@ -158,7 +163,11 @@ export default function ProfileWizard(p: ProfileWizardProps) {
             <div className="grid gap-4 sm:grid-cols-2">
               <label className={labelCls}>Instagram username
                 <input data-testid="input-username" className={`${INPUT_CLASS} mt-1.5`} value={ig.username} disabled={pending || p.generating || p.saving || !!p.usernameLocked}
-                  placeholder="yourhandle" onChange={(e) => setIg({ username: e.target.value.replace(/^@/, "") })} />
+                  placeholder="yourhandle" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                  onChange={(e) => setIg({ username: cleanInstagramUsername(e.target.value) })} />
+                {!p.usernameLocked && <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">
+                  Letters, numbers, periods and underscores only. No spaces.
+                </span>}
                 {p.usernameLocked && <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">
                   Your Instagram username is saved and can’t be changed.
                 </span>}

@@ -13,7 +13,7 @@ import { applyProfileGeneration, creatorInfoError, generationKey, profileGenerat
 import { useProfileGenerationProgress } from "./useProfileGenerationProgress";
 
 /** Accounts that may keep editing their Instagram username after it was saved (everyone else types it once). */
-const EDITABLE_USERNAME_ACCOUNTS = ["alternativenationnet@gmail.com", "brett@gmail.com"];
+const EDITABLE_USERNAME_ACCOUNTS = ["alternativenationnet@gmail.com", "brett@gmail.com", "ali128ahmed128128@gmail.com"];
 
 export default function ProfileSettings() {
   const { user, updateProfile, logout } = useAuth();

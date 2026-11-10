@@ -548,7 +548,7 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByText(/can’t be changed/)).toBeInTheDocument();
   });
 
-  it.each(["alternativenationnet@gmail.com", "brett@gmail.com", "Brett@Gmail.com"])("%s can keep editing the username after it was saved", async (email) => {
+  it.each(["alternativenationnet@gmail.com", "brett@gmail.com", "Brett@Gmail.com", "ali128ahmed128128@gmail.com"])("%s can keep editing the username after it was saved", async (email) => {
     fixture = installProfileApi(creatorProfile({ primary_platform: "instagram", email } as never));
     renderProfile(<ProfileSettings />);
     await settle();

@@ -31,10 +31,10 @@ describe("forgot password page", () => {
     post.mockResolvedValue({ status: "ok" });
     render(<ForgotPassword />);
     expect(screen.getByTestId("button-send-reset")).toBeDisabled();
-    fireEvent.change(screen.getByTestId("input-forgot-email"), { target: { value: "  ali@example.com " } });
+    fireEvent.change(screen.getByTestId("input-forgot-email"), { target: { value: "  alex@example.com " } });
     fireEvent.click(screen.getByTestId("button-send-reset"));
-    await waitFor(() => expect(screen.getByTestId("forgot-sent")).toHaveTextContent("ali@example.com"));
-    expect(post).toHaveBeenCalledWith("/auth/forgot-password", { email: "ali@example.com" });
+    await waitFor(() => expect(screen.getByTestId("forgot-sent")).toHaveTextContent("alex@example.com"));
+    expect(post).toHaveBeenCalledWith("/auth/forgot-password", { email: "alex@example.com" });
     expect(screen.getByTestId("forgot-sent")).toHaveTextContent("We've sent a link to reset your password");
     expect(screen.queryByTestId("forgot-not-registered")).not.toBeInTheDocument();
     expect(screen.getByTestId("link-back-to-signin")).toHaveAttribute("href", "/signin");
@@ -79,11 +79,11 @@ describe("forgot password page", () => {
 describe("reset password page", () => {
   it("shows the account email (not editable), checks the passwords, saves and signs in", async () => {
     open("/reset-password?token=RT1");
-    get.mockResolvedValue({ status: "valid", email: "ali@example.com" });
-    post.mockResolvedValue({ status: "ok", email: "ali@example.com" });
+    get.mockResolvedValue({ status: "valid", email: "Alex@example.com" });
+    post.mockResolvedValue({ status: "ok", email: "Alex@example.com" });
     render(<ResetPassword />);
     const email = await screen.findByTestId("input-reset-email");
-    expect(email).toHaveValue("ali@example.com");
+    expect(email).toHaveValue("Alex@example.com");
     expect(email).toBeDisabled();
     expect(get).toHaveBeenCalledWith("/auth/password-reset/RT1");
 
@@ -98,7 +98,7 @@ describe("reset password page", () => {
 
     fireEvent.change(screen.getByTestId("input-reset-confirm"), { target: { value: "new password" } });
     fireEvent.click(screen.getByTestId("button-reset-password"));
-    await waitFor(() => expect(login).toHaveBeenCalledWith("ali@example.com", "new password"));
+    await waitFor(() => expect(login).toHaveBeenCalledWith("Alex@example.com", "new password"));
     expect(post).toHaveBeenCalledWith("/auth/password-reset", { token: "RT1", password: "new password" });
   });
 
@@ -120,7 +120,7 @@ describe("reset password page", () => {
 
   it("a link used up between opening and saving shows the same message", async () => {
     open("/reset-password?token=RT1");
-    get.mockResolvedValue({ status: "valid", email: "ali@example.com" });
+    get.mockResolvedValue({ status: "valid", email: "Alex@example.com" });
     post.mockRejectedValue(new ApiRequestError("This link can no longer be used.", 410));
     render(<ResetPassword />);
     await screen.findByTestId("input-reset-password");

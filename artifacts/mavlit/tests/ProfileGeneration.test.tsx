@@ -136,7 +136,7 @@ describe("Instagram wizard generation", () => {
 
   it("shows only username and primary niches with both Generate and disabled Save Profile", async () => {
     await mount(false);
-    expect(screen.getByTestId("input-username")).toBeEnabled();   // no posts were read from it yet, so it is not verified
+    expect(screen.getByTestId("input-username")).toBeDisabled();   // a username is saved on this profile, so it is fixed
     expect(screen.getByText("Primary niches")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "2 selected" })).toBeEnabled();
     expect(screen.queryByTestId("input-brand-preferences")).not.toBeInTheDocument();
@@ -529,23 +529,45 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByTestId("input-username")).toBeDisabled();
   });
 
-  it("locks the username once its posts were read, but not after a failed run for a username that does not exist", async () => {
-    await mount();   // clicks Fetch
-    fixture.replaceOnServer({ ...fixture.persisted, instagram_description_status: "failed", instagram_description_error: "Instagram content could not be fetched" });
-    await tick(1500);
-    expect(screen.getByTestId("input-username")).toBeEnabled();
-    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "real_handle" } });
-    expect(screen.getByTestId("input-username")).toHaveValue("real_handle");
+  it("a username is typed once: the first Fetch saves it and the field is locked from then on, even if the fetch failed", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    fixture = installProfileApi(creatorProfile({ primary_platform: "instagram", instagram_handle: null, instagram_description: null, onboarding_completed: false } as never));
+    fixture.allowGeneration();
+    renderProfile(<ProfileSettings />);
+    await settle();
+    details();
+    expect(screen.getByTestId("input-username")).toBeEnabled();                       // nothing saved yet: type it
+    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "first_try" } });
+    expect(screen.getByTestId("input-username")).toHaveValue("first_try");
     fireEvent.click(screen.getByTestId("button-generate"));
     await settle();
-    finish();
+    fixture.replaceOnServer({ ...fixture.persisted, instagram_description_status: "failed", instagram_description_error: "Instagram content could not be fetched" });
     await tick(1500);
-    await tick(450);
-    expect(screen.getByTestId("input-username")).toBeDisabled();   // generated, and its 20 posts are saved
-    expect(screen.getByTestId("input-username")).toHaveValue("real_handle");
+    expect(screen.getByTestId("input-username")).toBeDisabled();                      // saved by the Fetch, so locked
+    expect(screen.getByTestId("input-username")).toHaveValue("first_try");
+    expect(screen.getByText(/can’t be changed/)).toBeInTheDocument();
   });
 
-  it("makes Fetch clickable and the username editable again when the username is changed in the admin", async () => {
+  it.each(["alternativenationnet@gmail.com", "brett@gmail.com", "Brett@Gmail.com"])("%s can keep editing the username after it was saved", async (email) => {
+    fixture = installProfileApi(creatorProfile({ primary_platform: "instagram", email } as never));
+    renderProfile(<ProfileSettings />);
+    await settle();
+    details("manual");
+    expect(screen.getByTestId("input-username")).toBeEnabled();
+    fireEvent.change(screen.getByTestId("input-username"), { target: { value: "new_handle" } });
+    expect(screen.getByTestId("input-username")).toHaveValue("new_handle");
+    expect(screen.queryByText(/can’t be changed/)).not.toBeInTheDocument();
+  });
+
+  it("any other account is locked as soon as a username is saved", async () => {
+    fixture = installProfileApi(creatorProfile({ primary_platform: "instagram", email: "someone.else@gmail.com" } as never));
+    renderProfile(<ProfileSettings />);
+    await settle();
+    details("manual");
+    expect(screen.getByTestId("input-username")).toBeDisabled();
+  });
+
+  it("makes Fetch clickable again when the username is changed in the admin, and shows the new username (still locked)", async () => {
     await mount();
     finish();
     await tick(1500);
@@ -558,8 +580,8 @@ describe("Instagram wizard generation", () => {
     renderProfile(<ProfileSettings />);
     await settle();
     expect(screen.getByRole("button", { name: "Fetch profile details with MAVLIT" })).toBeEnabled();
-    expect(screen.getByTestId("input-username")).toBeEnabled();
     expect(screen.getByTestId("input-username")).toHaveValue("changed_in_admin");
+    expect(screen.getByTestId("input-username")).toBeDisabled();
   });
 
   it("shows 'Your recent Instagram posts' in generate mode only after the profile details were fetched", async () => {

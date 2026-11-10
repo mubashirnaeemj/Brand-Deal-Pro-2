@@ -12,6 +12,9 @@ import { profilePatch, profileToForm, validateProfile, type ProfileForm } from "
 import { applyProfileGeneration, creatorInfoError, generationKey, profileGenerationKey, restoreWizardForm, serializeWizardDraft, type ProfileStep } from "./profileWizardModel";
 import { useProfileGenerationProgress } from "./useProfileGenerationProgress";
 
+/** Accounts that may keep editing their Instagram username after it was saved (everyone else types it once). */
+const EDITABLE_USERNAME_ACCOUNTS = ["alternativenationnet@gmail.com", "brett@gmail.com"];
+
 export default function ProfileSettings() {
   const { user, updateProfile, logout } = useAuth();
   const [, navigate] = useLocation();
@@ -114,17 +117,20 @@ export default function ProfileSettings() {
   useEffect(() => { void refreshPosts(); }, [refreshPosts, retry]);
 
   // The username is "verified" once MAVLIT generated the profile from it AND holds posts read from that same username.
-  // A username that does not exist on Instagram (no posts, or a failed run), or that was changed afterwards (for example
-  // in the admin), is not verified: it stays editable and "Fetch profile details" stays available.
+  // A username that was changed afterwards (for example in the admin) is no longer verified, so "Fetch profile details"
+  // becomes available again. (Whether the username field can be edited is a separate rule: see usernameLocked below.)
   const handleKey = (value: string | null | undefined) => (value ?? "").trim().replace(/^@/, "").toLowerCase();
   const usernameVerified = !!profile && profile.instagram_description_status === "completed" && !!posts && posts.total > 0 &&
     !!handleKey(profile.instagram_handle) && handleKey(posts.instagram_handle) === handleKey(profile.instagram_handle);
-  // A verified username can't be edited: show the saved one, never an older draft.
+  // The Instagram username is typed once: as soon as one is saved on the profile it can no longer be edited. Only the accounts in
+  // EDITABLE_USERNAME_ACCOUNTS may keep changing it. A locked field always shows the saved username, never an older draft.
+  const accountEmail = (profile?.email ?? user?.email ?? "").trim().toLowerCase();
+  const usernameLocked = !!profile && !!handleKey(profile.instagram_handle) && !EDITABLE_USERNAME_ACCOUNTS.includes(accountEmail);
   useEffect(() => {
-    if (true /* TEMP: username editable again; remove to restore lock */ || !usernameVerified || !profile) return;
+    if (!usernameLocked || !profile) return;
     setForm((current) => current && handleKey(current.instagram.username) !== handleKey(profile.instagram_handle)
       ? { ...current, instagram: { ...current.instagram, username: profileToForm(profile).instagram.username } } : current);
-  }, [usernameVerified, profile]);
+  }, [usernameLocked, profile]);
   const instagramStatus = profile?.instagram_description_status;
   const youtubeStatus = profile?.youtube_description_status;
   const instagramJobId = profile?.instagram_description_job_id;
@@ -475,7 +481,7 @@ export default function ProfileSettings() {
               form.instagram.audienceDescription.length <= 1500 && form.brandPreferences.length <= 1000 &&
               form.pitchStylePreferences.length <= 1000 &&
               (form.instagram.descriptionMode === "manual" || generationComplete)}
-            generationComplete={generationComplete} usernameLocked={false /* TEMP: username editable again; restore to usernameVerified */} fetchLocked={generationComplete && !editedSinceGeneration && !!form.instagram.audienceDescription.trim() && usernameVerified} status={instagramStatus}
+            generationComplete={generationComplete} usernameLocked={usernameLocked} fetchLocked={generationComplete && !editedSinceGeneration && !!form.instagram.audienceDescription.trim() && usernameVerified} status={instagramStatus}
             generationProgress={generationProgress.progress} showGenerationProgress={generationProgress.showProgress}
             error={error} pollError={pollError || profile.instagram_description_error || null} saved={saved}
             postsCard={<RecentPostsCard posts={posts} onPostsChange={setPosts} onPostAddedOrDeleted={() => setEditedSinceGeneration(true)} />} />

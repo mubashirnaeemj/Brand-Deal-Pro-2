@@ -16,7 +16,7 @@ const PALETTE = ["#7c3aed", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#14b8a6
 // The lines of the "Feature use per day" chart, in the order the server sends them (labels as the admin knows the features).
 export const FEATURE_LINES: { key: string; label: string; color: string }[] = [
   { key: "matches", label: "Brand matches", color: "#a78bfa" },             // violet: the MAVLIT brand colour, lightened to read on the dark page
-  { key: "rate", label: "Rate intelligence", color: "#facc15" },       // yellow
+  { key: "rate", label: "Rate intelligence uses", color: "#facc15" },       // yellow
   { key: "pitch", label: "Pitch generations", color: "#22c55e" },      // green
   { key: "description", label: "Profile generations", color: "#f472b6" },   // pink
   { key: "post_added", label: "Manual posts added", color: "#2563eb" },   // blue

@@ -55,11 +55,8 @@ describe("Usage & Cost page", () => {
     expect(await screen.findByTestId("stat-today")).toHaveTextContent("$0.500");
     expect(screen.getByTestId("stat-budget")).toHaveTextContent("25%");
     expect(screen.getByRole("alert")).toHaveTextContent("over 3×");
-    const steps = screen.getByTestId("steps-table");   // enrichment steps show their calls only, no prices
-    expect(steps).toHaveTextContent("demographics");
-    expect(steps).toHaveTextContent("3");
-    expect(steps).not.toHaveTextContent("$");
-    expect(screen.queryByText(/Download CSV/)).toBeNull();
+    expect(screen.queryByText("Enrichment scripts by step")).toBeNull();   // the section is gone
+    expect(screen.queryByTestId("steps-table")).toBeNull();
     expect(screen.getByTestId("chart-active-users")).toBeInTheDocument();
     expect(screen.getByText("Active users per day")).toBeInTheDocument();
     expect(screen.getByTestId("chart-features")).toBeInTheDocument();

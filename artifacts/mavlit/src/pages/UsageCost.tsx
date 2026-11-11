@@ -210,9 +210,6 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
-                {d.features.map((f) => <li key={f.name}>{f.name}: {f.calls} calls, average ${f.avg.toFixed(4)} per call</li>)}
-              </ul>
             </>
           ) : <Empty />}
         </Panel>
@@ -226,21 +223,6 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
           <Ranked rows={d.models} caption={(r) => { const m = r as typeof d.models[number]; return `${m.calls} calls · ${m.cached_pct}% of prompt tokens cached`; }} />
         </Panel>
       </div>
-
-      <Panel title="Enrichment scripts by step">
-        {d.steps.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm" data-testid="steps-table">
-              <thead><tr className="text-left text-xs text-muted-foreground"><th className="pb-2 pr-4 font-medium">Step</th><th className="pb-2 font-medium">Calls</th></tr></thead>
-              <tbody>
-                {d.steps.map((r) => (
-                  <tr key={r.name} className="border-t border-white/5"><td className="py-1.5 pr-4 text-white">{r.name}</td><td className="py-1.5 text-white">{r.calls}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : <Empty text="No script activity in this window." />}
-      </Panel>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Panel title="Most expensive calls"><CallsTable rows={d.expensive} /></Panel>

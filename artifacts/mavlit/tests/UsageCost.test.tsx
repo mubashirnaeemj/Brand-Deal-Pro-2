@@ -52,23 +52,48 @@ describe("Usage & Cost page", () => {
     expect(screen.queryByText(/budget/i)).toBeNull();
     expect(screen.queryByTestId("stat-budget")).toBeNull();
     expect(screen.getByRole("alert")).toHaveTextContent("over 3×");
-    expect(screen.queryByText("Enrichment scripts by step")).toBeNull();   // the section is gone
-    expect(screen.getByText(/Enrichment scripts are not counted/)).toBeInTheDocument();
-    expect(screen.getByTestId("chart-active-users")).toBeInTheDocument();
-    expect(screen.getByText("Active users per day")).toBeInTheDocument();
-    expect(screen.getByTestId("chart-features")).toBeInTheDocument();
-    expect(screen.queryByText("Users near a daily limit (today)")).toBeNull();   // removed
-    expect(screen.queryByText("29 / 30")).toBeNull();
-    expect(screen.getByText("Brand contacts opened per user")).toBeInTheDocument();
-    expect(screen.queryByText("Jobs")).toBeNull();            // the Jobs / Health section is gone
-    expect(screen.queryByText("Health")).toBeNull();
-    expect(screen.queryByTestId("health-jobs")).toBeNull();
-    for (const removed of ["Enrichment scripts vs users", "Most expensive calls", "Slowest calls", "Failed sign-ins by address"]) {
-      expect(screen.queryByText(removed)).toBeNull();   // these sections are gone
+    expect(screen.getByText(/Enrichment scripts and test accounts are not counted/)).toBeInTheDocument();
+    for (const removed of ["Enrichment scripts by step", "Users near a daily limit (today)", "Jobs", "Health", "Enrichment scripts vs users", "Most expensive calls", "Slowest calls",
+                           "Failed sign-ins by address"]) {
+      expect(screen.queryByText(removed)).toBeNull();   // sections that were removed
     }
+    expect(screen.queryByTestId("health-jobs")).toBeNull();
+    expect(screen.queryByText("29 / 30")).toBeNull();
     expect(screen.queryByText("10.0.0.1")).toBeNull();
-    expect(screen.getByText("Sign-up funnel")).toBeInTheDocument();
     expect(requested[0]).toBe("?days=30");
+  });
+
+  it("splits the page into a Cost tab and a User activity tab, Cost first", async () => {
+    install("admin", () => json(summary()));
+    renderProfile(<UsageCost />);
+    await screen.findByTestId("stat-today");
+    const [costTab, activityTab] = screen.getAllByRole("tab");
+    expect([costTab.textContent, activityTab.textContent]).toEqual(["Cost", "User activity"]);
+    expect(costTab).toHaveAttribute("aria-selected", "true");
+
+    // Cost tab: the money, nothing about people's activity
+    expect(screen.getByTestId("chart-daily")).toBeInTheDocument();
+    expect(screen.getByTestId("chart-features")).toBeInTheDocument();
+    for (const title of ["Top 10 users by cost", "Model mix and cached tokens", "Apify: dearest accounts"]) expect(screen.getByText(title)).toBeInTheDocument();
+    for (const other of ["Active users per day", "Brand contacts opened per user", "Sign-up funnel"]) expect(screen.queryByText(other)).toBeNull();
+
+    // User activity tab: the people, none of the money panels
+    fireEvent.click(activityTab);
+    expect(activityTab).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByTestId("stat-active-today")).toHaveTextContent("5");   // the last day of the fixture: 5 users
+    expect(screen.getByTestId("chart-active-users")).toBeInTheDocument();
+    for (const title of ["Active users per day", "Brand contacts opened per user", "Sign-up funnel"]) expect(screen.getByText(title)).toBeInTheDocument();
+    expect(screen.queryByTestId("chart-daily")).toBeNull();
+    expect(screen.queryByTestId("stat-today")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();                                  // the spend alert belongs to the Cost tab
+
+    // the chosen tab is kept when the time window changes
+    fireEvent.click(screen.getByRole("button", { name: "7 days" }));
+    await waitFor(() => expect(requested).toContain("?days=7"));
+    expect(screen.getByRole("tab", { name: "User activity" })).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Cost" }));
+    expect(await screen.findByTestId("chart-daily")).toBeInTheDocument();
   });
 
   it("is separate from the creator app: none of the app's navigation buttons, only a label and Sign out", async () => {

@@ -117,10 +117,26 @@ function CallsTable({ rows }: { rows: UsageCall[] }) {
   );
 }
 
-function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => void }) {
+type Tab = "cost" | "activity";
+const TABS: { id: Tab; label: string }[] = [{ id: "cost", label: "Cost" }, { id: "activity", label: "User activity" }];
+
+function Tabs({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
+  return (
+    <div role="tablist" aria-label="Usage sections" className="flex gap-1 border-b border-white/10">
+      {TABS.map((t) => (
+        <button key={t.id} role="tab" id={`tab-${t.id}`} aria-selected={tab === t.id} aria-controls={`panel-${t.id}`} onClick={() => onTab(t.id)}
+          className={`-mb-px px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${tab === t.id ? "border-primary text-white" : "border-transparent text-muted-foreground hover:text-white"}`}>
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CostTab({ d, onUser }: { d: UsageSummary; onUser: (id: number) => void }) {
   const c = d.cards;
   return (
-    <div className="space-y-6">
+    <div role="tabpanel" id="panel-cost" aria-labelledby="tab-cost" className="space-y-6">
       {c.spike && (
         <div role="alert" className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           Today's spend ({money(c.today)}) is over 3× the daily average of the previous 7 days ({money(c.prev7_avg)}). Check for a script stuck in a loop.
@@ -144,10 +160,60 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
               <Tooltip content={<ChartTip amount={(v) => money(v)} />} cursor={{ fill: "#ffffff10" }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="llm" name="OpenAI" stackId="s" fill={OPENAI} />
-              <Bar dataKey="apify" name="Apify" stackId="s" fill={APIFY} radius={[3, 3, 0, 0]} />            </BarChart>
+              <Bar dataKey="apify" name="Apify" stackId="s" fill={APIFY} radius={[3, 3, 0, 0]} />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </Panel>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Panel title="Where the money goes (by feature)">
+          {d.features.length ? (
+            <div style={{ height: Math.max(160, d.features.length * 44) }} data-testid="chart-features">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={d.features} layout="vertical" margin={{ left: 0, right: 16 }}>
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="name" width={150} interval={0} tickLine={false} tick={{ fill: "#e4e4e7", fontSize: 12 }} />
+                  <Tooltip content={<ChartTip amount={(v) => money(v)} extra={(row) => { const f = row.payload as { calls?: number; avg?: number } | undefined; return f?.calls ? `${f.calls} calls · average $${(f.avg ?? 0).toFixed(4)} per call` : null; }} />} cursor={{ fill: "#ffffff10" }} />
+                  <Bar dataKey="cost" name="Cost" radius={[0, 4, 4, 0]}>
+                    {d.features.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : <Empty />}
+        </Panel>
+
+        <Panel title="Top 10 users by cost">
+          <Ranked rows={d.users} onOpen={onUser}
+            caption={(r) => { const u = r as typeof d.users[number]; return <>{u.calls} calls{u.split?.length ? " · " + u.split.map(([k, v]) => `${k} ${money(v)}`).join(" · ") : ""}</>; }} />
+        </Panel>
+
+        <Panel title="Model mix and cached tokens">
+          <Ranked rows={d.models} caption={(r) => { const m = r as typeof d.models[number]; return `${m.calls} calls · ${m.cached_pct}% of prompt tokens cached`; }} />
+        </Panel>
+
+        <Panel title="Apify: dearest accounts">
+          <Ranked rows={d.apify} caption={(r) => { const a = r as typeof d.apify[number]; return `${a.runs} run${a.runs === 1 ? "" : "s"}, ${a.got} of ${a.asked} results`; }} />
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
+function ActivityTab({ d }: { d: UsageSummary }) {
+  const days = d.active_users;
+  const today = days[days.length - 1];
+  const peak = days.reduce((best, r) => (r.users > best.users ? r : best), days[0] ?? { day: "-", users: 0, actions: 0 });
+  const opened = d.reveals.reduce((sum, r) => sum + Math.round(r.cost), 0);
+  return (
+    <div role="tabpanel" id="panel-activity" aria-labelledby="tab-activity" className="space-y-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Stat label="Active today" value={String(today?.users ?? 0)} note={`${today?.actions ?? 0} actions`} testId="stat-active-today" />
+        <Stat label="Busiest day" value={String(peak?.users ?? 0)} note={`${peak?.day ?? "-"} (users)`} />
+        <Stat label="Contacts opened" value={String(opened)} note={`last ${d.days} days`} />
+        <Stat label="Accounts" value={String(d.funnel_extra.accounts)} note={`${d.funnel_extra.signups_window} new sign-ups in ${d.days} days`} />
+      </div>
 
       <Panel title="Active users per day">
         <div className="h-64" data-testid="chart-active-users">
@@ -165,54 +231,31 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
       </Panel>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="By feature (users)">
-          {d.features.length ? (
-            <>
-              <div style={{ height: Math.max(160, d.features.length * 44) }} data-testid="chart-features">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={d.features} layout="vertical" margin={{ left: 0, right: 16 }}>
-                    <XAxis type="number" hide />
-                    <YAxis type="category" dataKey="name" width={150} interval={0} tickLine={false} tick={{ fill: "#e4e4e7", fontSize: 12 }} />
-                    <Tooltip content={<ChartTip amount={(v) => money(v)} extra={(row) => { const f = row.payload as { calls?: number; avg?: number } | undefined; return f?.calls ? `${f.calls} calls · average $${(f.avg ?? 0).toFixed(4)} per call` : null; }} />} cursor={{ fill: "#ffffff10" }} />
-                    <Bar dataKey="cost" name="Cost" radius={[0, 4, 4, 0]}>
-                      {d.features.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </>
-          ) : <Empty />}
+        <Panel title="Brand contacts opened per user">
+          <Ranked rows={d.reveals} value={(r) => String(Math.round(r.cost))} caption={(r) => { const b = r as typeof d.reveals[number]; return `${b.brands} brand${b.brands === 1 ? "" : "s"}`; }} />
         </Panel>
 
-        <Panel title="Top 10 users">
-          <Ranked rows={d.users} onOpen={onUser}
-            caption={(r) => { const u = r as typeof d.users[number]; return <>{u.calls} calls{u.split?.length ? " · " + u.split.map(([k, v]) => `${k} ${money(v)}`).join(" · ") : ""}</>; }} />
-        </Panel>
-
-        <Panel title="Model mix and cached tokens">
-          <Ranked rows={d.models} caption={(r) => { const m = r as typeof d.models[number]; return `${m.calls} calls · ${m.cached_pct}% of prompt tokens cached`; }} />
+        <Panel title="Sign-up funnel">
+          <ul className="space-y-3">
+            {d.funnel.map((r) => (
+              <li key={r.name}>
+                <div className="flex justify-between gap-3 text-sm text-white"><span>{r.name}</span><strong>{r.n}</strong></div>
+                <Meter pct={r.pct} />
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground mt-3">{d.funnel_extra.accounts} accounts in total · {d.funnel_extra.signups_window} new sign-ups in the last {d.days} days</p>
         </Panel>
       </div>
+    </div>
+  );
+}
 
-      <Panel title="Apify: dearest accounts">
-        <Ranked rows={d.apify} caption={(r) => { const a = r as typeof d.apify[number]; return `${a.runs} run${a.runs === 1 ? "" : "s"}, ${a.got} of ${a.asked} results`; }} />
-      </Panel>
-
-      <Panel title="Brand contacts opened per user">
-        <Ranked rows={d.reveals} value={(r) => String(Math.round(r.cost))} caption={(r) => { const b = r as typeof d.reveals[number]; return `${b.brands} brand${b.brands === 1 ? "" : "s"}`; }} />
-      </Panel>
-
-      <Panel title="Sign-up funnel">
-        <ul className="space-y-3">
-          {d.funnel.map((r) => (
-            <li key={r.name}>
-              <div className="flex justify-between gap-3 text-sm text-white"><span>{r.name}</span><strong>{r.n}</strong></div>
-              <Meter pct={r.pct} />
-            </li>
-          ))}
-        </ul>
-        <p className="text-xs text-muted-foreground mt-3">{d.funnel_extra.accounts} accounts in total · {d.funnel_extra.signups_window} new sign-ups in the last {d.days} days</p>
-      </Panel>
+function Dashboard({ d, onUser, tab, onTab }: { d: UsageSummary; onUser: (id: number) => void; tab: Tab; onTab: (t: Tab) => void }) {
+  return (
+    <div className="space-y-6">
+      <Tabs tab={tab} onTab={onTab} />
+      {tab === "cost" ? <CostTab d={d} onUser={onUser} /> : <ActivityTab d={d} />}
     </div>
   );
 }
@@ -236,12 +279,14 @@ export default function UsageCost() {
   const { user, logout } = useAuth();
   const [days, setDays] = useState<number>(30);
   const [userId, setUserId] = useState<number | null>(null);
+  const [tab, setTab] = useState<Tab>("cost");
   const admin = isAdmin(user);
   const query = useQuery({
     queryKey: ["usage-summary", days, userId],
     queryFn: () => getUsageSummary(days, userId),
     enabled: admin,
     refetchInterval: 60_000,
+    placeholderData: (previous) => previous,   // keep what is on screen while another window / user loads, so the page does not flash to a spinner
   });
 
   if (!admin) return <Redirect to="/dashboard" />;   // the server refuses non-admins as well; this just keeps them off an empty page
@@ -263,7 +308,7 @@ export default function UsageCost() {
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div>
               <h1 className="text-2xl font-bold text-white">Usage &amp; Cost</h1>
-              <p className="text-sm text-muted-foreground">What users spent on OpenAI and Apify, plus limits and health. Enrichment scripts are not counted. Admins only.</p>
+              <p className="text-sm text-muted-foreground">What users spent on OpenAI and Apify, and what they did. Enrichment scripts and test accounts are not counted. Admins only.</p>
             </div>
             <div className="flex gap-2" role="group" aria-label="Time window">
               {USAGE_DAY_CHOICES.map((n) => (
@@ -281,7 +326,7 @@ export default function UsageCost() {
               {forbidden ? "You don't have access to this page." : "Could not load the usage numbers. Try again in a moment."}
             </div>
           )}
-          {query.data && (query.data.user ? <UserDetail d={query.data} onBack={() => setUserId(null)} /> : <Dashboard d={query.data} onUser={setUserId} />)}
+          {query.data && (query.data.user ? <UserDetail d={query.data} onBack={() => setUserId(null)} /> : <Dashboard d={query.data} onUser={setUserId} tab={tab} onTab={setTab} />)}
         </div>
       </main>
     </div>

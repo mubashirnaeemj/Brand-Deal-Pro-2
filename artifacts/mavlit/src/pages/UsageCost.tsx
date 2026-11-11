@@ -227,7 +227,7 @@ function ActivityTab({ d, onUser }: { d: UsageSummary; onUser: (id: number) => v
             </LineChart>
           </ResponsiveContainer>
         </div>
-        <p className="text-xs text-muted-foreground mt-2">A user counts once per day if they did anything that day: a paid AI call, a pitch, a saved brand, a daily-limit feature or an opened contact.</p>
+        <p className="text-xs text-muted-foreground mt-2">A user counts once per day if they did anything that day: a paid AI call, a pitch, a saved brand, an Instagram post added or removed, a daily-limit feature or an opened contact.</p>
       </Panel>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -317,7 +317,7 @@ function UserDetail({ d, tab, onBack }: { d: UsageSummary; tab: Tab; onBack: () 
             ) : <Empty text="No activity recorded yet." />}
           </div>
         </div>
-        <p className="text-xs text-muted-foreground mt-5">Shows what the user did (matching runs, pitches, saved brands, opened contacts and so on), newest first. Pages they only looked at are not recorded.</p>
+        <p className="text-xs text-muted-foreground mt-5">Shows what the user did (matching runs, pitches, saved brands, opened contacts, Instagram posts added or removed and so on), newest first. Pages they only looked at are not recorded.</p>
       </Panel>
     </div>
   );

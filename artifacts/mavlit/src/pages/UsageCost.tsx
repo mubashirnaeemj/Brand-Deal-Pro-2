@@ -199,27 +199,9 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
         <Ranked rows={d.apify} caption={(r) => { const a = r as typeof d.apify[number]; return `${a.runs} run${a.runs === 1 ? "" : "s"}, ${a.got} of ${a.asked} results`; }} />
       </Panel>
 
-      <h2 className="text-lg font-bold text-white pt-2">Limits</h2>
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="Users near a daily limit (today)">
-          {d.near_cap.length ? (
-            <ul className="space-y-3">
-              {d.near_cap.map((r) => (
-                <li key={`${r.id}${r.feature}`}>
-                  <div className="flex justify-between gap-3 text-sm">
-                    <button className="truncate text-left text-primary hover:underline" onClick={() => onUser(r.id)}>{r.name} · {r.feature}</button>
-                    <strong className="shrink-0 text-white">{r.uses} / {r.cap}</strong>
-                  </div>
-                  <Meter pct={r.pct} tone={r.pct >= 100 ? "bad" : "warn"} />
-                </li>
-              ))}
-            </ul>
-          ) : <Empty text="Nobody is near a limit." />}
-        </Panel>
-        <Panel title="Brand contacts opened per user">
-          <Ranked rows={d.reveals} value={(r) => String(Math.round(r.cost))} caption={(r) => { const b = r as typeof d.reveals[number]; return `${b.brands} brand${b.brands === 1 ? "" : "s"}`; }} />
-        </Panel>
-      </div>
+      <Panel title="Brand contacts opened per user">
+        <Ranked rows={d.reveals} value={(r) => String(Math.round(r.cost))} caption={(r) => { const b = r as typeof d.reveals[number]; return `${b.brands} brand${b.brands === 1 ? "" : "s"}`; }} />
+      </Panel>
 
       <Panel title="Sign-up funnel">
         <ul className="space-y-3">

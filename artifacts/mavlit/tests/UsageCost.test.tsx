@@ -60,7 +60,9 @@ describe("Usage & Cost page", () => {
     expect(screen.getByTestId("chart-active-users")).toBeInTheDocument();
     expect(screen.getByText("Active users per day")).toBeInTheDocument();
     expect(screen.getByTestId("chart-features")).toBeInTheDocument();
-    expect(screen.getByText("29 / 30")).toBeInTheDocument();
+    expect(screen.queryByText("Users near a daily limit (today)")).toBeNull();   // removed
+    expect(screen.queryByText("29 / 30")).toBeNull();
+    expect(screen.getByText("Brand contacts opened per user")).toBeInTheDocument();
     expect(screen.queryByText("Jobs")).toBeNull();            // the Jobs / Health section is gone
     expect(screen.queryByText("Health")).toBeNull();
     expect(screen.queryByTestId("health-jobs")).toBeNull();

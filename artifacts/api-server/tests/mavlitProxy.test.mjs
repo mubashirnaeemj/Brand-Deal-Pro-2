@@ -237,3 +237,18 @@ test("the landing page's early-access sign-up is forwarded to the API, and other
     assert.equal(upstreamUrl, null);
   });
 });
+
+test("the admin usage numbers are forwarded to the API (which refuses non-admins itself)", async () => {
+  let upstreamUrl = null;
+  await withProxy(async url => { upstreamUrl = String(url); return new Response('{"days":30}', { status: 200, headers: { "Content-Type": "application/json" } }); }, async send => {
+    const response = await send("/api/mavlit/usage/summary?days=7", "GET");
+    for await (const _ of response); // drain
+    assert.equal(response.statusCode, 200);
+    assert.equal(upstreamUrl, "https://api.mavlit.com/usage/summary?days=7");
+    upstreamUrl = null;
+    const lookalike = await send("/api/mavlit/usages", "GET");
+    for await (const _ of lookalike); // drain
+    assert.equal(lookalike.statusCode, 404);
+    assert.equal(upstreamUrl, null);
+  });
+});

@@ -13,10 +13,10 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 const summary = (extra: Record<string, unknown> = {}) => ({
   days: 30, choices: [7, 30, 90],
-  cards: { today: 0.5, prev7_avg: 0.1, d7: 1.2, d30: 3.4, month: 2.5, projected: 6.1, budget: 10, budget_pct: 25, projected_pct: 61, spike: true },
+  cards: { today: 0.5, prev7_avg: 0.1, d7: 1.2, d30: 3.4, month: 2.5, projected: 6.1, spike: true },
   daily: [{ day: "Nov 10", llm: 0.2, apify: 0.1 }, { day: "Nov 11", llm: 0.4, apify: 0.1 }],
   active_users: [{ day: "Nov 10", users: 1, actions: 3 }, { day: "Nov 11", users: 5, actions: 12 }],
-  daily_budget: 0.33, window_total: 0.8,
+  window_total: 0.8,
   split: { scripts: 0.3, users: 0.5, scripts_pct: 37.5, users_pct: 62.5 },
   features: [{ name: "Pitches", cost: 0.4, pct: 100, calls: 4, avg: 0.1 }],
   steps: [{ name: "demographics", llm: 0.2, apify: 0.1, cost: 0.3, calls: 3, avg: 0.1, pct: 100 }],
@@ -48,12 +48,14 @@ beforeEach(() => {
 });
 
 describe("Usage & Cost page", () => {
-  it("shows the cards, the budget, the spike alert and the tables to an admin", async () => {
+  it("shows the cards, the spike alert and the tables to an admin, with no budget anywhere", async () => {
     install("admin", () => json(summary()));
     renderProfile(<UsageCost />);
     expect(await screen.findByRole("heading", { name: /Usage & Cost/ })).toBeInTheDocument();
     expect(await screen.findByTestId("stat-today")).toHaveTextContent("$0.500");
-    expect(screen.getByTestId("stat-budget")).toHaveTextContent("25%");
+    expect(screen.getByTestId("stat-today").parentElement).toHaveTextContent("projected $6.10");
+    expect(screen.queryByText(/budget/i)).toBeNull();
+    expect(screen.queryByTestId("stat-budget")).toBeNull();
     expect(screen.getByRole("alert")).toHaveTextContent("over 3×");
     expect(screen.queryByText("Enrichment scripts by step")).toBeNull();   // the section is gone
     expect(screen.queryByTestId("steps-table")).toBeNull();
@@ -62,7 +64,11 @@ describe("Usage & Cost page", () => {
     expect(screen.getByTestId("chart-features")).toBeInTheDocument();
     expect(screen.getByText("29 / 30")).toBeInTheDocument();
     expect(screen.getByTestId("health-jobs")).toHaveTextContent("2 failed");
-    expect(screen.getByText("10.0.0.1")).toBeInTheDocument();
+    for (const removed of ["Enrichment scripts vs users", "Most expensive calls", "Slowest calls", "Failed sign-ins by address"]) {
+      expect(screen.queryByText(removed)).toBeNull();   // these sections are gone
+    }
+    expect(screen.queryByText("10.0.0.1")).toBeNull();
+    expect(screen.getByText("Sign-up funnel")).toBeInTheDocument();
     expect(requested[0]).toBe("?days=30");
   });
 

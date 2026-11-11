@@ -10,10 +10,9 @@ export interface UsageCall { created_at: string; model: string; context: string;
 export interface UsageSummary {
   days: number;
   choices: number[];
-  cards: { today: number; prev7_avg: number; d7: number; d30: number; month: number; projected: number; budget: number; budget_pct: number; projected_pct: number; spike: boolean };
+  cards: { today: number; prev7_avg: number; d7: number; d30: number; month: number; projected: number; spike: boolean };
   daily: { day: string; llm: number; apify: number }[];
   active_users: { day: string; users: number; actions: number }[];   // distinct users who did anything that day, and how many actions
-  daily_budget: number;
   window_total: number;
   split: { scripts: number; users: number; scripts_pct: number; users_pct: number };
   features: (UsageRow & { calls: number; avg: number })[];

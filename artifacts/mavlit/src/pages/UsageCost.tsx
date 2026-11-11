@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Redirect } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { isAdmin, useAuth } from "@/contexts/AuthContext";
@@ -11,7 +11,7 @@ import { USAGE_DAY_CHOICES, getUsageSummary, money, type UsageCall, type UsageRo
 
 const OPENAI = "#7c3aed";
 const APIFY = "#f59e0b";
-const BUDGET = "#ef4444";
+const DANGER = "#ef4444";
 const PALETTE = ["#7c3aed", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#14b8a6", "#8b5cf6", "#ef4444"];
 const TOOLTIP_STYLE = { background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 12, color: "#f4f4f5" };
 const TOOLTIP_LABEL = { color: "#f4f4f5", fontWeight: 600, marginBottom: 4 };
@@ -67,7 +67,7 @@ function Stat({ label, value, note, testId }: { label: string; value: string; no
 }
 
 function Meter({ pct, tone = "primary" }: { pct: number; tone?: "primary" | "warn" | "bad" }) {
-  const color = tone === "bad" ? BUDGET : tone === "warn" ? APIFY : OPENAI;
+  const color = tone === "bad" ? DANGER : tone === "warn" ? APIFY : OPENAI;
   return (
     <div className="h-2 rounded-full bg-white/10 overflow-hidden">
       <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: color }} />
@@ -120,7 +120,6 @@ function CallsTable({ rows }: { rows: UsageCall[] }) {
 
 function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => void }) {
   const c = d.cards;
-  const budgetTone = c.budget_pct >= 100 ? "bad" : c.projected_pct >= 100 ? "warn" : "primary";
   return (
     <div className="space-y-6">
       {c.spike && (
@@ -129,26 +128,11 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Stat label="Today" value={money(c.today)} note="since midnight" testId="stat-today" />
         <Stat label="7 days" value={money(c.d7)} note="rolling" />
         <Stat label="30 days" value={money(c.d30)} note="rolling" />
         <Stat label="This month" value={money(c.month)} note={`projected ${money(c.projected)}`} />
-        <div className="rounded-2xl border border-border bg-secondary/40 p-4 col-span-2 lg:col-span-1" data-testid="stat-budget">
-          <p className="text-xs text-muted-foreground">Monthly budget</p>
-          {c.budget ? (
-            <>
-              <p className="text-2xl font-bold text-white mt-1">{c.budget_pct}%</p>
-              <div className="my-1.5"><Meter pct={c.budget_pct} tone={budgetTone} /></div>
-              <p className="text-xs text-muted-foreground">{money(c.month)} of {money(c.budget)}; on pace for {c.projected_pct}%</p>
-            </>
-          ) : (
-            <>
-              <p className="text-2xl font-bold text-white mt-1">not set</p>
-              <p className="text-xs text-muted-foreground mt-1">set USAGE_MONTHLY_BUDGET_USD on the server</p>
-            </>
-          )}
-        </div>
       </div>
 
       <Panel title={`Spend per day (${d.days} days: ${money(d.window_total)})`}>
@@ -161,9 +145,7 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
               <Tooltip content={<ChartTip amount={(v) => money(v)} />} cursor={{ fill: "#ffffff10" }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="llm" name="OpenAI" stackId="s" fill={OPENAI} />
-              <Bar dataKey="apify" name="Apify" stackId="s" fill={APIFY} radius={[3, 3, 0, 0]} />
-              {d.daily_budget > 0 && <ReferenceLine y={d.daily_budget} stroke={BUDGET} strokeDasharray="5 4" label={{ value: "daily budget", fill: BUDGET, fontSize: 11, position: "insideTopRight" }} />}
-            </BarChart>
+              <Bar dataKey="apify" name="Apify" stackId="s" fill={APIFY} radius={[3, 3, 0, 0]} />            </BarChart>
           </ResponsiveContainer>
         </div>
       </Panel>
@@ -184,17 +166,6 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
       </Panel>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="Enrichment scripts vs users">
-          <div className="h-3 rounded-full overflow-hidden flex bg-white/10" data-testid="split-bar">
-            <div style={{ width: `${d.split.scripts_pct}%`, background: APIFY }} />
-            <div style={{ width: `${d.split.users_pct}%`, background: OPENAI }} />
-          </div>
-          <div className="flex justify-between text-sm mt-3 gap-3">
-            <span className="text-white"><span className="inline-block w-2.5 h-2.5 rounded-sm mr-1.5" style={{ background: APIFY }} />Scripts {money(d.split.scripts)} ({d.split.scripts_pct}%)</span>
-            <span className="text-white"><span className="inline-block w-2.5 h-2.5 rounded-sm mr-1.5" style={{ background: OPENAI }} />Users {money(d.split.users)} ({d.split.users_pct}%)</span>
-          </div>
-        </Panel>
-
         <Panel title="By feature (users)">
           {d.features.length ? (
             <>
@@ -224,13 +195,9 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
         </Panel>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Panel title="Most expensive calls"><CallsTable rows={d.expensive} /></Panel>
-        <Panel title="Slowest calls"><CallsTable rows={d.slow} /></Panel>
-        <Panel title="Apify: dearest accounts">
-          <Ranked rows={d.apify} caption={(r) => { const a = r as typeof d.apify[number]; return `${a.runs} run${a.runs === 1 ? "" : "s"}, ${a.got} of ${a.asked} results`; }} />
-        </Panel>
-      </div>
+      <Panel title="Apify: dearest accounts">
+        <Ranked rows={d.apify} caption={(r) => { const a = r as typeof d.apify[number]; return `${a.runs} run${a.runs === 1 ? "" : "s"}, ${a.got} of ${a.asked} results`; }} />
+      </Panel>
 
       <h2 className="text-lg font-bold text-white pt-2">Limits</h2>
       <div className="grid gap-6 lg:grid-cols-2">
@@ -255,7 +222,7 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
       </div>
 
       <h2 className="text-lg font-bold text-white pt-2">Health</h2>
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-2">
         <Panel title="Jobs">
           <p className="text-sm mb-3" data-testid="health-jobs">
             {d.health.failed_total ? <strong className="text-red-400">{d.health.failed_total} failed</strong> : <strong className="text-emerald-400">No failed jobs</strong>}
@@ -266,14 +233,6 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
             {Object.entries(d.health.failed).filter(([, n]) => n > 0).map(([k, n]) => <li key={k} className="flex justify-between text-white"><span>{k}</span><strong>{n}</strong></li>)}
             {d.health.stuck.map((s, i) => <li key={i} className="flex justify-between text-red-300"><span>{s.name} · {s.feature}</span><strong>since {s.since}</strong></li>)}
           </ul>
-        </Panel>
-        <Panel title="Failed sign-ins by address">
-          {d.failed_signins.length ? (
-            <table className="w-full text-xs">
-              <thead><tr className="text-left text-muted-foreground"><th className="pb-1 font-medium">IP</th><th className="pb-1 font-medium">Failures</th><th className="pb-1 font-medium">Emails</th><th className="pb-1 font-medium">Last</th></tr></thead>
-              <tbody>{d.failed_signins.map((r) => <tr key={r.name} className="border-t border-white/5 text-white"><td className="py-1.5">{r.name}</td><td>{r.n}</td><td>{r.emails}</td><td>{r.last}</td></tr>)}</tbody>
-            </table>
-          ) : <Empty text="None in this window." />}
         </Panel>
         <Panel title="Sign-up funnel">
           <ul className="space-y-3">

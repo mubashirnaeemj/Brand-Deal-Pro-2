@@ -20,7 +20,8 @@ const summary = (extra: Record<string, unknown> = {}) => ({
   expensive: [{ created_at: "Nov 11 10:00", model: "gpt-x", context: "pitch for creator", cost: 0.2, duration_ms: 1500 }], slow: [],
   apify: [{ name: "nike", cost: 0.09, pct: 100, runs: 1, asked: 40, got: 40 }],
   near_cap: [{ id: 7, name: "member@example.test", feature: "pitches", uses: 29, cap: 30, pct: 97 }],
-  reveals: [], health: { stuck: [], failed: { ranking_v3: 2 }, failed_total: 2 },
+  reveals: [{ name: "contacts-user@example.test", cost: 4, pct: 100, brands: 2 }],
+  activity_users: [{ id: 7, name: "member@example.test", count: 13, pct: 100, split: [["Pitches", 9], ["Matching", 4]] }], health: { stuck: [], failed: { ranking_v3: 2 }, failed_total: 2 },
   failed_signins: [{ name: "10.0.0.1", n: 6, emails: 2, last: "Nov 11 09:00" }],
   funnel: [{ name: "Early-access sign-ups", n: 10, pct: 100 }, { name: "Invitations sent", n: 6, pct: 60 }, { name: "Created an account from an invitation", n: 3, pct: 30 }],
   funnel_extra: { accounts: 8, signups_window: 4 }, user: null, ...extra,
@@ -75,14 +76,18 @@ describe("Usage & Cost page", () => {
     expect(screen.getByTestId("chart-daily")).toBeInTheDocument();
     expect(screen.getByTestId("chart-features")).toBeInTheDocument();
     for (const title of ["Top 10 users by cost", "Model mix and cached tokens", "Apify: dearest accounts"]) expect(screen.getByText(title)).toBeInTheDocument();
-    for (const other of ["Active users per day", "Brand contacts opened per user", "Sign-up funnel"]) expect(screen.queryByText(other)).toBeNull();
+    for (const other of ["Active users per day", "Top 10 users by activity", "Brand contacts opened per user", "Sign-up funnel"]) expect(screen.queryByText(other)).toBeNull();
 
     // User activity tab: the people, none of the money panels
     fireEvent.click(activityTab);
     expect(activityTab).toHaveAttribute("aria-selected", "true");
     expect(await screen.findByTestId("stat-active-today")).toHaveTextContent("5");   // the last day of the fixture: 5 users
     expect(screen.getByTestId("chart-active-users")).toBeInTheDocument();
-    for (const title of ["Active users per day", "Brand contacts opened per user", "Sign-up funnel"]) expect(screen.getByText(title)).toBeInTheDocument();
+    for (const title of ["Active users per day", "Top 10 users by activity", "Brand contacts opened per user", "Sign-up funnel"]) expect(screen.getByText(title)).toBeInTheDocument();
+    expect(screen.getByText("13 actions")).toBeInTheDocument();                         // the new ranking shows how much each user did
+    expect(screen.getByText(/Most used: Pitches · Pitches 9 · Matching 4/)).toBeInTheDocument();
+    expect(screen.getByText("contacts-user@example.test")).toBeInTheDocument();         // "Brand contacts opened per user" is a plain list, as it was:
+    expect(screen.queryByRole("button", { name: "contacts-user@example.test" })).toBeNull();   // its names are not clickable
     expect(screen.queryByTestId("chart-daily")).toBeNull();
     expect(screen.queryByTestId("stat-today")).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();                                  // the spend alert belongs to the Cost tab
@@ -108,6 +113,54 @@ describe("Usage & Cost page", () => {
     const header = screen.getByTestId("admin-header");
     expect(header).toHaveTextContent("Admin");
     expect(screen.getByRole("button", { name: /Sign out/ })).toBeInTheDocument();
+  });
+
+  it("opens a user from 'Top 10 users by activity' and shows what they did, when, and what they use most, with no money", async () => {
+    const withUser = () => summary({
+      user: {
+        id: 7, email: "member@example.test",
+        features: [{ name: "pitch", cost: 0.4, pct: 100, calls: 4 }], recent: [{ created_at: "Nov 11 10:00", model: "gpt-x", context: "pitch call", cost: 0.2, duration_ms: 900 }],
+        activity: [
+          { at: "2026-11-11T10:05:00Z", what: "Created a pitch for Nike", group: "Pitches" },
+          { at: "2026-11-11T10:01:00Z", what: "Opened the contacts of Nike", group: "Brand contacts" },
+          { at: "2026-11-11T09:58:00Z", what: "Ran AI brand matching", group: "Matching" },
+        ],
+        activity_mix: [{ name: "Pitches", count: 9, pct: 100 }, { name: "Matching", count: 4, pct: 44.4 }],
+      },
+    });
+    install("admin", () => json(requested[requested.length - 1].includes("user=7") ? withUser() : summary()));
+    renderProfile(<UsageCost />);
+    await screen.findByTestId("stat-today");
+    fireEvent.click(screen.getByRole("tab", { name: "User activity" }));
+    fireEvent.click(await screen.findByRole("button", { name: "member@example.test" }));   // the name in the activity ranking is clickable
+    await waitFor(() => expect(requested).toContain("?days=30&user=7"));
+
+    const view = await screen.findByTestId("user-activity");
+    expect(screen.getByTestId("stat-most-used")).toHaveTextContent("Pitches");
+    expect(screen.getByTestId("stat-most-used")).toHaveTextContent("9 times");
+    const items = Array.from(screen.getByTestId("activity-timeline").querySelectorAll("li")).map((li) => li.textContent ?? "");
+    expect(items).toHaveLength(3);
+    expect(items[0]).toContain("Created a pitch for Nike");   // newest first, in the order the server sent them
+    expect(items[2]).toContain("Ran AI brand matching");
+    expect(items[0]).toMatch(/\d{1,2}:\d{2}/);                // each entry shows its time
+    expect(view.textContent).not.toContain("$");              // no money in this view
+    expect(screen.queryByText("Cost by feature (30 days)")).toBeNull();
+    expect(screen.queryByText("Latest 20 calls")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Back to user activity/ }));
+    expect(await screen.findByTestId("stat-active-today")).toBeInTheDocument();           // back on the User activity tab
+  });
+
+  it("opening a user from the Cost tab still shows the money view", async () => {
+    install("admin", () => json(requested[requested.length - 1].includes("user=7") ? summary({
+      user: { id: 7, email: "member@example.test", features: [{ name: "pitch", cost: 0.4, pct: 100, calls: 4 }], recent: [], activity: [], activity_mix: [] },
+    }) : summary()));
+    renderProfile(<UsageCost />);
+    await screen.findByTestId("stat-today");
+    fireEvent.click((await screen.findAllByRole("button", { name: "member@example.test" }))[0]);
+    expect(await screen.findByText("Cost by feature (30 days)")).toBeInTheDocument();
+    expect(screen.getByText("$0.400")).toBeInTheDocument();
+    expect(screen.queryByTestId("user-activity")).toBeNull();
   });
 
   it("changes the window and opens one user", async () => {

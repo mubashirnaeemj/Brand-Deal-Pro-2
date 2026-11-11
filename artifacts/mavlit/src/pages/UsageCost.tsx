@@ -201,7 +201,7 @@ function CostTab({ d, onUser }: { d: UsageSummary; onUser: (id: number) => void 
   );
 }
 
-function ActivityTab({ d }: { d: UsageSummary }) {
+function ActivityTab({ d, onUser }: { d: UsageSummary; onUser: (id: number) => void }) {
   const days = d.active_users;
   const today = days[days.length - 1];
   const peak = days.reduce((best, r) => (r.users > best.users ? r : best), days[0] ?? { day: "-", users: 0, actions: 0 });
@@ -231,6 +231,12 @@ function ActivityTab({ d }: { d: UsageSummary }) {
       </Panel>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <Panel title="Top 10 users by activity">
+          <Ranked rows={d.activity_users.map((u) => ({ id: u.id, name: u.name, cost: u.count, pct: u.pct, split: u.split }))} onOpen={onUser}
+            value={(r) => `${Math.round(r.cost)} actions`}
+            caption={(r) => { const split = (r as { split?: [string, number][] }).split ?? []; return split.length ? <>Most used: {split[0][0]} · {split.map(([k, n]) => `${k} ${n}`).join(" · ")}</> : null; }} />
+        </Panel>
+
         <Panel title="Brand contacts opened per user">
           <Ranked rows={d.reveals} value={(r) => String(Math.round(r.cost))} caption={(r) => { const b = r as typeof d.reveals[number]; return `${b.brands} brand${b.brands === 1 ? "" : "s"}`; }} />
         </Panel>
@@ -255,21 +261,63 @@ function Dashboard({ d, onUser, tab, onTab }: { d: UsageSummary; onUser: (id: nu
   return (
     <div className="space-y-6">
       <Tabs tab={tab} onTab={onTab} />
-      {tab === "cost" ? <CostTab d={d} onUser={onUser} /> : <ActivityTab d={d} />}
+      {tab === "cost" ? <CostTab d={d} onUser={onUser} /> : <ActivityTab d={d} onUser={onUser} />}
     </div>
   );
 }
 
-function UserDetail({ d, onBack }: { d: UsageSummary; onBack: () => void }) {
+const when = (iso: string) => {
+  const t = new Date(iso);
+  return Number.isNaN(t.getTime()) ? iso : t.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+};
+
+/** One user, opened from the Cost tab (money) or from the User activity tab (what they did: no money anywhere). */
+function UserDetail({ d, tab, onBack }: { d: UsageSummary; tab: Tab; onBack: () => void }) {
   const u = d.user!;
+  const back = <button onClick={onBack} className="text-sm text-primary hover:underline">← Back to {tab === "cost" ? "cost" : "user activity"}</button>;
+  if (tab === "cost") {
+    return (
+      <div className="space-y-6">
+        {back}
+        <Panel title={u.email}>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div><h3 className="text-xs text-muted-foreground mb-3">Cost by feature ({d.days} days)</h3><Ranked rows={u.features} caption={(r) => `${r.calls ?? 0} calls`} /></div>
+            <div><h3 className="text-xs text-muted-foreground mb-3">Latest 20 calls</h3><CallsTable rows={u.recent} /></div>
+          </div>
+        </Panel>
+      </div>
+    );
+  }
+  const mix = u.activity_mix.map((m) => ({ name: m.name, cost: m.count, pct: m.pct }));   // Ranked draws "cost"; here it is a number of times
   return (
-    <div className="space-y-6">
-      <button onClick={onBack} className="text-sm text-primary hover:underline">← Back to all users</button>
+    <div className="space-y-6" data-testid="user-activity">
+      {back}
       <Panel title={u.email}>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div><h3 className="text-xs text-muted-foreground mb-3">Cost by feature ({d.days} days)</h3><Ranked rows={u.features} caption={(r) => `${r.calls ?? 0} calls`} /></div>
-          <div><h3 className="text-xs text-muted-foreground mb-3">Latest 20 calls</h3><CallsTable rows={u.recent} /></div>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <Stat label="Most used feature" value={u.activity_mix[0]?.name ?? "No activity"} note={u.activity_mix[0] ? `${u.activity_mix[0].count} times in ${d.days} days` : `none in ${d.days} days`} testId="stat-most-used" />
+          <Stat label="Activities" value={String(u.activity_mix.reduce((n, m) => n + m.count, 0))} note={`last ${d.days} days`} />
         </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div>
+            <h3 className="text-xs text-muted-foreground mb-3">What they use ({d.days} days)</h3>
+            <Ranked rows={mix} value={(r) => String(Math.round(r.cost))} />
+          </div>
+          <div>
+            <h3 className="text-xs text-muted-foreground mb-3">Latest 20 activities</h3>
+            {u.activity.length ? (
+              <ol className="space-y-2.5 border-l border-white/10 pl-4" data-testid="activity-timeline">
+                {u.activity.map((a, i) => (
+                  <li key={`${a.at}${i}`} className="relative text-sm">
+                    <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-primary" />
+                    <p className="text-white">{a.what}</p>
+                    <p className="text-xs text-muted-foreground">{when(a.at)} · {a.group}</p>
+                  </li>
+                ))}
+              </ol>
+            ) : <Empty text="No activity recorded yet." />}
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-5">Shows what the user did (matching runs, pitches, saved brands, opened contacts and so on), newest first. Pages they only looked at are not recorded.</p>
       </Panel>
     </div>
   );
@@ -326,7 +374,7 @@ export default function UsageCost() {
               {forbidden ? "You don't have access to this page." : "Could not load the usage numbers. Try again in a moment."}
             </div>
           )}
-          {query.data && (query.data.user ? <UserDetail d={query.data} onBack={() => setUserId(null)} /> : <Dashboard d={query.data} onUser={setUserId} tab={tab} onTab={setTab} />)}
+          {query.data && (query.data.user ? <UserDetail d={query.data} tab={tab} onBack={() => setUserId(null)} /> : <Dashboard d={query.data} onUser={setUserId} tab={tab} onTab={setTab} />)}
         </div>
       </main>
     </div>

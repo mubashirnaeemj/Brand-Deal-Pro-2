@@ -17,14 +17,14 @@ const PALETTE = ["#7c3aed", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#14b8a6
 export const FEATURE_LINES: { key: string; label: string; color: string }[] = [
   { key: "matches", label: "Brand matches", color: "#a78bfa" },             // violet: the MAVLIT brand colour, lightened to read on the dark page
   { key: "rate", label: "Rate intelligence", color: "#facc15" },       // yellow
-  { key: "pitch", label: "Pitch generation", color: "#22c55e" },       // green
+  { key: "pitch", label: "Pitch generations", color: "#22c55e" },      // green
   { key: "description", label: "Profile generations", color: "#f472b6" },   // pink
   { key: "post_added", label: "Manual post added", color: "#2563eb" },   // blue
-  { key: "own_brand", label: "Custom brand", color: "#f1f5f9" },       // near-white (the page's text colour), the one neutral, so it cannot be mistaken for any hue
+  { key: "own_brand", label: "Custom brands added", color: "#f1f5f9" },   // near-white (the page's text colour), the one neutral, so it cannot be mistaken for any hue
   { key: "contacts", label: "Brand clicks", color: "#fb923c" },        // orange
-  { key: "saved", label: "Saved brands", color: "#22d3ee" },           // cyan
+  { key: "saved", label: "Brand saves", color: "#22d3ee" },            // cyan
   // Eight different colour families, no two alike (the closest pair is 14.6 apart in OKLab x100), each at least 3.9:1 against the page background.
-  // Pitch generation (green) and Custom brand (white) are far apart. "Delete post" is not a line: removed posts are logged but not charted.
+  // Pitch generations (green) and Custom brands added (white) are far apart. "Delete post" is not a line: removed posts are logged but not charted.
 ];
 type FeatureMode = "users" | "uses";
 type FeaturePrefs = { mode: FeatureMode; lines: string[] };   // what the admin chose: users or uses, and which lines are drawn

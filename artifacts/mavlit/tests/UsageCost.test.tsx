@@ -94,7 +94,7 @@ describe("Usage & Cost page", () => {
     const picker = screen.getByTestId("feature-line-picker");
     const boxes = Array.from(picker.querySelectorAll<HTMLInputElement>("input[type=checkbox]"));
     expect(boxes.map((b) => b.parentElement?.textContent?.trim())).toEqual([
-      "Brand matches", "Rate intelligence", "Pitch generation", "Profile generations", "Manual post added", "Custom brand", "Brand clicks", "Saved brands"]);
+      "Brand matches", "Rate intelligence", "Pitch generations", "Profile generations", "Manual post added", "Custom brands added", "Brand clicks", "Brand saves"]);
     expect(screen.queryByLabelText("Delete post")).toBeNull();               // removed posts are not a line
     expect(boxes.every((b) => b.checked)).toBe(true);                       // every line is drawn to start with
     const chart = () => screen.getByTestId("chart-feature-use");
@@ -112,7 +112,7 @@ describe("Usage & Cost page", () => {
     fireEvent.click(screen.getByRole("button", { name: "None" }));
     expect(screen.queryByTestId("chart-feature-use")).toBeNull();
     expect(screen.getByText("Tick at least one line to draw it.")).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText("Pitch generation"));
+    fireEvent.click(screen.getByLabelText("Pitch generations"));
     fireEvent.click(screen.getByLabelText("Manual post added"));
     expect(drawn()).toBe(2);
 

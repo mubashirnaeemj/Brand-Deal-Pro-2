@@ -1,19 +1,44 @@
 import { useState, type ReactNode } from "react";
 import { Redirect } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Download, Loader2 } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Cell, Legend, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Loader2 } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { isAdmin, useAuth } from "@/contexts/AuthContext";
 import { ApiRequestError } from "@/lib/api";
-import { USAGE_DAY_CHOICES, getUsageSummary, money, stepsCsv, type UsageCall, type UsageRow, type UsageSummary } from "@/lib/usage";
+import { USAGE_DAY_CHOICES, getUsageSummary, money, type UsageCall, type UsageRow, type UsageSummary } from "@/lib/usage";
 
 const OPENAI = "#7c3aed";
 const APIFY = "#f59e0b";
 const BUDGET = "#ef4444";
 const PALETTE = ["#7c3aed", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#14b8a6", "#8b5cf6", "#ef4444"];
-const TOOLTIP_STYLE = { background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 12 };
+const TOOLTIP_STYLE = { background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 12, color: "#f4f4f5" };
+const TOOLTIP_LABEL = { color: "#f4f4f5", fontWeight: 600, marginBottom: 4 };
+const AMOUNT = "#fbbf24";   // the number in a tooltip: its own colour, readable on the dark box
+
+type TipRow = { name?: string | number; value?: number | string; color?: string; payload?: Record<string, unknown> };
+/** Tooltip box: light name, the amount in AMOUNT. `amount` formats the value; `extra` adds a muted line under the rows. */
+export function ChartTip({ active, payload, label, amount, extra }: {
+  active?: boolean; payload?: TipRow[]; label?: string | number; amount: (v: number, row: TipRow) => string; extra?: (row: TipRow) => string | null;
+}) {
+  if (!active || !payload?.length) return null;
+  const note = extra ? extra(payload[0]) : null;
+  return (
+    <div style={TOOLTIP_STYLE} className="px-3 py-2">
+      <p style={TOOLTIP_LABEL}>{label ?? String(payload[0].payload?.name ?? "")}</p>
+      {payload.map((row, i) => (
+        <p key={i} className="flex items-center justify-between gap-4">
+          <span className="flex items-center gap-1.5" style={{ color: "#e4e4e7" }}>
+            {row.color && <span className="inline-block w-2 h-2 rounded-sm" style={{ background: row.color }} />}{row.name}
+          </span>
+          <strong style={{ color: AMOUNT }}>{amount(Number(row.value ?? 0), row)}</strong>
+        </p>
+      ))}
+      {note && <p style={{ color: "#a1a1aa", marginTop: 4 }}>{note}</p>}
+    </div>
+  );
+}
 
 function Panel({ title, action, children, className = "" }: { title: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
@@ -93,15 +118,6 @@ function CallsTable({ rows }: { rows: UsageCall[] }) {
   );
 }
 
-function downloadStepsCsv(summary: UsageSummary) {
-  const url = URL.createObjectURL(new Blob([stepsCsv(summary.steps)], { type: "text/csv" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `usage-by-step-${summary.days}d.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => void }) {
   const c = d.cards;
   const budgetTone = c.budget_pct >= 100 ? "bad" : c.projected_pct >= 100 ? "warn" : "primary";
@@ -142,7 +158,7 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
               <CartesianGrid stroke="#ffffff14" vertical={false} />
               <XAxis dataKey="day" tick={{ fill: "#a1a1aa", fontSize: 11 }} interval="preserveStartEnd" minTickGap={24} />
               <YAxis tick={{ fill: "#a1a1aa", fontSize: 11 }} tickFormatter={(v: number) => `$${v}`} width={48} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => money(v)} cursor={{ fill: "#ffffff10" }} />
+              <Tooltip content={<ChartTip amount={(v) => money(v)} />} cursor={{ fill: "#ffffff10" }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="llm" name="OpenAI" stackId="s" fill={OPENAI} />
               <Bar dataKey="apify" name="Apify" stackId="s" fill={APIFY} radius={[3, 3, 0, 0]} />
@@ -150,6 +166,21 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </Panel>
+
+      <Panel title="Active users per day">
+        <div className="h-64" data-testid="chart-active-users">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={d.active_users} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid stroke="#ffffff14" vertical={false} />
+              <XAxis dataKey="day" tick={{ fill: "#a1a1aa", fontSize: 11 }} interval="preserveStartEnd" minTickGap={24} />
+              <YAxis allowDecimals={false} domain={[0, (max: number) => Math.max(max, 1)]} tick={{ fill: "#a1a1aa", fontSize: 11 }} width={32} />
+              <Tooltip content={<ChartTip amount={(v) => String(v)} extra={(row) => { const a = (row.payload as { actions?: number } | undefined)?.actions; return a != null ? `${a} actions in total` : null; }} />} cursor={{ stroke: "#ffffff30" }} />
+              <Line type="monotone" dataKey="users" name="Active users" stroke="#10b981" strokeWidth={2} dot={{ r: 3, fill: "#10b981" }} activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">A user counts once per day if they did anything that day: a paid AI call, a pitch, a saved brand, a daily-limit feature or an opened contact.</p>
       </Panel>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -167,12 +198,12 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
         <Panel title="By feature (users)">
           {d.features.length ? (
             <>
-              <div className="h-48">
+              <div style={{ height: Math.max(160, d.features.length * 44) }} data-testid="chart-features">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={d.features} layout="vertical" margin={{ left: 8, right: 16 }}>
+                  <BarChart data={d.features} layout="vertical" margin={{ left: 0, right: 16 }}>
                     <XAxis type="number" hide />
-                    <YAxis type="category" dataKey="name" width={120} tick={{ fill: "#d4d4d8", fontSize: 12 }} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => money(v)} cursor={{ fill: "#ffffff10" }} />
+                    <YAxis type="category" dataKey="name" width={150} interval={0} tickLine={false} tick={{ fill: "#e4e4e7", fontSize: 12 }} />
+                    <Tooltip content={<ChartTip amount={(v) => money(v)} extra={(row) => { const f = row.payload as { calls?: number; avg?: number } | undefined; return f?.calls ? `${f.calls} calls · average $${(f.avg ?? 0).toFixed(4)} per call` : null; }} />} cursor={{ fill: "#ffffff10" }} />
                     <Bar dataKey="cost" name="Cost" radius={[0, 4, 4, 0]}>
                       {d.features.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
                     </Bar>
@@ -196,26 +227,19 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
         </Panel>
       </div>
 
-      <Panel title="Enrichment scripts by step (OpenAI + Apify)"
-        action={<button onClick={() => downloadStepsCsv(d)} className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"><Download size={13} />Download CSV</button>}>
+      <Panel title="Enrichment scripts by step">
         {d.steps.length ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm" data-testid="steps-table">
-              <thead><tr className="text-left text-xs text-muted-foreground">
-                <th className="pb-2 pr-4 font-medium">Step</th><th className="pb-2 pr-4 font-medium">OpenAI</th><th className="pb-2 pr-4 font-medium">Apify</th>
-                <th className="pb-2 pr-4 font-medium">Total</th><th className="pb-2 pr-4 font-medium">Calls</th><th className="pb-2 font-medium">Avg per call</th>
-              </tr></thead>
+              <thead><tr className="text-left text-xs text-muted-foreground"><th className="pb-2 pr-4 font-medium">Step</th><th className="pb-2 font-medium">Calls</th></tr></thead>
               <tbody>
                 {d.steps.map((r) => (
-                  <tr key={r.name} className="border-t border-white/5">
-                    <td className="py-1.5 pr-4 text-white">{r.name}</td><td className="py-1.5 pr-4 text-white">{money(r.llm)}</td><td className="py-1.5 pr-4 text-white">{money(r.apify)}</td>
-                    <td className="py-1.5 pr-4 font-bold text-white">{money(r.cost)}</td><td className="py-1.5 pr-4 text-white">{r.calls}</td><td className="py-1.5 text-white">${r.avg.toFixed(4)}</td>
-                  </tr>
+                  <tr key={r.name} className="border-t border-white/5"><td className="py-1.5 pr-4 text-white">{r.name}</td><td className="py-1.5 text-white">{r.calls}</td></tr>
                 ))}
               </tbody>
             </table>
           </div>
-        ) : <Empty text="No script spend in this window." />}
+        ) : <Empty text="No script activity in this window." />}
       </Panel>
 
       <div className="grid gap-6 lg:grid-cols-3">

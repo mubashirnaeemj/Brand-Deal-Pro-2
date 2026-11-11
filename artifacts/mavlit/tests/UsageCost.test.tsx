@@ -1,7 +1,7 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import UsageCost from "@/pages/UsageCost";
-import { stepsCsv, money } from "@/lib/usage";
+import UsageCost, { ChartTip } from "@/pages/UsageCost";
+import { money } from "@/lib/usage";
 import { installProfileApi } from "./fixtures/profileApi";
 import { creatorProfile } from "./fixtures/creatorProfile";
 import { renderProfile } from "./renderProfile";
@@ -15,6 +15,7 @@ const summary = (extra: Record<string, unknown> = {}) => ({
   days: 30, choices: [7, 30, 90],
   cards: { today: 0.5, prev7_avg: 0.1, d7: 1.2, d30: 3.4, month: 2.5, projected: 6.1, budget: 10, budget_pct: 25, projected_pct: 61, spike: true },
   daily: [{ day: "Nov 10", llm: 0.2, apify: 0.1 }, { day: "Nov 11", llm: 0.4, apify: 0.1 }],
+  active_users: [{ day: "Nov 10", users: 1, actions: 3 }, { day: "Nov 11", users: 5, actions: 12 }],
   daily_budget: 0.33, window_total: 0.8,
   split: { scripts: 0.3, users: 0.5, scripts_pct: 37.5, users_pct: 62.5 },
   features: [{ name: "Pitches", cost: 0.4, pct: 100, calls: 4, avg: 0.1 }],
@@ -54,7 +55,14 @@ describe("Usage & Cost page", () => {
     expect(await screen.findByTestId("stat-today")).toHaveTextContent("$0.500");
     expect(screen.getByTestId("stat-budget")).toHaveTextContent("25%");
     expect(screen.getByRole("alert")).toHaveTextContent("over 3×");
-    expect(screen.getByTestId("steps-table")).toHaveTextContent("demographics");
+    const steps = screen.getByTestId("steps-table");   // enrichment steps show their calls only, no prices
+    expect(steps).toHaveTextContent("demographics");
+    expect(steps).toHaveTextContent("3");
+    expect(steps).not.toHaveTextContent("$");
+    expect(screen.queryByText(/Download CSV/)).toBeNull();
+    expect(screen.getByTestId("chart-active-users")).toBeInTheDocument();
+    expect(screen.getByText("Active users per day")).toBeInTheDocument();
+    expect(screen.getByTestId("chart-features")).toBeInTheDocument();
     expect(screen.getByText("29 / 30")).toBeInTheDocument();
     expect(screen.getByTestId("health-jobs")).toHaveTextContent("2 failed");
     expect(screen.getByText("10.0.0.1")).toBeInTheDocument();
@@ -91,11 +99,18 @@ describe("Usage & Cost page", () => {
 });
 
 describe("usage helpers", () => {
-  it("formats money and builds a CSV that quotes commas", () => {
+  it("draws the chart tooltip with a light name and the amount in its own colour on the dark box", () => {
+    const { container } = render(<ChartTip active label="Profile generation" payload={[{ name: "Cost", value: 0.5, color: "#7c3aed" }]} amount={(v) => money(v)} />);
+    const box = container.firstElementChild as HTMLElement;
+    expect(box.style.background).not.toBe("");
+    expect(screen.getByText("Profile generation")).toHaveStyle({ color: "#f4f4f5" });   // the name: light on the dark box
+    const amount = screen.getByText("$0.500");
+    expect(amount).toHaveStyle({ color: "#fbbf24" });                                  // the price: its own colour
+    expect(amount.style.color).not.toBe(box.style.color);
+  });
+
+  it("formats money", () => {
     expect(money(0.092)).toBe("$0.092");
     expect(money(12.345)).toBe("$12.35");
-    const csv = stepsCsv([{ name: 'a, "b"', llm: 1, apify: 2, cost: 3, calls: 4, avg: 0.75, pct: 100 }]);
-    expect(csv.split("\n")[0]).toBe("step,openai_usd,apify_usd,total_usd,calls,avg_usd_per_call");
-    expect(csv.split("\n")[1]).toBe('"a, ""b""",1,2,3,4,0.75');
   });
 });

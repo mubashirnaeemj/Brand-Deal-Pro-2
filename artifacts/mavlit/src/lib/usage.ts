@@ -12,6 +12,7 @@ export interface UsageSummary {
   choices: number[];
   cards: { today: number; prev7_avg: number; d7: number; d30: number; month: number; projected: number; budget: number; budget_pct: number; projected_pct: number; spike: boolean };
   daily: { day: string; llm: number; apify: number }[];
+  active_users: { day: string; users: number; actions: number }[];   // distinct users who did anything that day, and how many actions
   daily_budget: number;
   window_total: number;
   split: { scripts: number; users: number; scripts_pct: number; users_pct: number };
@@ -37,10 +38,3 @@ export const getUsageSummary = (days: number, user: number | null) =>
   api.get<UsageSummary>(`/usage/summary?days=${days}${user ? `&user=${user}` : ""}`);
 
 export const money = (v: number) => `$${v >= 1 ? v.toFixed(2) : v.toFixed(3)}`;
-
-/** The per-step table as CSV text (the page downloads this). */
-export function stepsCsv(steps: UsageStepRow[]): string {
-  const cell = (v: string | number) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
-  const rows = [["step", "openai_usd", "apify_usd", "total_usd", "calls", "avg_usd_per_call"], ...steps.map((r) => [r.name, r.llm, r.apify, r.cost, r.calls, r.avg])];
-  return rows.map((row) => row.map(cell).join(",")).join("\n");
-}

@@ -3,8 +3,7 @@ import { Redirect } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import { LogOut } from "lucide-react";
 import { isAdmin, useAuth } from "@/contexts/AuthContext";
 import { ApiRequestError } from "@/lib/api";
 import { USAGE_DAY_CHOICES, getUsageSummary, money, type UsageCall, type UsageRow, type UsageSummary } from "@/lib/usage";
@@ -234,7 +233,7 @@ function UserDetail({ d, onBack }: { d: UsageSummary; onBack: () => void }) {
 }
 
 export default function UsageCost() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [days, setDays] = useState<number>(30);
   const [userId, setUserId] = useState<number | null>(null);
   const admin = isAdmin(user);
@@ -250,8 +249,16 @@ export default function UsageCost() {
   const forbidden = query.error instanceof ApiRequestError && query.error.status === 403;
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      <Navbar />
-      <main className="pt-28 pb-24 px-4">
+      {/* This page is separate from the creator app: no app navigation, no footer, just a label and Sign out. */}
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-background/80 backdrop-blur-xl" data-testid="admin-header">
+        <div className="container mx-auto max-w-6xl px-4 h-14 flex items-center justify-between">
+          <span className="font-bold tracking-tight text-white">MAVLIT <span className="ml-1 text-xs font-semibold text-primary">Admin</span></span>
+          <button onClick={logout} title="Sign out" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-white transition-colors">
+            <LogOut size={13} />Sign out
+          </button>
+        </div>
+      </header>
+      <main className="pt-24 pb-16 px-4">
         <div className="container mx-auto max-w-6xl">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div>
@@ -277,7 +284,6 @@ export default function UsageCost() {
           {query.data && (query.data.user ? <UserDetail d={query.data} onBack={() => setUserId(null)} /> : <Dashboard d={query.data} onUser={setUserId} />)}
         </div>
       </main>
-      <Footer />
     </div>
   );
 }

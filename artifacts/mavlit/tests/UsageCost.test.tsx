@@ -6,9 +6,6 @@ import { installProfileApi } from "./fixtures/profileApi";
 import { creatorProfile } from "./fixtures/creatorProfile";
 import { renderProfile } from "./renderProfile";
 
-vi.mock("@/components/Navbar", () => ({ default: () => null }));
-vi.mock("@/components/Footer", () => ({ default: () => null }));
-
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 const summary = (extra: Record<string, unknown> = {}) => ({
@@ -72,6 +69,20 @@ describe("Usage & Cost page", () => {
     expect(screen.queryByText("10.0.0.1")).toBeNull();
     expect(screen.getByText("Sign-up funnel")).toBeInTheDocument();
     expect(requested[0]).toBe("?days=30");
+  });
+
+  it("is separate from the creator app: none of the app's navigation buttons, only a label and Sign out", async () => {
+    install("admin", () => json(summary()));
+    renderProfile(<UsageCost />);   // the real page, with no Navbar or Footer mocked
+    await screen.findByTestId("stat-today");
+    for (const label of ["Dashboard", "Matches", "Pitch", "Pipeline", "Profile"]) {
+      expect(screen.queryByRole("link", { name: label })).toBeNull();
+    }
+    expect(screen.queryByTestId("nav-link-dashboard")).toBeNull();
+    expect(screen.queryAllByRole("link")).toHaveLength(0);   // no link at all leads back into the app
+    const header = screen.getByTestId("admin-header");
+    expect(header).toHaveTextContent("Admin");
+    expect(screen.getByRole("button", { name: /Sign out/ })).toBeInTheDocument();
   });
 
   it("changes the window and opens one user", async () => {

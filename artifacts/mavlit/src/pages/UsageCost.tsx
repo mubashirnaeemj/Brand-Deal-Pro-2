@@ -19,7 +19,7 @@ export const FEATURE_LINES: { key: string; label: string; color: string }[] = [
   { key: "rate", label: "Rate intelligence", color: "#facc15" },       // yellow
   { key: "pitch", label: "Pitch generations", color: "#22c55e" },      // green
   { key: "description", label: "Profile generations", color: "#f472b6" },   // pink
-  { key: "post_added", label: "Manual post added", color: "#2563eb" },   // blue
+  { key: "post_added", label: "Manual posts added", color: "#2563eb" },   // blue
   { key: "own_brand", label: "Custom brands added", color: "#f1f5f9" },   // near-white (the page's text colour), the one neutral, so it cannot be mistaken for any hue
   { key: "contacts", label: "Brand clicks", color: "#fb923c" },        // orange
   { key: "saved", label: "Brand saves", color: "#22d3ee" },            // cyan

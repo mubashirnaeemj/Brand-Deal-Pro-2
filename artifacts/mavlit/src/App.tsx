@@ -13,6 +13,7 @@ import ProfileSettings from "@/pages/ProfileSettings";
 import OnboardingPage from "@/pages/OnboardingPage";
 import Negotiator from "@/pages/Negotiator";
 import Pipeline from "@/pages/Pipeline";
+import UsageCost from "@/pages/UsageCost";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
 import Login from "@/pages/Login";
@@ -20,7 +21,7 @@ import SetPassword from "@/pages/SetPassword";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import PasswordChangeRequired from "@/components/PasswordChangeRequired";
-import { AuthProvider, isProfileComplete, useAuth } from "@/contexts/AuthContext";
+import { AuthProvider, isAdmin, isProfileComplete, useAuth } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ function Router() {
       <Route path="/profile" component={ProfileSettings} />
       <Route path="/rate-calculator" component={Negotiator} />
       <Route path="/deals" component={Pipeline} />
+      {isAdmin(user) && <Route path="/usage-cost" component={UsageCost} />}   {/* admins only: anyone else gets the 404 page */}
       <Route component={NotFound} />
     </Switch>
   );

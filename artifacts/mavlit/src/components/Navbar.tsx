@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, Users, Zap, UserCircle, Briefcase, LogOut } from "lucide-react";
-import { isProfileComplete, useAuth } from "@/contexts/AuthContext";
+import { LayoutDashboard, Users, Zap, UserCircle, Briefcase, LogOut, BarChart3 } from "lucide-react";
+import { isAdmin, isProfileComplete, useAuth } from "@/contexts/AuthContext";
 import LogoutEverywhereButton from "@/components/LogoutEverywhereButton";
 
 const NAV_LINKS = [
@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { label: "Pipeline",  href: "/deals",         Icon: Briefcase       },
   { label: "Profile",   href: "/profile",       Icon: UserCircle      },
 ];
+const ADMIN_LINKS = [{ label: "Usage", href: "/usage-cost", Icon: BarChart3 }];   // shown to admins only (the server enforces it too)
 
 export default function Navbar() {
   const [location] = useLocation();
@@ -44,7 +45,7 @@ export default function Navbar() {
 
         {isApp && profileComplete && (
           <div className="hidden md:flex items-center gap-1 flex-1">
-            {NAV_LINKS.map(({ label, href, Icon }) => {
+            {[...NAV_LINKS, ...(isAdmin(user) ? ADMIN_LINKS : [])].map(({ label, href, Icon }) => {
               const active = location === href;
               return (
                 <Link

@@ -20,6 +20,7 @@ export interface CreatorProfile {
   id: number;
   email: string;
   is_active: boolean;
+  role?: "user" | "admin";   // set by the server; admins see the Usage & Cost page
   full_name: string | null;
   creator_handle: string | null;
   age: number | null;
@@ -77,6 +78,8 @@ export interface CreatorProfile {
 }
 
 /** Until the API supplies onboarding_completed, derive it from persisted profile fields. */
+export const isAdmin = (profile: CreatorProfile | null | undefined) => profile?.role === "admin";
+
 export function isProfileComplete(profile: CreatorProfile): boolean {
   if (typeof profile.onboarding_completed === "boolean") return profile.onboarding_completed;
   return (

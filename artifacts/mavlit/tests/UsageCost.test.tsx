@@ -7,7 +7,7 @@ vi.mock("recharts", async (importOriginal) => {
   const original = await importOriginal<typeof import("recharts")>();
   return { ...original, ResponsiveContainer: ({ children }: { children: ReactElement<{ width?: number; height?: number }> }) => cloneElement(children, { width: 800, height: 300 }) };
 });
-import UsageCost, { ChartTip } from "@/pages/UsageCost";
+import UsageCost, { ChartTip, FEATURE_LINES } from "@/pages/UsageCost";
 import { money } from "@/lib/usage";
 import { installProfileApi } from "./fixtures/profileApi";
 import { creatorProfile } from "./fixtures/creatorProfile";
@@ -91,6 +91,11 @@ describe("Usage & Cost page", () => {
       "Matches", "Rate intelligence", "Pitch", "Description made by MAVLIT", "Add post", "Delete post", "Add own brand", "View brands (contacts)", "Saved brands"]);
     expect(boxes.every((b) => b.checked)).toBe(true);                       // every line is drawn to start with
     const chart = () => screen.getByTestId("chart-feature-use");
+    // layout: the By user / By feature uses toggle stays in the panel header (above the chart); the line picker is UNDER the chart
+    const toggleButton = screen.getByRole("button", { name: "By user" });
+    expect(toggleButton.compareDocumentPosition(chart()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();   // chart comes after the toggle
+    expect(chart().compareDocumentPosition(picker) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();         // picker comes after the chart
+    expect(toggleButton.compareDocumentPosition(picker) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const drawn = () => chart().querySelectorAll(".recharts-line").length;
     expect(drawn()).toBe(9);
 
@@ -125,6 +130,23 @@ describe("Usage & Cost page", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "All" }));
     expect(drawn()).toBe(9);
+  });
+
+  it("gives each of the nine lines its own colour, all different", () => {
+    const colors = FEATURE_LINES.map((l) => l.color.toLowerCase());
+    expect(colors).toHaveLength(9);
+    expect(new Set(colors).size).toBe(9);
+    for (const c of colors) expect(c).toMatch(/^#[0-9a-f]{6}$/);
+    // no two lines share a hue family: compare hues of the colours
+    const hue = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+      const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+      const h = d === 0 ? 0 : max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return (h * 60 + 360) % 360;
+    };
+    const hues = colors.map(hue).sort((a, b) => a - b);
+    const gaps = hues.map((h, i) => (i === hues.length - 1 ? hues[0] + 360 - h : hues[i + 1] - h));
+    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(20);   // every hue at least 20 degrees from its nearest neighbour
   });
 
   it("splits the page into a Cost tab and a User activity tab, Cost first", async () => {

@@ -15,15 +15,17 @@ const PALETTE = ["#7c3aed", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#14b8a6
 
 // The lines of the "Feature use per day" chart, in the order the server sends them (labels as the admin knows the features).
 export const FEATURE_LINES: { key: string; label: string; color: string }[] = [
-  { key: "matches", label: "Matches", color: "#7c3aed" },
-  { key: "rate", label: "Rate intelligence", color: "#38bdf8" },
-  { key: "pitch", label: "Pitch", color: "#10b981" },
-  { key: "description", label: "Description made by MAVLIT", color: "#f59e0b" },
-  { key: "post_added", label: "Add post", color: "#ec4899" },
-  { key: "post_removed", label: "Delete post", color: "#ef4444" },
-  { key: "own_brand", label: "Add own brand", color: "#a3e635" },
-  { key: "contacts", label: "View brands (contacts)", color: "#fb923c" },
-  { key: "saved", label: "Saved brands", color: "#94a3b8" },
+  { key: "matches", label: "Matches", color: "#a78bfa" },             // violet: the MAVLIT brand colour, lightened to read on the dark page
+  { key: "rate", label: "Rate intelligence", color: "#facc15" },       // yellow
+  { key: "pitch", label: "Pitch", color: "#34d399" },                  // emerald
+  { key: "description", label: "Description made by MAVLIT", color: "#f472b6" },   // pink
+  { key: "post_added", label: "Add post", color: "#2563eb" },          // blue
+  { key: "post_removed", label: "Delete post", color: "#dc2626" },     // red
+  { key: "own_brand", label: "Add own brand", color: "#22d3ee" },      // cyan
+  { key: "contacts", label: "View brands (contacts)", color: "#fb923c" },   // orange
+  { key: "saved", label: "Saved brands", color: "#a3e635" },           // lime
+  // Nine hues spread round the colour wheel, none close to another (closest pair 12 apart in OKLab x100, was 4 when amber and orange both used) and each at
+  // least 3.9:1 against the page background. Neighbours in the list (which tend to be drawn near each other) are far apart in hue.
 ];
 type FeatureMode = "users" | "uses";
 type FeaturePrefs = { mode: FeatureMode; lines: string[] };   // what the admin chose: users or uses, and which lines are drawn
@@ -234,19 +236,6 @@ function FeatureUsePanel({ d, prefs, onPrefs }: { d: UsageSummary; prefs: Featur
           ))}
         </div>
       }>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4" role="group" aria-label="Lines to show" data-testid="feature-line-picker">
-        {lines.map((l) => (
-          <label key={l.key} className="flex items-center gap-2 text-xs text-white cursor-pointer select-none">
-            <input type="checkbox" checked={prefs.lines.includes(l.key)} onChange={() => toggle(l.key)} className="h-3.5 w-3.5 accent-primary" />
-            <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: l.color }} />{l.label}
-          </label>
-        ))}
-        <span className="flex gap-3 text-xs">
-          <button className="text-primary hover:underline" onClick={() => onPrefs({ ...prefs, lines: lines.map((l) => l.key) })}>All</button>
-          <button className="text-primary hover:underline" onClick={() => onPrefs({ ...prefs, lines: [] })}>None</button>
-        </span>
-      </div>
-
       {shown.length ? (
         <div className="h-72" data-testid="chart-feature-use">
           <ResponsiveContainer width="100%" height="100%">
@@ -260,7 +249,22 @@ function FeatureUsePanel({ d, prefs, onPrefs }: { d: UsageSummary; prefs: Featur
           </ResponsiveContainer>
         </div>
       ) : <Empty text="Tick at least one line to draw it." />}
-      <p className="text-xs text-muted-foreground mt-2">
+
+      {/* the line picker sits under the chart; the By user / By feature uses toggle stays in the panel header */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 pt-4 border-t border-white/10" role="group" aria-label="Lines to show" data-testid="feature-line-picker">
+        {lines.map((l) => (
+          <label key={l.key} className="flex items-center gap-2 text-xs text-white cursor-pointer select-none">
+            <input type="checkbox" checked={prefs.lines.includes(l.key)} onChange={() => toggle(l.key)} className="h-3.5 w-3.5 accent-primary" />
+            <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: l.color }} />{l.label}
+          </label>
+        ))}
+        <span className="flex gap-3 text-xs">
+          <button className="text-primary hover:underline" onClick={() => onPrefs({ ...prefs, lines: lines.map((l) => l.key) })}>All</button>
+          <button className="text-primary hover:underline" onClick={() => onPrefs({ ...prefs, lines: [] })}>None</button>
+        </span>
+      </div>
+
+      <p className="text-xs text-muted-foreground mt-3">
         {prefs.mode === "users"
           ? "By user: how many different users used each feature that day (up the side)."
           : "By feature uses: how many times each feature was used that day, which can be several per user."}

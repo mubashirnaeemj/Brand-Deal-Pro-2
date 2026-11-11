@@ -17,15 +17,15 @@ const PALETTE = ["#7c3aed", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#14b8a6
 export const FEATURE_LINES: { key: string; label: string; color: string }[] = [
   { key: "matches", label: "Matches", color: "#a78bfa" },             // violet: the MAVLIT brand colour, lightened to read on the dark page
   { key: "rate", label: "Rate intelligence", color: "#facc15" },       // yellow
-  { key: "pitch", label: "Pitch", color: "#34d399" },                  // emerald
+  { key: "pitch", label: "Pitch", color: "#22c55e" },                  // green
   { key: "description", label: "Description made by MAVLIT", color: "#f472b6" },   // pink
   { key: "post_added", label: "Add post", color: "#2563eb" },          // blue
   { key: "post_removed", label: "Delete post", color: "#dc2626" },     // red
-  { key: "own_brand", label: "Add own brand", color: "#22d3ee" },      // cyan
+  { key: "own_brand", label: "Add own brand", color: "#f1f5f9" },      // near-white (the page's text colour), the one neutral, so it cannot be mistaken for any hue
   { key: "contacts", label: "View brands (contacts)", color: "#fb923c" },   // orange
-  { key: "saved", label: "Saved brands", color: "#a3e635" },           // lime
-  // Nine hues spread round the colour wheel, none close to another (closest pair 12 apart in OKLab x100, was 4 when amber and orange both used) and each at
-  // least 3.9:1 against the page background. Neighbours in the list (which tend to be drawn near each other) are far apart in hue.
+  { key: "saved", label: "Saved brands", color: "#22d3ee" },           // cyan
+  // Nine different colour families, no two alike: the closest pair is 14.6 apart (OKLab x100; it was 4 when amber and orange were both used, and 12 for
+  // the emerald / cyan pair that looked the same), and each is at least 3.9:1 against the page background. Pitch (green) and Add own brand (white) are far apart.
 ];
 type FeatureMode = "users" | "uses";
 type FeaturePrefs = { mode: FeatureMode; lines: string[] };   // what the admin chose: users or uses, and which lines are drawn

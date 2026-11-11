@@ -144,9 +144,14 @@ describe("Usage & Cost page", () => {
       const h = d === 0 ? 0 : max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
       return (h * 60 + 360) % 360;
     };
-    const hues = colors.map(hue).sort((a, b) => a - b);
+    const chromatic = FEATURE_LINES.filter((l) => l.key !== "own_brand").map((l) => hue(l.color));   // Add own brand is the one neutral (near-white): it has no hue
+    const hues = chromatic.sort((a, b) => a - b);
     const gaps = hues.map((h, i) => (i === hues.length - 1 ? hues[0] + 360 - h : hues[i + 1] - h));
     expect(Math.min(...gaps)).toBeGreaterThanOrEqual(20);   // every hue at least 20 degrees from its nearest neighbour
+    const byKey = Object.fromEntries(FEATURE_LINES.map((l) => [l.key, l.color]));
+    expect(byKey.pitch).not.toBe(byKey.saved);
+    expect(byKey.own_brand).toBe("#f1f5f9");                                                        // Pitch (green) and Add own brand (white) are nothing alike
+    expect(byKey.pitch).toBe("#22c55e");
   });
 
   it("splits the page into a Cost tab and a User activity tab, Cost first", async () => {

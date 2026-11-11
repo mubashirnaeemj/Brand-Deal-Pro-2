@@ -65,7 +65,7 @@ function Router() {
       <Route path="/profile" component={ProfileSettings} />
       <Route path="/rate-calculator" component={Negotiator} />
       <Route path="/deals" component={Pipeline} />
-      {isAdmin(user) && <Route path="/usage-cost" component={UsageCost} />}   {/* admins only: anyone else gets the 404 page */}
+      {isAdmin(user) && <Route path="/admin" component={UsageCost} />}   {/* admins only: anyone else gets the 404 page */}
       <Route component={NotFound} />
     </Switch>
   );

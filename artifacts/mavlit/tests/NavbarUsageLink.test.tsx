@@ -8,7 +8,7 @@ import { renderProfile } from "./renderProfile";
 beforeEach(() => window.history.replaceState(null, "", "/dashboard"));
 
 describe("Navbar: no Usage button", () => {
-  it.each([["admin"], ["user"]] as const)("is not shown to a %s (admins open /usage-cost directly)", async (role) => {
+  it.each([["admin"], ["user"]] as const)("is not shown to a %s (admins open /admin directly)", async (role) => {
     installProfileApi(creatorProfile({ role, onboarding_completed: true }));
     renderProfile(<Navbar />);
     await screen.findByTestId("nav-link-dashboard");

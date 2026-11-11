@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import Navbar from "@/components/Navbar";
 
-// Shown for every unknown address, and for pages the signed-in account may not open (for example /usage-cost for a normal user):
+// Shown for every unknown address, and for pages the signed-in account may not open (for example /admin for a normal user):
 // the same answer in both cases, so nothing reveals that an admin-only page exists.
 export default function NotFound() {
   return (

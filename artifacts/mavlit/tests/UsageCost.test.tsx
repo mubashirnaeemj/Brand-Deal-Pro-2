@@ -1,5 +1,12 @@
+import { cloneElement, type ReactElement } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// jsdom has no layout, so recharts draws nothing; give every chart a fixed size so its lines can be counted.
+vi.mock("recharts", async (importOriginal) => {
+  const original = await importOriginal<typeof import("recharts")>();
+  return { ...original, ResponsiveContainer: ({ children }: { children: ReactElement<{ width?: number; height?: number }> }) => cloneElement(children, { width: 800, height: 300 }) };
+});
 import UsageCost, { ChartTip } from "@/pages/UsageCost";
 import { money } from "@/lib/usage";
 import { installProfileApi } from "./fixtures/profileApi";
@@ -14,6 +21,13 @@ const summary = (extra: Record<string, unknown> = {}) => ({
   daily: [{ day: "Nov 10", llm: 0.2, apify: 0.1 }, { day: "Nov 11", llm: 0.4, apify: 0.1 }],
   active_users: [{ day: "Nov 10", users: 1, actions: 3 }, { day: "Nov 11", users: 5, actions: 12 }],
   window_total: 0.8,
+  feature_lines: ["matches", "rate", "pitch", "description", "post_added", "post_removed", "own_brand", "contacts", "saved"],
+  feature_daily: [
+    { day: "Nov 10", users: { matches: 1, rate: 0, pitch: 1, description: 0, post_added: 0, post_removed: 0, own_brand: 0, contacts: 1, saved: 0 },
+      uses: { matches: 2, rate: 0, pitch: 3, description: 0, post_added: 0, post_removed: 0, own_brand: 0, contacts: 4, saved: 0 } },
+    { day: "Nov 11", users: { matches: 2, rate: 1, pitch: 2, description: 1, post_added: 1, post_removed: 1, own_brand: 1, contacts: 2, saved: 1 },
+      uses: { matches: 6, rate: 2, pitch: 5, description: 1, post_added: 3, post_removed: 1, own_brand: 1, contacts: 9, saved: 2 } },
+  ],
   features: [{ name: "Pitches", cost: 0.4, pct: 100, calls: 4, avg: 0.1 }],
   users: [{ id: 7, name: "member@example.test", cost: 0.5, pct: 100, calls: 5, split: [["Pitches", 0.4]] }],
   models: [{ name: "gpt-x", cost: 0.8, pct: 100, calls: 9, prompt: 1000, cached: 500, cached_pct: 50 }],
@@ -62,6 +76,55 @@ describe("Usage & Cost page", () => {
     expect(screen.queryByText("29 / 30")).toBeNull();
     expect(screen.queryByText("10.0.0.1")).toBeNull();
     expect(requested[0]).toBe("?days=30");
+  });
+
+  it("draws a multi-line 'Feature use per day' chart with a by-user / by-uses toggle and tick boxes for the lines", async () => {
+    install("admin", () => json(summary()));
+    renderProfile(<UsageCost />);
+    await screen.findByTestId("stat-today");
+    fireEvent.click(screen.getByRole("tab", { name: "User activity" }));
+    expect(await screen.findByText("Feature use per day")).toBeInTheDocument();
+
+    const picker = screen.getByTestId("feature-line-picker");
+    const boxes = Array.from(picker.querySelectorAll<HTMLInputElement>("input[type=checkbox]"));
+    expect(boxes.map((b) => b.parentElement?.textContent?.trim())).toEqual([
+      "Matches", "Rate intelligence", "Pitch", "Description made by MAVLIT", "Add post", "Delete post", "Add own brand", "View brands (contacts)", "Saved brands"]);
+    expect(boxes.every((b) => b.checked)).toBe(true);                       // every line is drawn to start with
+    const chart = () => screen.getByTestId("chart-feature-use");
+    const drawn = () => chart().querySelectorAll(".recharts-line").length;
+    expect(drawn()).toBe(9);
+
+    // the admin picks the lines
+    fireEvent.click(screen.getByLabelText("Matches"));
+    expect(drawn()).toBe(8);
+    fireEvent.click(screen.getByRole("button", { name: "None" }));
+    expect(screen.queryByTestId("chart-feature-use")).toBeNull();
+    expect(screen.getByText("Tick at least one line to draw it.")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Pitch"));
+    fireEvent.click(screen.getByLabelText("Add post"));
+    expect(drawn()).toBe(2);
+
+    // by user (default): how many different users; by feature uses: how many times
+    const byUser = screen.getByRole("button", { name: "By user" });
+    const byUses = screen.getByRole("button", { name: "By feature uses" });
+    expect(byUser).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/how many different users used each feature/)).toBeInTheDocument();
+    const yMax = () => Math.max(...Array.from(chart().querySelectorAll(".recharts-yAxis .recharts-cartesian-axis-tick-value")).map((t) => Number(t.textContent)));
+    expect(yMax()).toBeLessThanOrEqual(2);                                              // different users per day: at most 2 for pitch / add post in the fixture
+    fireEvent.click(byUses);
+    expect(byUses).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/how many times each feature was used/)).toBeInTheDocument();
+    expect(yMax()).toBeGreaterThanOrEqual(5);                                           // uses per day: the axis now reaches the 5 pitch uses
+    expect(drawn()).toBe(2);
+
+    // the choice is kept when the admin goes to the Cost tab and back
+    fireEvent.click(screen.getByRole("tab", { name: "Cost" }));
+    fireEvent.click(screen.getByRole("tab", { name: "User activity" }));
+    expect(screen.getByRole("button", { name: "By feature uses" })).toHaveAttribute("aria-pressed", "true");
+    expect(chart().querySelectorAll(".recharts-line").length).toBe(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "All" }));
+    expect(drawn()).toBe(9);
   });
 
   it("splits the page into a Cost tab and a User activity tab, Cost first", async () => {

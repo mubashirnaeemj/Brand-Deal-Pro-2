@@ -12,6 +12,21 @@ const OPENAI = "#7c3aed";
 const APIFY = "#f59e0b";
 const DANGER = "#ef4444";
 const PALETTE = ["#7c3aed", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#14b8a6", "#8b5cf6", "#ef4444"];
+
+// The lines of the "Feature use per day" chart, in the order the server sends them (labels as the admin knows the features).
+export const FEATURE_LINES: { key: string; label: string; color: string }[] = [
+  { key: "matches", label: "Matches", color: "#7c3aed" },
+  { key: "rate", label: "Rate intelligence", color: "#38bdf8" },
+  { key: "pitch", label: "Pitch", color: "#10b981" },
+  { key: "description", label: "Description made by MAVLIT", color: "#f59e0b" },
+  { key: "post_added", label: "Add post", color: "#ec4899" },
+  { key: "post_removed", label: "Delete post", color: "#ef4444" },
+  { key: "own_brand", label: "Add own brand", color: "#a3e635" },
+  { key: "contacts", label: "View brands (contacts)", color: "#fb923c" },
+  { key: "saved", label: "Saved brands", color: "#94a3b8" },
+];
+type FeatureMode = "users" | "uses";
+type FeaturePrefs = { mode: FeatureMode; lines: string[] };   // what the admin chose: users or uses, and which lines are drawn
 const TOOLTIP_STYLE = { background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 12, color: "#f4f4f5" };
 const TOOLTIP_LABEL = { color: "#f4f4f5", fontWeight: 600, marginBottom: 4 };
 const AMOUNT = "#fbbf24";   // the number in a tooltip: its own colour, readable on the dark box
@@ -201,7 +216,60 @@ function CostTab({ d, onUser }: { d: UsageSummary; onUser: (id: number) => void 
   );
 }
 
-function ActivityTab({ d, onUser }: { d: UsageSummary; onUser: (id: number) => void }) {
+function FeatureUsePanel({ d, prefs, onPrefs }: { d: UsageSummary; prefs: FeaturePrefs; onPrefs: (p: FeaturePrefs) => void }) {
+  const lines = FEATURE_LINES.filter((l) => d.feature_lines.includes(l.key));
+  const shown = lines.filter((l) => prefs.lines.includes(l.key));
+  const data = d.feature_daily.map((r) => ({ day: r.day, ...r[prefs.mode] }));
+  const toggle = (key: string) => onPrefs({ ...prefs, lines: prefs.lines.includes(key) ? prefs.lines.filter((k) => k !== key) : [...prefs.lines, key] });
+  const modes: { id: FeatureMode; label: string }[] = [{ id: "users", label: "By user" }, { id: "uses", label: "By feature uses" }];
+  return (
+    <Panel title="Feature use per day"
+      action={
+        <div className="flex gap-1" role="group" aria-label="Count by">
+          {modes.map((m) => (
+            <button key={m.id} onClick={() => onPrefs({ ...prefs, mode: m.id })} aria-pressed={prefs.mode === m.id}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold border ${prefs.mode === m.id ? "bg-primary/15 text-primary border-primary/40" : "border-border text-muted-foreground hover:text-white"}`}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+      }>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4" role="group" aria-label="Lines to show" data-testid="feature-line-picker">
+        {lines.map((l) => (
+          <label key={l.key} className="flex items-center gap-2 text-xs text-white cursor-pointer select-none">
+            <input type="checkbox" checked={prefs.lines.includes(l.key)} onChange={() => toggle(l.key)} className="h-3.5 w-3.5 accent-primary" />
+            <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: l.color }} />{l.label}
+          </label>
+        ))}
+        <span className="flex gap-3 text-xs">
+          <button className="text-primary hover:underline" onClick={() => onPrefs({ ...prefs, lines: lines.map((l) => l.key) })}>All</button>
+          <button className="text-primary hover:underline" onClick={() => onPrefs({ ...prefs, lines: [] })}>None</button>
+        </span>
+      </div>
+
+      {shown.length ? (
+        <div className="h-72" data-testid="chart-feature-use">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid stroke="#ffffff14" vertical={false} />
+              <XAxis dataKey="day" tick={{ fill: "#a1a1aa", fontSize: 11 }} interval="preserveStartEnd" minTickGap={24} />
+              <YAxis allowDecimals={false} domain={[0, (max: number) => Math.max(max, 1)]} tick={{ fill: "#a1a1aa", fontSize: 11 }} width={32} />
+              <Tooltip content={<ChartTip amount={(v) => String(v)} />} cursor={{ stroke: "#ffffff30" }} />
+              {shown.map((l) => <Line key={l.key} type="monotone" dataKey={l.key} name={l.label} stroke={l.color} strokeWidth={2} dot={{ r: 2.5, fill: l.color }} activeDot={{ r: 5 }} />)}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      ) : <Empty text="Tick at least one line to draw it." />}
+      <p className="text-xs text-muted-foreground mt-2">
+        {prefs.mode === "users"
+          ? "By user: how many different users used each feature that day (up the side)."
+          : "By feature uses: how many times each feature was used that day, which can be several per user."}
+      </p>
+    </Panel>
+  );
+}
+
+function ActivityTab({ d, onUser, prefs, onPrefs }: { d: UsageSummary; onUser: (id: number) => void; prefs: FeaturePrefs; onPrefs: (p: FeaturePrefs) => void }) {
   const days = d.active_users;
   const today = days[days.length - 1];
   const peak = days.reduce((best, r) => (r.users > best.users ? r : best), days[0] ?? { day: "-", users: 0, actions: 0 });
@@ -230,6 +298,8 @@ function ActivityTab({ d, onUser }: { d: UsageSummary; onUser: (id: number) => v
         <p className="text-xs text-muted-foreground mt-2">A user counts once per day if they did anything that day: a paid AI call, a pitch, a saved brand, an Instagram post added or removed, a daily-limit feature or an opened contact.</p>
       </Panel>
 
+      <FeatureUsePanel d={d} prefs={prefs} onPrefs={onPrefs} />
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel title="Top 10 users by activity">
           <Ranked rows={d.activity_users.map((u) => ({ id: u.id, name: u.name, cost: u.count, pct: u.pct, split: u.split }))} onOpen={onUser}
@@ -257,11 +327,13 @@ function ActivityTab({ d, onUser }: { d: UsageSummary; onUser: (id: number) => v
   );
 }
 
-function Dashboard({ d, onUser, tab, onTab }: { d: UsageSummary; onUser: (id: number) => void; tab: Tab; onTab: (t: Tab) => void }) {
+function Dashboard({ d, onUser, tab, onTab, prefs, onPrefs }: {
+  d: UsageSummary; onUser: (id: number) => void; tab: Tab; onTab: (t: Tab) => void; prefs: FeaturePrefs; onPrefs: (p: FeaturePrefs) => void;
+}) {
   return (
     <div className="space-y-6">
       <Tabs tab={tab} onTab={onTab} />
-      {tab === "cost" ? <CostTab d={d} onUser={onUser} /> : <ActivityTab d={d} onUser={onUser} />}
+      {tab === "cost" ? <CostTab d={d} onUser={onUser} /> : <ActivityTab d={d} onUser={onUser} prefs={prefs} onPrefs={onPrefs} />}
     </div>
   );
 }
@@ -328,6 +400,7 @@ export default function UsageCost() {
   const [days, setDays] = useState<number>(30);
   const [userId, setUserId] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("cost");
+  const [featurePrefs, setFeaturePrefs] = useState<FeaturePrefs>({ mode: "users", lines: FEATURE_LINES.map((l) => l.key) });   // kept while you switch tabs or open a user
   const admin = isAdmin(user);
   const query = useQuery({
     queryKey: ["usage-summary", days, userId],
@@ -374,7 +447,7 @@ export default function UsageCost() {
               {forbidden ? "You don't have access to this page." : "Could not load the usage numbers. Try again in a moment."}
             </div>
           )}
-          {query.data && (query.data.user ? <UserDetail d={query.data} tab={tab} onBack={() => setUserId(null)} /> : <Dashboard d={query.data} onUser={setUserId} tab={tab} onTab={setTab} />)}
+          {query.data && (query.data.user ? <UserDetail d={query.data} tab={tab} onBack={() => setUserId(null)} /> : <Dashboard d={query.data} onUser={setUserId} tab={tab} onTab={setTab} prefs={featurePrefs} onPrefs={setFeaturePrefs} />)}
         </div>
       </main>
     </div>

@@ -12,6 +12,8 @@ export interface UsageSummary {
   cards: { today: number; prev7_avg: number; d7: number; d30: number; month: number; projected: number; spike: boolean };
   daily: { day: string; llm: number; apify: number }[];
   active_users: { day: string; users: number; actions: number }[];   // distinct users who did anything that day, and how many actions
+  feature_lines: string[];                                           // the keys of the feature-use chart, in display order
+  feature_daily: { day: string; users: Record<string, number>; uses: Record<string, number> }[];   // per day and line: different users / total uses
   window_total: number;
   features: (UsageRow & { calls: number; avg: number })[];
   users: UsageUserRow[];

@@ -4,7 +4,6 @@ import { api } from "@/lib/api";
 export interface UsageRow { name: string; cost: number; pct: number; calls?: number; id?: number }
 export interface UsageUserRow extends UsageRow { split: [string, number][] }
 export interface UsageModelRow extends UsageRow { prompt: number; cached: number; cached_pct: number }
-export interface UsageStepRow { name: string; llm: number; apify: number; cost: number; calls: number; avg: number; pct: number }
 export interface UsageCall { created_at: string; model: string; context: string; cost: number; duration_ms: number | null }
 
 export interface UsageSummary {
@@ -14,9 +13,7 @@ export interface UsageSummary {
   daily: { day: string; llm: number; apify: number }[];
   active_users: { day: string; users: number; actions: number }[];   // distinct users who did anything that day, and how many actions
   window_total: number;
-  split: { scripts: number; users: number; scripts_pct: number; users_pct: number };
   features: (UsageRow & { calls: number; avg: number })[];
-  steps: UsageStepRow[];
   users: UsageUserRow[];
   models: UsageModelRow[];
   expensive: UsageCall[];

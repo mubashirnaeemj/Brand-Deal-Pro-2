@@ -221,31 +221,17 @@ function Dashboard({ d, onUser }: { d: UsageSummary; onUser: (id: number) => voi
         </Panel>
       </div>
 
-      <h2 className="text-lg font-bold text-white pt-2">Health</h2>
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="Jobs">
-          <p className="text-sm mb-3" data-testid="health-jobs">
-            {d.health.failed_total ? <strong className="text-red-400">{d.health.failed_total} failed</strong> : <strong className="text-emerald-400">No failed jobs</strong>}
-            {" · "}
-            {d.health.stuck.length ? <strong className="text-red-400">{d.health.stuck.length} stuck</strong> : <strong className="text-emerald-400">none stuck</strong>}
-          </p>
-          <ul className="space-y-1 text-sm">
-            {Object.entries(d.health.failed).filter(([, n]) => n > 0).map(([k, n]) => <li key={k} className="flex justify-between text-white"><span>{k}</span><strong>{n}</strong></li>)}
-            {d.health.stuck.map((s, i) => <li key={i} className="flex justify-between text-red-300"><span>{s.name} · {s.feature}</span><strong>since {s.since}</strong></li>)}
-          </ul>
-        </Panel>
-        <Panel title="Sign-up funnel">
-          <ul className="space-y-3">
-            {d.funnel.map((r) => (
-              <li key={r.name}>
-                <div className="flex justify-between gap-3 text-sm text-white"><span>{r.name}</span><strong>{r.n}</strong></div>
-                <Meter pct={r.pct} />
-              </li>
-            ))}
-          </ul>
-          <p className="text-xs text-muted-foreground mt-3">{d.funnel_extra.accounts} accounts in total · {d.funnel_extra.signups_window} new sign-ups in the last {d.days} days</p>
-        </Panel>
-      </div>
+      <Panel title="Sign-up funnel">
+        <ul className="space-y-3">
+          {d.funnel.map((r) => (
+            <li key={r.name}>
+              <div className="flex justify-between gap-3 text-sm text-white"><span>{r.name}</span><strong>{r.n}</strong></div>
+              <Meter pct={r.pct} />
+            </li>
+          ))}
+        </ul>
+        <p className="text-xs text-muted-foreground mt-3">{d.funnel_extra.accounts} accounts in total · {d.funnel_extra.signups_window} new sign-ups in the last {d.days} days</p>
+      </Panel>
     </div>
   );
 }
@@ -288,7 +274,7 @@ export default function UsageCost() {
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div>
               <h1 className="text-2xl font-bold text-white">Usage &amp; Cost</h1>
-              <p className="text-sm text-muted-foreground">OpenAI and Apify spend, limits and health. Admins only.</p>
+              <p className="text-sm text-muted-foreground">What users spent on OpenAI and Apify, plus limits and health. Enrichment scripts are not counted. Admins only.</p>
             </div>
             <div className="flex gap-2" role="group" aria-label="Time window">
               {USAGE_DAY_CHOICES.map((n) => (

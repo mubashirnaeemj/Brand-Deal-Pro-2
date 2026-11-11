@@ -17,9 +17,7 @@ const summary = (extra: Record<string, unknown> = {}) => ({
   daily: [{ day: "Nov 10", llm: 0.2, apify: 0.1 }, { day: "Nov 11", llm: 0.4, apify: 0.1 }],
   active_users: [{ day: "Nov 10", users: 1, actions: 3 }, { day: "Nov 11", users: 5, actions: 12 }],
   window_total: 0.8,
-  split: { scripts: 0.3, users: 0.5, scripts_pct: 37.5, users_pct: 62.5 },
   features: [{ name: "Pitches", cost: 0.4, pct: 100, calls: 4, avg: 0.1 }],
-  steps: [{ name: "demographics", llm: 0.2, apify: 0.1, cost: 0.3, calls: 3, avg: 0.1, pct: 100 }],
   users: [{ id: 7, name: "member@example.test", cost: 0.5, pct: 100, calls: 5, split: [["Pitches", 0.4]] }],
   models: [{ name: "gpt-x", cost: 0.8, pct: 100, calls: 9, prompt: 1000, cached: 500, cached_pct: 50 }],
   expensive: [{ created_at: "Nov 11 10:00", model: "gpt-x", context: "pitch for creator", cost: 0.2, duration_ms: 1500 }], slow: [],
@@ -58,12 +56,14 @@ describe("Usage & Cost page", () => {
     expect(screen.queryByTestId("stat-budget")).toBeNull();
     expect(screen.getByRole("alert")).toHaveTextContent("over 3×");
     expect(screen.queryByText("Enrichment scripts by step")).toBeNull();   // the section is gone
-    expect(screen.queryByTestId("steps-table")).toBeNull();
+    expect(screen.getByText(/Enrichment scripts are not counted/)).toBeInTheDocument();
     expect(screen.getByTestId("chart-active-users")).toBeInTheDocument();
     expect(screen.getByText("Active users per day")).toBeInTheDocument();
     expect(screen.getByTestId("chart-features")).toBeInTheDocument();
     expect(screen.getByText("29 / 30")).toBeInTheDocument();
-    expect(screen.getByTestId("health-jobs")).toHaveTextContent("2 failed");
+    expect(screen.queryByText("Jobs")).toBeNull();            // the Jobs / Health section is gone
+    expect(screen.queryByText("Health")).toBeNull();
+    expect(screen.queryByTestId("health-jobs")).toBeNull();
     for (const removed of ["Enrichment scripts vs users", "Most expensive calls", "Slowest calls", "Failed sign-ins by address"]) {
       expect(screen.queryByText(removed)).toBeNull();   // these sections are gone
     }

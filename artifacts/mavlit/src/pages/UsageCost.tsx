@@ -15,17 +15,16 @@ const PALETTE = ["#7c3aed", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#14b8a6
 
 // The lines of the "Feature use per day" chart, in the order the server sends them (labels as the admin knows the features).
 export const FEATURE_LINES: { key: string; label: string; color: string }[] = [
-  { key: "matches", label: "Matches", color: "#a78bfa" },             // violet: the MAVLIT brand colour, lightened to read on the dark page
+  { key: "matches", label: "Brand matches", color: "#a78bfa" },             // violet: the MAVLIT brand colour, lightened to read on the dark page
   { key: "rate", label: "Rate intelligence", color: "#facc15" },       // yellow
-  { key: "pitch", label: "Pitch", color: "#22c55e" },                  // green
-  { key: "description", label: "Description made by MAVLIT", color: "#f472b6" },   // pink
-  { key: "post_added", label: "Add post", color: "#2563eb" },          // blue
-  { key: "post_removed", label: "Delete post", color: "#dc2626" },     // red
-  { key: "own_brand", label: "Add own brand", color: "#f1f5f9" },      // near-white (the page's text colour), the one neutral, so it cannot be mistaken for any hue
-  { key: "contacts", label: "View brands (contacts)", color: "#fb923c" },   // orange
+  { key: "pitch", label: "Pitch generation", color: "#22c55e" },       // green
+  { key: "description", label: "Profile generations", color: "#f472b6" },   // pink
+  { key: "post_added", label: "Manual post added", color: "#2563eb" },   // blue
+  { key: "own_brand", label: "Custom brand", color: "#f1f5f9" },       // near-white (the page's text colour), the one neutral, so it cannot be mistaken for any hue
+  { key: "contacts", label: "Brand clicks", color: "#fb923c" },        // orange
   { key: "saved", label: "Saved brands", color: "#22d3ee" },           // cyan
-  // Nine different colour families, no two alike: the closest pair is 14.6 apart (OKLab x100; it was 4 when amber and orange were both used, and 12 for
-  // the emerald / cyan pair that looked the same), and each is at least 3.9:1 against the page background. Pitch (green) and Add own brand (white) are far apart.
+  // Eight different colour families, no two alike (the closest pair is 14.6 apart in OKLab x100), each at least 3.9:1 against the page background.
+  // Pitch generation (green) and Custom brand (white) are far apart. "Delete post" is not a line: removed posts are logged but not charted.
 ];
 type FeatureMode = "users" | "uses";
 type FeaturePrefs = { mode: FeatureMode; lines: string[] };   // what the admin chose: users or uses, and which lines are drawn
@@ -135,7 +134,7 @@ function CallsTable({ rows }: { rows: UsageCall[] }) {
 }
 
 type Tab = "cost" | "activity";
-const TABS: { id: Tab; label: string }[] = [{ id: "cost", label: "Cost" }, { id: "activity", label: "User activity" }];
+const TABS: { id: Tab; label: string }[] = [{ id: "activity", label: "User activity" }, { id: "cost", label: "Cost" }];   // User activity first (the tab the page opens on), Cost second
 
 function Tabs({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   return (
@@ -403,7 +402,7 @@ export default function UsageCost() {
   const { user, logout } = useAuth();
   const [days, setDays] = useState<number>(30);
   const [userId, setUserId] = useState<number | null>(null);
-  const [tab, setTab] = useState<Tab>("cost");
+  const [tab, setTab] = useState<Tab>("activity");
   const [featurePrefs, setFeaturePrefs] = useState<FeaturePrefs>({ mode: "users", lines: FEATURE_LINES.map((l) => l.key) });   // kept while you switch tabs or open a user
   const admin = isAdmin(user);
   const query = useQuery({

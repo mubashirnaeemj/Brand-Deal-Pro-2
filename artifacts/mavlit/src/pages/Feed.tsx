@@ -20,7 +20,7 @@ const TABS = [
   { id: "similar", label: "Similar Creators", Icon: Users, hint: "Creators with similar content, audiences and follower counts, and who they partner with." },
   { id: "brands", label: "Brand Intelligence", Icon: Building2, hint: "Which brands work with creators like you, and what they look for." },
   { id: "insights", label: "Market Insights", Icon: BarChart3, hint: "Where you stand against similar creators, and what to do next." },
-  { id: "trending", label: "Trending", Icon: Flame, hint: "Recently detected brand partnerships across niches." },
+  { id: "trending", label: "Trending", Icon: Flame, hint: "Creator market trends: what is growing in your niche and where brands are investing." },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -28,10 +28,13 @@ export default function Feed() {
   const [tab, setTab] = useState<TabId>("for-you");
   const [filters, setFilters] = useState<FeedFilters>(EMPTY_FILTERS);
   const [saved, setSaved] = useState<Set<string>>(() => new Set());
+  const [savedInspiration, setSavedInspiration] = useState<Set<string>>(() => new Set());
+  const [compareIds, setCompareIds] = useState<string[]>([]);
   const [creator, setCreator] = useState<FeedCreator | null>(null);
   const [brand, setBrand] = useState<FeedBrand | null>(null);
   const clear = useCallback(() => setFilters(EMPTY_FILTERS), []);
   const toggleSave = useCallback((id: string) => setSaved((prev) => { const next = new Set(prev); if (!next.delete(id)) next.add(id); return next; }), []);
+  const toggleInspiration = useCallback((id: string) => setSavedInspiration((prev) => { const next = new Set(prev); if (!next.delete(id)) next.add(id); return next; }), []);
   const viewCreator = useCallback((c: FeedCreator) => { setBrand(null); setCreator(c); }, []);
   const viewBrand = useCallback((b: FeedBrand) => { setCreator(null); setBrand(b); }, []);
   const active = TABS.find((t) => t.id === tab)!;
@@ -61,15 +64,16 @@ export default function Feed() {
           </div>
           <p className="-mt-3 text-xs text-muted-foreground">{active.hint}</p>
 
-          <FeedFilterBar filters={filters} onChange={setFilters} />
+          {/* Trending has its own period / niche / platform / country filters. */}
+          {tab !== "trending" && <FeedFilterBar filters={filters} onChange={setFilters} />}
 
           <motion.div key={tab} role="tabpanel" id={`feed-panel-${tab}`} aria-labelledby={`feed-tab-${tab}`}
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: "easeOut" }}>
-            {tab === "for-you" && <ForYouTab filters={filters} onClear={clear} saved={saved} onToggleSave={toggleSave} onViewCreator={viewCreator} onViewBrand={viewBrand} />}
-            {tab === "similar" && <SimilarCreatorsTab filters={filters} onClear={clear} onViewCreator={viewCreator} />}
+            {tab === "for-you" && <ForYouTab filters={filters} onClear={clear} saved={saved} onToggleSave={toggleSave} savedInspiration={savedInspiration} onToggleInspiration={toggleInspiration} onViewCreator={viewCreator} onViewBrand={viewBrand} />}
+            {tab === "similar" && <SimilarCreatorsTab filters={filters} onClear={clear} onViewCreator={viewCreator} compareIds={compareIds} onCompareChange={setCompareIds} />}
             {tab === "brands" && <BrandIntelligenceTab filters={filters} onClear={clear} onViewBrand={viewBrand} />}
             {tab === "insights" && <MarketInsightsTab filters={filters} onClear={clear} />}
-            {tab === "trending" && <TrendingTab filters={filters} onClear={clear} onViewCreator={viewCreator} onViewBrand={viewBrand} />}
+            {tab === "trending" && <TrendingTab />}
           </motion.div>
         </div>
       </main>

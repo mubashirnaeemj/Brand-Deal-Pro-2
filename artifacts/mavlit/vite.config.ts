@@ -66,10 +66,17 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    // Local dev: send /api/* to the Express proxy (artifacts/api-server), exactly as nginx does in production.
+    proxy: {
+      "/api": { target: process.env.API_PROXY_TARGET ?? "http://127.0.0.1:8090", changeOrigin: false },
+    },
   },
   preview: {
     port,
     host: "0.0.0.0",
     allowedHosts: true,
+    proxy: {
+      "/api": { target: process.env.API_PROXY_TARGET ?? "http://127.0.0.1:8090", changeOrigin: false },
+    },
   },
 });

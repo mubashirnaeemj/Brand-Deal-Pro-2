@@ -252,3 +252,24 @@ test("the admin usage numbers are forwarded to the API (which refuses non-admins
     assert.equal(upstreamUrl, null);
   });
 });
+
+test("origin headers are forwarded, except in local development where localhost would be refused as cross-site", async () => {
+  const seen = [];
+  const upstream = async (_url, options) => { seen.push(options.headers); return new Response("{}", { headers: { "Content-Type": "application/json" } }); };
+  const browser = { Origin: "https://app.mavlit.com", "Sec-Fetch-Site": "same-origin" };
+  const previous = process.env.NODE_ENV;
+  try {
+    await withProxy(upstream, async send => {
+      process.env.NODE_ENV = "production";
+      await send("/api/mavlit/auth/login", "POST", browser);
+      process.env.NODE_ENV = "development";
+      await send("/api/mavlit/auth/login", "POST", browser);
+    });
+  } finally {
+    if (previous === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previous;
+  }
+  assert.equal(seen[0].get("origin"), "https://app.mavlit.com");
+  assert.equal(seen[0].get("sec-fetch-site"), "same-origin");
+  assert.equal(seen[1].get("origin"), null);
+  assert.equal(seen[1].get("sec-fetch-site"), null);
+});

@@ -53,8 +53,12 @@ export function localCookies(upstreamCookies: string[]): string[] {
 // The API's CSRF check looks at Origin / Sec-Fetch-Site, its login lockout at the client address; pass what the browser sent.
 // Never send Cloudflare's own headers (cf-*, true-client-ip, x-forwarded-host...): api.mavlit.com sits behind Cloudflare, which answers 403
 // to a request that carries them. Only the allow-list below is ever copied from the browser request.
+//
+// Local development only (NODE_ENV=development, which `pnpm dev` sets): the browser's Origin is http://localhost:<port>, which that CSRF check
+// refuses, so no Origin / Sec-Fetch-Site is sent at all. Any other NODE_ENV (production included) forwards them untouched.
 function forwardedHeaders(req: Request, headers: Headers): void {
-  for (const name of ["origin", "sec-fetch-site"]) {
+  const localDev = process.env.NODE_ENV === "development";
+  for (const name of localDev ? [] : ["origin", "sec-fetch-site"]) {
     const value = req.headers[name];
     if (typeof value === "string" && value) headers.set(name, value);
   }

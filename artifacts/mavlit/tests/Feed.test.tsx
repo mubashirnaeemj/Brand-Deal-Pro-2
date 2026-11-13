@@ -46,10 +46,11 @@ describe("Feed page", () => {
     expect(screen.getByText(/Discover creator partnerships, explore brands/)).toBeInTheDocument();
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["For You", "Similar Creators", "Brand Intelligence", "Market Insights", "Trending"]);
     expect(screen.getByTestId("feed-tab-for-you")).toHaveAttribute("aria-selected", "true");
-    const first = screen.getAllByTestId(/^feed-post-/)[0];
-    for (const name of ["View Creator", "View Brand", "View Original Post"]) expect(within(first).getByRole("button", { name })).toBeInTheDocument();
-    expect(within(first).getByRole("button", { name: /^Save/ })).toBeInTheDocument();
-    expect(within(first).getByText(/Why you're seeing this/)).toBeInTheDocument();
+    const first = screen.getAllByTestId(/^inspiration-p\d+$/)[0];
+    expect(screen.getByRole("region", { name: "Partnerships Picked for You" })).toBeInTheDocument();
+    expect(screen.queryByText("Partnerships picked for you")).toBeNull();            // the old duplicate section is gone
+    for (const name of ["View Post", "Save"]) expect(within(first).getByRole("button", { name })).toBeInTheDocument();
+    for (const t of [/^views$/, /^likes$/, /^comments$/, /Why it's relevant to you/]) expect(within(first).getByText(t)).toBeInTheDocument();
   });
 
   it("switches between all five tabs without leaving the page", async () => {
@@ -57,33 +58,34 @@ describe("Feed page", () => {
     await tab("similar"); expect(await screen.findByText("Similar creators")).toBeInTheDocument();
     await tab("brands"); expect(await screen.findAllByRole("button", { name: /View insights for/ })).not.toHaveLength(0);
     await tab("insights"); expect(await screen.findByRole("region", { name: "Your Competitive Position" })).toBeInTheDocument();
-    await tab("trending"); expect(await screen.findByTestId("trending-list")).toBeInTheDocument();
-    await tab("for-you"); expect(await screen.findAllByTestId(/^feed-post-/)).not.toHaveLength(0);
+    await tab("trending"); expect(await screen.findByRole("heading", { name: "Creator Market Trends" })).toBeInTheDocument();
+    await tab("for-you"); expect(await screen.findAllByTestId(/^inspiration-p\d+$/)).not.toHaveLength(0);
     expect(window.location.pathname).toBe("/feed");
   });
 
   it("filters, shows chips, an empty state and Clear all", async () => {
     await open();
-    const total = screen.getAllByTestId(/^feed-post-/).length;
+    const ids = () => screen.getAllByTestId(/^inspiration-p\d+$/).map((n) => n.getAttribute("data-testid"));
+    const before = ids();
     await userEvent.click(screen.getByTestId("filter-niche"));
     await userEvent.click(await screen.findByRole("option", { name: "Beauty" }));
-    await waitFor(() => expect(screen.getAllByTestId(/^feed-post-/).length).toBeLessThan(total));
+    await waitFor(() => expect(ids()).not.toEqual(before));
     expect(screen.getByRole("button", { name: "Remove Niche filter Beauty" })).toBeInTheDocument();
     await userEvent.click(screen.getByTestId("filter-country"));
     await userEvent.click(await screen.findByRole("option", { name: "Canada" }));
     expect(await screen.findByText("No partnerships match these filters")).toBeInTheDocument();
     await userEvent.click(screen.getByTestId("filters-clear-all"));
-    await waitFor(() => expect(screen.getAllByTestId(/^feed-post-/)).toHaveLength(total));
+    await waitFor(() => expect(ids()).toEqual(before));
   });
 
   it("saves a post and lists it under Saved", async () => {
     await open();
-    const first = screen.getAllByTestId(/^feed-post-/)[0];
+    const first = screen.getAllByTestId(/^inspiration-p\d+$/)[0];
     const id = first.getAttribute("data-testid")!;
-    await userEvent.click(within(first).getByRole("button", { name: /^Save/ }));
-    expect(within(first).getByRole("button", { name: /^Unsave/ })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(within(first).getByRole("button", { name: "Save" }));
+    expect(within(first).getByRole("button", { name: "Saved" })).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(screen.getByRole("button", { name: /^Saved \(1\)/ }));
-    expect(screen.getAllByTestId(/^feed-post-/).map((n) => n.getAttribute("data-testid"))).toEqual([id]);
+    expect(screen.getAllByTestId(/^inspiration-p\d+$/).map((n) => n.getAttribute("data-testid"))).toEqual([id]);
   });
 
   it("opens a creator's partnership history from Similar Creators", async () => {
@@ -114,16 +116,5 @@ describe("Feed page", () => {
     expect(within(missed).queryByText("Splice")).toBeNull();      // already partnered
     expect(within(missed).getByText("Native Instruments")).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "AI Recommendations" })).getAllByRole("listitem").length).toBeGreaterThanOrEqual(3);
-  });
-
-  it("trending sorts by views", async () => {
-    await open(); await tab("trending");
-    const items = await screen.findAllByTestId("trending-item");
-    expect(items).toHaveLength(PARTNERSHIPS.length);
-    await userEvent.click(screen.getByTestId("trending-sort"));
-    await userEvent.click(await screen.findByRole("option", { name: "Most Views" }));
-    const top = PARTNERSHIPS.reduce((a, b) => (b.views > a.views ? b : a));
-    const handle = CREATORS.find((c) => c.id === top.creatorId)!.handle;
-    await waitFor(() => expect(screen.getAllByTestId("trending-item")[0]).toHaveTextContent(`@${handle}`));
   });
 });

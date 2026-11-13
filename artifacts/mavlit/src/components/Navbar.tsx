@@ -1,12 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, Users, Zap, UserCircle, Briefcase, LogOut } from "lucide-react";
+import { LayoutDashboard, Rss, Users, Zap, UserCircle, Briefcase, LogOut } from "lucide-react";
 import { isProfileComplete, useAuth } from "@/contexts/AuthContext";
 import LogoutEverywhereButton from "@/components/LogoutEverywhereButton";
 
 const NAV_LINKS = [
   { label: "Dashboard", href: "/dashboard",     Icon: LayoutDashboard },
+  { label: "Feed",      href: "/feed",          Icon: Rss             },
   { label: "Matches",   href: "/brand-matches", Icon: Users           },
   { label: "Pitch",     href: "/pitch",         Icon: Zap             },
   { label: "Pipeline",  href: "/deals",         Icon: Briefcase       },

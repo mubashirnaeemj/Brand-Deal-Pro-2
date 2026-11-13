@@ -9,6 +9,7 @@ import BrandMatches from "@/pages/BrandMatches";
 import BrandDetail from "@/pages/BrandDetail";
 import Pitch from "@/pages/Pitch";
 import Dashboard from "@/pages/Dashboard";
+import Feed from "@/pages/Feed";
 import ProfileSettings from "@/pages/ProfileSettings";
 import OnboardingPage from "@/pages/OnboardingPage";
 import Negotiator from "@/pages/Negotiator";
@@ -62,6 +63,7 @@ function Router() {
       <Route path="/brands/:slug" component={BrandDetail} />
       <Route path="/pitch" component={Pitch} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/feed" component={Feed} />
       <Route path="/profile" component={ProfileSettings} />
       <Route path="/rate-calculator" component={Negotiator} />
       <Route path="/deals" component={Pipeline} />

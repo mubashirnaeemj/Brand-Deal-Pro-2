@@ -63,19 +63,13 @@ describe("Feed page", () => {
     expect(window.location.pathname).toBe("/feed");
   });
 
-  it("filters, shows chips, an empty state and Clear all", async () => {
+  it("has no Feed-wide filter bar on any tab", async () => {
     await open();
-    const ids = () => screen.getAllByTestId(/^inspiration-p\d+$/).map((n) => n.getAttribute("data-testid"));
-    const before = ids();
-    await userEvent.click(screen.getByTestId("filter-niche"));
-    await userEvent.click(await screen.findByRole("option", { name: "Beauty" }));
-    await waitFor(() => expect(ids()).not.toEqual(before));
-    expect(screen.getByRole("button", { name: "Remove Niche filter Beauty" })).toBeInTheDocument();
-    await userEvent.click(screen.getByTestId("filter-country"));
-    await userEvent.click(await screen.findByRole("option", { name: "Canada" }));
-    expect(await screen.findByText("No partnerships match these filters")).toBeInTheDocument();
-    await userEvent.click(screen.getByTestId("filters-clear-all"));
-    await waitFor(() => expect(ids()).toEqual(before));
+    for (const id of ["for-you", "similar", "brands", "insights", "trending"]) {
+      await tab(id);
+      expect(screen.queryByRole("group", { name: "Filters" })).toBeNull();
+      for (const t of ["filter-niche", "filter-platform", "filter-country", "filter-followers", "filter-engagement"]) expect(screen.queryByTestId(t)).toBeNull();
+    }
   });
 
   it("saves a post and lists it under Saved", async () => {

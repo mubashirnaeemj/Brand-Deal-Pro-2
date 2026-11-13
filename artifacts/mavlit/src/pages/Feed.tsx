@@ -6,13 +6,12 @@ import Navbar from "@/components/Navbar";
 import BrandDialog from "@/components/feed/BrandDialog";
 import BrandIntelligenceTab from "@/components/feed/BrandIntelligenceTab";
 import CreatorDialog from "@/components/feed/CreatorDialog";
-import FeedFilterBar from "@/components/feed/FeedFilterBar";
 import ForYouTab from "@/components/feed/ForYouTab";
 import MarketInsightsTab from "@/components/feed/MarketInsightsTab";
 import SimilarCreatorsTab from "@/components/feed/SimilarCreatorsTab";
 import TrendingTab from "@/components/feed/TrendingTab";
 import type { FeedBrand, FeedCreator } from "@/data/feed";
-import { EMPTY_FILTERS, type FeedFilters } from "@/lib/feedData";
+import { EMPTY_FILTERS } from "@/lib/feedData";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -26,13 +25,14 @@ type TabId = (typeof TABS)[number]["id"];
 
 export default function Feed() {
   const [tab, setTab] = useState<TabId>("for-you");
-  const [filters, setFilters] = useState<FeedFilters>(EMPTY_FILTERS);
   const [saved, setSaved] = useState<Set<string>>(() => new Set());
   const [savedInspiration, setSavedInspiration] = useState<Set<string>>(() => new Set());
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [creator, setCreator] = useState<FeedCreator | null>(null);
   const [brand, setBrand] = useState<FeedBrand | null>(null);
-  const clear = useCallback(() => setFilters(EMPTY_FILTERS), []);
+  // The Feed-wide filter bar was removed: every tab always shows the full, unfiltered data.
+  const filters = EMPTY_FILTERS;
+  const clear = useCallback(() => {}, []);
   const toggleSave = useCallback((id: string) => setSaved((prev) => { const next = new Set(prev); if (!next.delete(id)) next.add(id); return next; }), []);
   const toggleInspiration = useCallback((id: string) => setSavedInspiration((prev) => { const next = new Set(prev); if (!next.delete(id)) next.add(id); return next; }), []);
   const viewCreator = useCallback((c: FeedCreator) => { setBrand(null); setCreator(c); }, []);
@@ -63,9 +63,6 @@ export default function Feed() {
             })}
           </div>
           <p className="-mt-3 text-xs text-muted-foreground">{active.hint}</p>
-
-          {/* Trending has its own period / niche / platform / country filters. */}
-          {tab !== "trending" && <FeedFilterBar filters={filters} onChange={setFilters} />}
 
           <motion.div key={tab} role="tabpanel" id={`feed-panel-${tab}`} aria-labelledby={`feed-tab-${tab}`}
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: "easeOut" }}>

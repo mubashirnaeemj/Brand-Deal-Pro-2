@@ -125,13 +125,10 @@ function build(base: Comparable, real: {
   };
 }
 
-/** The prototype's hardcoded numbers of the mock creator behind a similar creator's sample column: what stands in for a missing average Reel views and brand partnerships. */
-export function sampleCreatorNumbers(username: string): { avgReelViews: number; partnerships: number } {
-  const sample = sampleFor(username);
-  return { avgReelViews: sample.avgReelViews, partnerships: partnershipsOfCreator(sample.id).length };
-}
+/** The prototype's hardcoded average Reel views of the mock creator behind a similar creator's sample column: what stands in when the creator has none. */
+export const sampleCreatorNumbers = (username: string): { avgReelViews: number } => ({ avgReelViews: sampleFor(username).avgReelViews });
 /** The same for you (the prototype's mock profile). */
-export const sampleMeNumbers = (): { avgReelViews: number; partnerships: number } => ({ avgReelViews: ME.avgReelViews, partnerships: ME_PARTNERSHIPS.length });
+export const sampleMeNumbers = (): { avgReelViews: number } => ({ avgReelViews: ME.avgReelViews });
 
 /**
  * Make the creators of the tab, and you, known to Compare. Returns each creator's id (the same id comparableFor() understands).
@@ -144,7 +141,7 @@ export function registerRealCreators(list: SimilarCreator[], you?: YouStats | nu
     const handle = (you.handle ?? "").replace(/^@/, "").trim() || "you";
     realMe = build(comparableFor("me"), {
       id: "me", handle, name: you.name?.trim() || handle, isMe: true, followers: you.followers, engagement: you.engagement_rate, avgLikes: you.avg_likes, avgComments: you.avg_comments,
-      avgReelViews: you.avg_reel_views, postsPerWeek: you.posts_per_week, partnershipCount: you.brand_partnerships,
+      avgReelViews: you.avg_reel_views, postsPerWeek: you.posts_per_week, partnershipCount: you.brand_partnerships ?? 0,   // the posts you marked as partnerships; none: 0
       summary: null,   // nothing in the data says which brands, categories and formats your own partnerships were
       product: you.product_focused_pct, categories: you.content_categories,
     });

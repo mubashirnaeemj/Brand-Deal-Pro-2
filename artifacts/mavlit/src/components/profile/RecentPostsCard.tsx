@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Loader2, X } from "lucide-react";
 import PostThumbnail from "@/components/PostThumbnail";
@@ -61,6 +62,9 @@ function PostsDialog({ open, onOpenChange, posts, onPostsChange, onPostAddedOrDe
 }) {
   const [message, setMessage] = useState<Message | null>(null);
   const [toggling, setToggling] = useState<ReadonlySet<CreatorPost["id"]>>(new Set());
+  // Each post marked as a partnership counts as one brand partnership in the Feed (Why Them, Not Me?, Compare, Market Insights): a change makes its numbers stale.
+  const queryClient = useQueryClient();
+  const feedChanged = () => { void queryClient.invalidateQueries({ queryKey: ["feed"] }); };
   const [deleting, setDeleting] = useState<CreatorPost["id"] | null>(null);
   const [url, setUrl] = useState("");
   const [adding, setAdding] = useState(false);
@@ -119,6 +123,7 @@ function PostsDialog({ open, onOpenChange, posts, onPostsChange, onPostAddedOrDe
     patchPost(post.id, { is_partnership_post: next });
     try {
       patchPost(post.id, { is_partnership_post: (await setPostPartnership(post.id, next)).is_partnership_post ?? next });
+      feedChanged();
     } catch (cause) {
       patchPost(post.id, { is_partnership_post: !next });
       setMessage({ kind: "error", text: errorText(cause, "Could not update this post.") });
@@ -135,6 +140,7 @@ function PostsDialog({ open, onOpenChange, posts, onPostsChange, onPostAddedOrDe
       const updated = await deleteCreatorPost(post.id);
       if (!isPostsList(updated)) throw new Error("MAVLIT returned an unexpected response. Please reload.");
       onPostAddedOrDeleted?.();
+      feedChanged();   // a deleted post that was marked as a partnership no longer counts
       if (activeQuery) {
         // The DELETE response lists every post; show the matches again.
         try { await reload(activeQuery); }

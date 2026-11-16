@@ -61,7 +61,6 @@ export interface CreatorProfile {
   substack_subscribers: number | null;
   instagram_followers: number | null;
   instagram_highest_views?: number | null;
-  brand_partnerships?: number | null;   // typed by the creator on the profile page
   instagram_engagement_rate?: number | null;   // calculated by MAVLIT when it generates the profile; read-only
   youtube_channel_name: string | null;
   youtube_subscribers: number | null;

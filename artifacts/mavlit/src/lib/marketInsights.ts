@@ -30,7 +30,7 @@ export function marketMetrics(you: YouStats, peers: MarketPeers): Metric[] {
     { key: "views", label: "Avg Reel views", me: you.avg_reel_views ?? 0, peer: peers.avg_reel_views, show: fmtCount },
     { key: "eng", label: "Engagement rate", me: you.engagement_rate, peer: peers.avg_engagement, show: fmtPercent },
     { key: "freq", label: "Posts per week", me: you.posts_per_week, peer: peers.avg_posts_per_week, show: perWeek },
-    { key: "deals", label: "Brand partnerships", me: you.brand_partnerships, peer: peers.avg_partnerships, show: count },
+    { key: "deals", label: "Brand partnerships", me: you.brand_partnerships ?? 0, peer: peers.avg_partnerships, show: count },
   ];
 }
 

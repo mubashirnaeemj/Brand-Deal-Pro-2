@@ -150,7 +150,7 @@ describe("Why Them, Not Me? and Compare Creators (sample numbers for the real cr
     expect(within(mix).queryByText(/Sample data/)).toBeNull();
   });
 
-  it("uses the hardcoded sample for a missing average Reel views, brand partnerships, product-focused content and content categories", async () => {
+  it("uses the hardcoded sample for a missing average Reel views, product-focused content and content categories, and counts no marked post as 0 brand partnerships", async () => {
     const response = { ...RESPONSE, you: { ...RESPONSE.you, brand_partnerships: null, avg_reel_views: null, product_focused_pct: null, content_categories: null },
                        creators: [{ ...RESPONSE.creators[0], avg_reel_views: null }] };
     api.setSimilarCreators(response);
@@ -158,6 +158,7 @@ describe("Why Them, Not Me? and Compare Creators (sample numbers for the real cr
     await userEvent.click(await screen.findByRole("button", { name: "Why them, not me? @skinbyalice" }));
     const dialog = await screen.findByRole("dialog");
     for (const key of ["views", "deals", "product"]) expect(within(dialog).getByTestId(`why-row-${key}`)).toBeInTheDocument();
+    expect(within(dialog).getByTestId("why-row-deals")).toHaveTextContent("0");                                  // no post marked as a partnership: your count is 0, not a sample
     expect(within(dialog).getAllByTestId(/^why-row-category:/).length).toBeGreaterThan(0);
     expect(within(dialog).getByTestId("why-row-views")).not.toHaveTextContent("30K");                           // the creator's views are the sample, not a number from the data
     expect(within(dialog).queryByTestId("why-missing")).toBeNull();                                              // none of the four is "not compared" any more

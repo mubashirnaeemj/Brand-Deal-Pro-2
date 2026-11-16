@@ -22,7 +22,6 @@ export type ProfileForm = {
   gender: string;
   brandPreferences: string;
   pitchStylePreferences: string;
-  brandPartnerships: string;   // how many brand partnerships the creator has had (typed; used by "Why Them, Not Me?")
   primaryPlatforms: PlatformKey[];
   instagram: PlatformDetails & { username: string; followers: string; highestViews: string; engagementRate: string };
   youtube: PlatformDetails & { channelName: string; subscribers: string };
@@ -40,7 +39,6 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
     gender: text(profile.gender),
     brandPreferences: text(profile.brand_preferences),
     pitchStylePreferences: text(profile.pitch_style_preferences),
-    brandPartnerships: numberText(profile.brand_partnerships),
     primaryPlatforms: parsePlatforms(profile.primary_platform),
     instagram: {
       username: text(profile.instagram_handle),
@@ -80,8 +78,6 @@ export function validateProfile(form: ProfileForm, profile: CreatorProfile): str
   for (const [value, label] of [[form.instagram.followers, "Follower count"], [form.instagram.highestViews, "Highest Instagram reel / post views"], ...(form.primaryPlatforms.includes("youtube") ? [[form.youtube.subscribers, "Subscriber count"]] : [])]) {
     if (value.trim() && (!Number.isInteger(Number(value)) || Number(value) < 0)) return `${label} must be a non-negative whole number.`;
   }
-  const partnerships = form.brandPartnerships.trim();
-  if (partnerships && (!Number.isInteger(Number(partnerships)) || Number(partnerships) < 0 || Number(partnerships) > 100000)) return "Brand partnerships must be a whole number from 0 to 100000.";
   const rate = form.instagram.engagementRate.trim();
   if (rate && (!Number.isFinite(Number(rate)) || Number(rate) < 0 || Number(rate) > 100)) return "Engagement rate must be a number between 0 and 100.";
   for (const platform of ["instagram", "youtube"] as const) {
@@ -117,7 +113,6 @@ function profileValues(form: ProfileForm, profile: CreatorProfile): Partial<Crea
     full_name: form.fullName.trim(),
     brand_preferences: form.brandPreferences.trim() || null,
     pitch_style_preferences: form.pitchStylePreferences.trim() || null,
-    brand_partnerships: optionalNumber(form.brandPartnerships),
     creator_handle: instagramHandle || profile.creator_handle || "",
     age: optionalNumber(form.age),
     gender: form.gender.trim() || null,

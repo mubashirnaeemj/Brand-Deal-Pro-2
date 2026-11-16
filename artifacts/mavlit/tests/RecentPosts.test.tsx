@@ -216,6 +216,30 @@ describe("recent Instagram posts on the profile page", () => {
     expect(within(rows()[0]).getByRole("switch")).toBeChecked();
   });
 
+  it("makes the Feed's numbers stale when a post is marked or unmarked as a partnership (each marked post is one brand partnership there)", async () => {
+    const user = userEvent.setup();
+    const rendered = await mount(posts(10));
+    const invalidate = vi.spyOn(rendered.queryClient, "invalidateQueries");
+    await openDialog();
+    const toggle = within(rows()[0]).getByRole("switch");
+    await user.click(toggle);                                                                           // marked: counts as a partnership
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["feed"] }));
+    invalidate.mockClear();
+    await user.click(toggle);                                                                           // unmarked again
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["feed"] }));
+  });
+
+  it("does not touch the Feed when the toggle call fails", async () => {
+    const user = userEvent.setup();
+    const rendered = await mount(posts(10));
+    vi.spyOn(creatorPosts, "setPostPartnership").mockRejectedValue(new Error("Instagram is not answering."));
+    const invalidate = vi.spyOn(rendered.queryClient, "invalidateQueries");
+    await openDialog();
+    await user.click(within(rows()[0]).getByRole("switch"));
+    await screen.findByText(/Instagram is not answering/);
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ["feed"] });
+  });
+
   it("puts the switch back and shows the error when the toggle call fails", async () => {
     const user = userEvent.setup();
     await mount(posts(10));

@@ -33,7 +33,8 @@ export interface SimilarCreator {
 export interface YouStats {
   name: string | null; avg_likes: number | null; avg_comments: number | null;
   handle: string | null; followers: number | null; engagement_rate: number | null; avg_reel_views: number | null;
-  posts_per_week: number | null; brand_partnerships: number | null;   // brand_partnerships is typed on the profile page
+  posts_per_week: number | null;
+  brand_partnerships: number | null;   // the posts you marked as a partnership in "Your recent Instagram posts", one each (0 when none)
   product_focused_pct: number | null;                                 // the content mix MAVLIT estimated when it generated your profile (percent)
   content_categories: { name: string; pct: number }[] | null;         // your five biggest content categories, e.g. Tutorial 32%
 }

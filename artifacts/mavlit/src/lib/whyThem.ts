@@ -36,14 +36,14 @@ const pct = (n: number) => `${Math.round(n)}%`;
 const perWeek = (n: number) => n.toFixed(1);
 const whole = (n: number) => String(Math.round(n));
 
-/** Hardcoded sample numbers that stand in when a side has none: its average Reel views and its brand partnerships. */
-export interface SampleNumbers { avgReelViews: number; partnerships: number }
+/** Hardcoded sample numbers that stand in when a side has no average Reel views. */
+export interface SampleNumbers { avgReelViews: number }
 export interface Samples { you: SampleNumbers; them: SampleNumbers }
 
 /**
  * The metrics both sides have a value for, in a fixed order. Followers, engagement rate and posts per week left out when either side lacks them, rather
- * than compared with a guess. The average Reel views and the brand partnerships (when `samples` is given) and the content mix (when `mixes` is given) use
- * the hardcoded sample numbers for a side that has none, so those rows always show.
+ * than compared with a guess. The average Reel views (when `samples` is given) and the content mix (when `mixes` is given) use the hardcoded sample numbers for a side that has
+ * none, so those rows always show. Brand partnerships are always compared: yours is the number of posts you marked as partnerships, 0 when none.
  */
 export function whyRows(you: YouStats, them: SimilarCreator, mixes?: { you: Mix; them: Mix }, samples?: Samples): WhyRow[] {
   const pairs: [WhyRow["key"], string, number | null, number | null, (n: number) => string][] = [
@@ -51,7 +51,7 @@ export function whyRows(you: YouStats, them: SimilarCreator, mixes?: { you: Mix;
     ["views", "Avg Reel views", you.avg_reel_views ?? samples?.you.avgReelViews ?? null, them.avg_reel_views ?? samples?.them.avgReelViews ?? null, fmtCount],
     ["engagement", "Engagement rate", you.engagement_rate, them.engagement_rate, fmtPercent],
     ["frequency", "Posts per week", you.posts_per_week, them.posts_per_week, perWeek],
-    ["deals", "Brand partnerships", you.brand_partnerships ?? samples?.you.partnerships ?? null, them.partnership_count ?? samples?.them.partnerships ?? null, whole],
+    ["deals", "Brand partnerships", you.brand_partnerships ?? 0, them.partnership_count, whole],   // no marked post: 0
   ];
   const rows: WhyRow[] = pairs.flatMap(([key, label, me, theirs, show]) => me === null || me === undefined || theirs === null || theirs === undefined ? [] : [{ key, label, me, them: theirs, show }]);
   if (mixes) {

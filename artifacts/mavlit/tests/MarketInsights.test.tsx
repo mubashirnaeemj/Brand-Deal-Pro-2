@@ -108,7 +108,8 @@ describe("Market Insights (real numbers)", () => {
     api.setMarketInsights({ ...RESPONSE, you: { ...YOU, avg_reel_views: null, engagement_rate: null, posts_per_week: null, brand_partnerships: null } });
     await openInsights();
     expect(await screen.findByTestId("metric-views")).toHaveTextContent("0");                      // no view counts: 0, like in Compare
-    for (const key of ["eng", "freq", "deals"]) expect(screen.getByTestId(`metric-${key}`)).toHaveTextContent("—");
+    expect(screen.getByTestId("metric-deals")).toHaveTextContent("0");                              // no post marked as a partnership: 0 brand partnerships
+    for (const key of ["eng", "freq"]) expect(screen.getByTestId(`metric-${key}`)).toHaveTextContent("—");
     expect(screen.getByTestId("radar-empty")).toBeInTheDocument();                                   // fewer than three numbers both of you have: no radar
   });
 

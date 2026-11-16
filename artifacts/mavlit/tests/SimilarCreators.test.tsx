@@ -130,10 +130,10 @@ describe("Why Them, Not Me? and Compare Creators (sample numbers for the real cr
     for (const name of ["Their Advantages", "Your Advantages", "Opportunities to Improve"]) expect(within(dialog).getByRole("region", { name })).toBeInTheDocument();
     // the five numbers, and nothing about product-focused or tutorial content
     for (const key of ["followers", "views", "engagement", "frequency", "deals"]) expect(within(dialog).getByTestId(`why-row-${key}`)).toBeInTheDocument();
-    // the content mix is not compared while the creator has no estimated one (theirs is sample data): it is listed as not compared
-    expect(within(dialog).queryByTestId("why-row-product")).toBeNull();
-    expect(within(dialog).queryByTestId(/^why-row-category:/)).toBeNull();
-    expect(within(dialog).getByTestId("why-missing")).toHaveTextContent("Not compared, because one of you has no number yet: Product-focused content, Content categories.");
+    // the content mix rows are there too: the creator has no estimated mix, so theirs is the hardcoded sample (yours is real)
+    expect(within(dialog).getByTestId("why-row-product")).toHaveTextContent("35%");
+    expect(within(dialog).getAllByTestId(/^why-row-category:/).length).toBeGreaterThan(0);
+    expect(within(dialog).queryByTestId("why-missing")).toBeNull();                                             // nothing is left out
     expect(within(dialog).getByTestId("why-row-followers")).toHaveTextContent("12.4K");
     expect(within(dialog).getByTestId("why-row-views")).toHaveTextContent("30K");
     expect(within(dialog).getByTestId("why-row-engagement")).toHaveTextContent("8.1%");
@@ -150,15 +150,27 @@ describe("Why Them, Not Me? and Compare Creators (sample numbers for the real cr
     expect(within(mix).queryByText(/Sample data/)).toBeNull();
   });
 
-  it("leaves out a number one of you does not have, and says how to add the brand partnerships", async () => {
-    api.setSimilarCreators({ ...RESPONSE, you: { ...RESPONSE.you, brand_partnerships: null, avg_reel_views: null } });
+  it("uses the hardcoded sample for a missing average Reel views, brand partnerships, product-focused content and content categories", async () => {
+    const response = { ...RESPONSE, you: { ...RESPONSE.you, brand_partnerships: null, avg_reel_views: null, product_focused_pct: null, content_categories: null },
+                       creators: [{ ...RESPONSE.creators[0], avg_reel_views: null }] };
+    api.setSimilarCreators(response);
     await openSimilar();
     await userEvent.click(await screen.findByRole("button", { name: "Why them, not me? @skinbyalice" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).queryByTestId("why-row-deals")).toBeNull();
-    expect(within(dialog).queryByTestId("why-row-views")).toBeNull();
-    expect(within(dialog).getByTestId("why-missing")).toHaveTextContent(/Avg Reel views, Brand partnerships, Product-focused content, Content categories\./);
-    expect(within(dialog).getByTestId("why-missing")).toHaveTextContent(/Add your brand partnerships on your profile/);
+    for (const key of ["views", "deals", "product"]) expect(within(dialog).getByTestId(`why-row-${key}`)).toBeInTheDocument();
+    expect(within(dialog).getAllByTestId(/^why-row-category:/).length).toBeGreaterThan(0);
+    expect(within(dialog).getByTestId("why-row-views")).not.toHaveTextContent("30K");                           // the creator's views are the sample, not a number from the data
+    expect(within(dialog).queryByTestId("why-missing")).toBeNull();                                              // none of the four is "not compared" any more
+    expect(within(dialog).queryByText(/Sample data/)).toBeNull();                                                // and no line says so
+  });
+
+  it("still leaves out followers, engagement rate and posts per week when one of you has none", async () => {
+    api.setSimilarCreators({ ...RESPONSE, you: { ...RESPONSE.you, engagement_rate: null, posts_per_week: null }, creators: [{ ...RESPONSE.creators[0], followers: null }] });
+    await openSimilar();
+    await userEvent.click(await screen.findByRole("button", { name: "Why them, not me? @skinbyalice" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByTestId("why-missing")).toHaveTextContent("Not compared, because one of you has no number yet: Followers, Engagement rate, Posts per week.");
+    expect(within(dialog).getByTestId("why-row-views")).toBeInTheDocument();
   });
 
   it("limits the selection to three, lets you remove one and shows the dashboard", async () => {

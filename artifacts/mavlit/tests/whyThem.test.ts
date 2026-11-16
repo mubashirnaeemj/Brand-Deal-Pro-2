@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SimilarCreator, YouStats } from "@/lib/similarCreators";
-import { sampleMix, theirMix, whyAdvice, whyRows, yourMix, type Mix } from "@/lib/whyThem";
+import { sampleMix, theirMix, whyAdvice, whyRows, yourMix, type Mix, type Samples } from "@/lib/whyThem";
 
 const creator = (extra: Partial<SimilarCreator> = {}): SimilarCreator => ({
   username: "abc", full_name: null, profile_url: "https://www.instagram.com/abc", niche: "Music", description: null, tags: [], country: null, followers: 20_000,
@@ -61,6 +61,27 @@ describe("whyAdvice (no LLM: sentences from the numbers)", () => {
 });
 
 const mix = (product: number, categories: Record<string, number>): Mix => ({ product, categories });
+
+describe("the sample numbers that stand in for a missing value", () => {
+  const samples: Samples = { you: { avgReelViews: 21_400, partnerships: 1 }, them: { avgReelViews: 25_800, partnerships: 2 } };
+  it("fill a side that has no average Reel views or brand partnerships, and are not used when it has them", () => {
+    const rows = whyRows(you({ avg_reel_views: null, brand_partnerships: null }), creator({ avg_reel_views: null }), undefined, samples);
+    expect(rows.find((r) => r.key === "views")).toMatchObject({ me: 21_400, them: 25_800 });
+    expect(rows.find((r) => r.key === "deals")).toMatchObject({ me: 1, them: 5 });          // the creator's partnership count is real: 5
+    const real = whyRows(you(), creator(), undefined, samples);
+    expect(real.find((r) => r.key === "views")).toMatchObject({ me: 100_000, them: 50_000 });
+    expect(real.find((r) => r.key === "deals")).toMatchObject({ me: 2, them: 5 });
+  });
+  it("leave the rows out when no samples are given, and never fill followers, engagement or posts per week", () => {
+    expect(whyRows(you({ avg_reel_views: null, brand_partnerships: null }), creator()).map((r) => r.key)).toEqual(["followers", "engagement", "frequency"]);
+    const keys = whyRows(you({ followers: null, engagement_rate: null, posts_per_week: null }), creator(), undefined, samples).map((r) => r.key);
+    expect(keys).toEqual(["views", "deals"]);
+  });
+  it("go into the advice sentences too", () => {
+    const advice = whyAdvice(you({ avg_reel_views: null }), creator({ avg_reel_views: null }), undefined, samples);
+    expect(advice.theirAdvantages).toContain("21% more average Reel views.");                // 25.8K against 21.4K
+  });
+});
 
 describe("the content mix rows", () => {
   const mixes = { you: mix(40, { Tutorial: 30, "Product review": 20, Lifestyle: 10 }), them: mix(20, { Tutorial: 10, Entertainment: 50, Educational: 5 }) };

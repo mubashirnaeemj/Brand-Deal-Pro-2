@@ -125,6 +125,14 @@ function build(base: Comparable, real: {
   };
 }
 
+/** The prototype's hardcoded numbers of the mock creator behind a similar creator's sample column: what stands in for a missing average Reel views and brand partnerships. */
+export function sampleCreatorNumbers(username: string): { avgReelViews: number; partnerships: number } {
+  const sample = sampleFor(username);
+  return { avgReelViews: sample.avgReelViews, partnerships: partnershipsOfCreator(sample.id).length };
+}
+/** The same for you (the prototype's mock profile). */
+export const sampleMeNumbers = (): { avgReelViews: number; partnerships: number } => ({ avgReelViews: ME.avgReelViews, partnerships: ME_PARTNERSHIPS.length });
+
 /**
  * Make the creators of the tab, and you, known to Compare. Returns each creator's id (the same id comparableFor() understands).
  * `you` gives the "You" column your real name, handle and numbers; without it that column is the prototype's sample profile.

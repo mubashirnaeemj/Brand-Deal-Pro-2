@@ -36,14 +36,22 @@ const pct = (n: number) => `${Math.round(n)}%`;
 const perWeek = (n: number) => n.toFixed(1);
 const whole = (n: number) => String(Math.round(n));
 
-/** The metrics both sides have a value for, in a fixed order. A metric either side lacks is left out rather than compared with a guess. */
-export function whyRows(you: YouStats, them: SimilarCreator, mixes?: { you: Mix; them: Mix }): WhyRow[] {
+/** Hardcoded sample numbers that stand in when a side has none: its average Reel views and its brand partnerships. */
+export interface SampleNumbers { avgReelViews: number; partnerships: number }
+export interface Samples { you: SampleNumbers; them: SampleNumbers }
+
+/**
+ * The metrics both sides have a value for, in a fixed order. Followers, engagement rate and posts per week left out when either side lacks them, rather
+ * than compared with a guess. The average Reel views and the brand partnerships (when `samples` is given) and the content mix (when `mixes` is given) use
+ * the hardcoded sample numbers for a side that has none, so those rows always show.
+ */
+export function whyRows(you: YouStats, them: SimilarCreator, mixes?: { you: Mix; them: Mix }, samples?: Samples): WhyRow[] {
   const pairs: [WhyRow["key"], string, number | null, number | null, (n: number) => string][] = [
     ["followers", "Followers", you.followers, them.followers, fmtCount],
-    ["views", "Avg Reel views", you.avg_reel_views, them.avg_reel_views, fmtCount],
+    ["views", "Avg Reel views", you.avg_reel_views ?? samples?.you.avgReelViews ?? null, them.avg_reel_views ?? samples?.them.avgReelViews ?? null, fmtCount],
     ["engagement", "Engagement rate", you.engagement_rate, them.engagement_rate, fmtPercent],
     ["frequency", "Posts per week", you.posts_per_week, them.posts_per_week, perWeek],
-    ["deals", "Brand partnerships", you.brand_partnerships, them.partnership_count, whole],
+    ["deals", "Brand partnerships", you.brand_partnerships ?? samples?.you.partnerships ?? null, them.partnership_count ?? samples?.them.partnerships ?? null, whole],
   ];
   const rows: WhyRow[] = pairs.flatMap(([key, label, me, theirs, show]) => me === null || me === undefined || theirs === null || theirs === undefined ? [] : [{ key, label, me, them: theirs, show }]);
   if (mixes) {
@@ -62,8 +70,8 @@ export interface Advice { theirAdvantages: string[]; yourAdvantages: string[]; i
 /** A lead of less than 8% either way is not worth a sentence. */
 const LEAD = 1.08;
 
-export function whyAdvice(you: YouStats, them: SimilarCreator, mixes?: { you: Mix; them: Mix }): Advice {
-  const rows = whyRows(you, them, mixes);
+export function whyAdvice(you: YouStats, them: SimilarCreator, mixes?: { you: Mix; them: Mix }, samples?: Samples): Advice {
+  const rows = whyRows(you, them, mixes, samples);
   const handle = `@${them.username}`;
   const lines = {
     followers: (p: number, who: "them" | "you", r: WhyRow) => who === "them" ? `${p}% larger audience (${r.show(r.them)} vs ${r.show(r.me)}).` : `${p}% larger audience than ${handle}.`,

@@ -2,7 +2,7 @@ import { Check, ShieldAlert, Sparkles, TrendingDown } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { avatarHue } from "@/lib/similarCreators";
 import type { SimilarCreator, YouStats } from "@/lib/similarCreators";
-import { comparableFor } from "@/lib/feedCompare";
+import { comparableFor, sampleCreatorNumbers, sampleMeNumbers } from "@/lib/feedCompare";
 import { theirMix, whyAdvice, whyRows, yourMix } from "@/lib/whyThem";
 import { cn } from "@/lib/utils";
 import { IndexRadar, MixBars, SERIES_COLORS } from "./CompareCharts";
@@ -18,8 +18,6 @@ function List({ title, icon, tone, items }: { title: string; icon: React.ReactNo
 }
 
 const LABELS = { followers: "Followers", views: "Avg Reel views", engagement: "Engagement rate", frequency: "Posts per week", deals: "Brand partnerships" } as const;
-// The content mix numbers are compared only when both of you have a real, estimated one: a sample mix is never compared.
-const MIX_LABELS = { product: "Product-focused content", category: "Content categories" } as const;
 
 /** Your numbers against one similar creator's: followers, average Reel views, engagement rate, posts per week and brand partnerships. All real, no LLM. */
 export default function WhyThemDialog({ creator, you, onClose }: { creator: SimilarCreator | null; you: YouStats | null; onClose: () => void }) {
@@ -29,17 +27,16 @@ export default function WhyThemDialog({ creator, you, onClose }: { creator: Simi
   const sampleThem = creator ? comparableFor(`real:${creator.username}`) : null;
   const mine = you ? yourMix(you, sampleMe) : null;
   const theirs = creator && sampleThem ? theirMix(creator, sampleThem) : null;
-  const mixes = mine?.real && theirs?.real ? { you: mine, them: theirs } : undefined;
-  const rows = creator && you ? whyRows(you, creator, mixes) : [];
-  const advice = creator && you ? whyAdvice(you, creator, mixes) : null;
+  // The rows for average Reel views, brand partnerships, product-focused content and content categories are always there: a side with no number uses the
+  // prototype's hardcoded sample one (the estimated mix when there is one).
+  const mixes = mine && theirs ? { you: mine, them: theirs } : undefined;
+  const samples = creator ? { you: sampleMeNumbers(), them: sampleCreatorNumbers(creator.username) } : undefined;
+  const rows = creator && you ? whyRows(you, creator, mixes, samples) : [];
+  const advice = creator && you ? whyAdvice(you, creator, mixes, samples) : null;
   const mixKeys = mine && theirs ? [...new Set([...Object.keys(mine.categories), ...Object.keys(theirs.categories)])] : [];
   const mixRows = mine && theirs ? [{ name: "You", ...mine.categories }, { name: `@${creator?.username}`, ...theirs.categories }] : [];
   const top = (categories: Record<string, number>) => Object.entries(categories).sort((a, b) => b[1] - a[1])[0];
-  const missing = [
-    ...(Object.keys(LABELS) as (keyof typeof LABELS)[]).filter((key) => !rows.some((r) => r.key === key)).map((key) => LABELS[key]),
-    ...(rows.some((r) => r.key === "product") ? [] : [MIX_LABELS.product]),
-    ...(rows.some((r) => r.key.startsWith("category:")) ? [] : [MIX_LABELS.category]),
-  ];
+  const missing = (Object.keys(LABELS) as (keyof typeof LABELS)[]).filter((key) => !rows.some((r) => r.key === key)).map((key) => LABELS[key]);
   return (
     <Dialog open={!!creator} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-h-[92vh] max-w-4xl overflow-y-auto border-border bg-card p-0 sm:rounded-2xl">
@@ -88,7 +85,6 @@ export default function WhyThemDialog({ creator, you, onClose }: { creator: Simi
             {missing.length > 0 && (
               <p data-testid="why-missing" className="rounded-xl bg-secondary/50 p-3 text-xs text-muted-foreground">
                 Not compared, because one of you has no number yet: {missing.join(", ")}.
-                {missing.includes(LABELS.deals) && you.brand_partnerships === null ? " Add your brand partnerships on your profile to compare them." : ""}
               </p>
             )}
 

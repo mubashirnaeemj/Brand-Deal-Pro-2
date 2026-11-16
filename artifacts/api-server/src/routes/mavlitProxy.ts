@@ -7,7 +7,7 @@ const UPSTREAM = "https://api.mavlit.com";
 
 // Only the MAVLIT API routes the app uses are proxied. Everything else (/docs, /redoc, /openapi.json, /admin, /static, /health*, the operator
 // routes, the API's own HTML pages) answers 404 here without calling the API.
-export const ALLOWED_PATH = /^\/(auth|creator-profile|matches|brands|dashboard|pitches|rate-intelligence|contract-advice|own-brands|saved-brands|brand-niches|brand-niche-tags|brand-category-niches|brand-category-tags|creator-sub-niches|early-access|usage)(\/|$)/;   // usage: the admin Usage & Cost page (the API itself refuses non-admins)
+export const ALLOWED_PATH = /^\/(auth|creator-profile|matches|brands|dashboard|pitches|rate-intelligence|contract-advice|own-brands|saved-brands|brand-niches|brand-niche-tags|brand-category-niches|brand-category-tags|creator-sub-niches|early-access|usage|feed)(\/|$)/;   // usage: the admin Usage & Cost page (the API itself refuses non-admins); feed: the Feed's Similar Creators tab
 
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;   // a proxied (non-stream) response is held in memory: refuse anything larger
 const NORMAL_TIMEOUT_MS = 20_000;
@@ -87,7 +87,7 @@ router.use(async (req, res): Promise<void> => {
   const advisory = req.method === "POST" && ["/contract-advice", "/rate-intelligence"].includes(req.path);
   const timeoutMs = slowPitch ? PITCH_TIMEOUT_MS : advisory ? ADVISORY_TIMEOUT_MS : NORMAL_TIMEOUT_MS;
   // Post thumbnails are images that MAVLIT caches; let the browser keep them too.
-  const thumbnail = req.method === "GET" && /^\/creator-profile\/me\/posts\/[^/]+\/thumbnail$/.test(req.path);
+  const thumbnail = req.method === "GET" && /^\/(?:creator-profile\/me\/posts\/[^/]+\/thumbnail|feed\/post-thumbnail)$/.test(req.path);
   const headers = new Headers({ Accept: streaming ? "text/event-stream" : thumbnail ? "image/*,*/*;q=0.8" : "application/json" });
   const accessToken = req.cookies?.access_token;
   if (typeof accessToken === "string") headers.set("Cookie", `access_token=${accessToken}`);

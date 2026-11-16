@@ -253,6 +253,37 @@ test("the admin usage numbers are forwarded to the API (which refuses non-admins
   });
 });
 
+test("the Feed's similar creators are forwarded to the API", async () => {
+  let upstreamUrl = null;
+  await withProxy(async url => { upstreamUrl = String(url); return new Response('{"creators":[]}', { status: 200, headers: { "Content-Type": "application/json" } }); }, async send => {
+    const response = await send("/api/mavlit/feed/similar-creators", "GET");
+    for await (const _ of response); // drain
+    assert.equal(response.statusCode, 200);
+    assert.equal(upstreamUrl, "https://api.mavlit.com/feed/similar-creators");
+    upstreamUrl = null;
+    const picture = await send("/api/mavlit/feed/post-thumbnail?code=AbC_123", "GET");
+    for await (const _ of picture); // drain
+    assert.equal(picture.statusCode, 200);
+    assert.equal(upstreamUrl, "https://api.mavlit.com/feed/post-thumbnail?code=AbC_123");
+    upstreamUrl = null;
+    upstreamUrl = null;
+    const added = await send("/api/mavlit/feed/competitors", "POST");        // adding and removing a competitor
+    for await (const _ of added); // drain
+    assert.equal(added.statusCode, 200);
+    assert.equal(upstreamUrl, "https://api.mavlit.com/feed/competitors");
+    upstreamUrl = null;
+    const removed = await send("/api/mavlit/feed/competitors/501", "DELETE");
+    for await (const _ of removed); // drain
+    assert.equal(removed.statusCode, 200);
+    assert.equal(upstreamUrl, "https://api.mavlit.com/feed/competitors/501");
+    upstreamUrl = null;
+    const lookalike = await send("/api/mavlit/feeds", "GET");
+    for await (const _ of lookalike); // drain
+    assert.equal(lookalike.statusCode, 404);
+    assert.equal(upstreamUrl, null);
+  });
+});
+
 test("origin headers are forwarded, except in local development where localhost would be refused as cross-site", async () => {
   const seen = [];
   const upstream = async (_url, options) => { seen.push(options.headers); return new Response("{}", { headers: { "Content-Type": "application/json" } }); };

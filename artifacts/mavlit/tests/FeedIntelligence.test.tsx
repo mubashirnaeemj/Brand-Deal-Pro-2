@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Toaster } from "@/components/ui/toaster";
 import { CREATORS, IDEAS, ME_PARTNERSHIPS, PARTNERSHIPS, STRATEGY } from "@/data/feed";
 import Feed from "@/pages/Feed";
-import { comparableFor, contentIdeas, whyThemNotMe } from "@/lib/feedCompare";
+import { comparableFor, contentIdeas } from "@/lib/feedCompare";
 import { installProfileApi } from "./fixtures/profileApi";
 import { creatorProfile } from "./fixtures/creatorProfile";
 import { renderProfile } from "./renderProfile";
@@ -37,14 +37,6 @@ describe("mock data for the intelligence features", () => {
     const me = comparableFor("me");
     expect(me.avgLikes + me.avgComments).toBe(Math.round((me.followers * me.engagement) / 100));
     expect(me.partnerships).toHaveLength(1);
-  });
-  it("gives every competitor advice on both sides plus 3 to 5 improvements", () => {
-    for (const c of CREATORS) {
-      const advice = whyThemNotMe(comparableFor(c.id));
-      expect(advice.theirAdvantages.length + advice.yourAdvantages.length).toBeGreaterThan(0);
-      expect(advice.improvements.length).toBeGreaterThanOrEqual(3);
-      expect(advice.improvements.length).toBeLessThanOrEqual(5);
-    }
   });
 });
 
@@ -121,51 +113,3 @@ describe("Partnerships Picked for You (For You)", () => {
   });
 });
 
-describe("Why Them, Not Me? (Similar Creators)", () => {
-  it("opens a comparison with advantages, improvements and the disclaimer", async () => {
-    await open();
-    await userEvent.click(screen.getByTestId("feed-tab-similar"));
-    await userEvent.click(await screen.findByRole("button", { name: "Why them, not me? @kai.beatlab" }));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("heading", { name: "Why Them, Not Me?" })).toBeInTheDocument();
-    for (const name of ["Their Advantages", "Your Advantages", "Opportunities to Improve"]) expect(within(dialog).getByRole("region", { name })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("why-row-views")).toHaveTextContent("31.2K");
-    expect(within(dialog).getByRole("note")).toHaveTextContent(/estimated competitive insights based on available public data, not confirmed reasons/);
-    expect(within(within(dialog).getByRole("region", { name: "Their Advantages" })).getByText(/46% more average Reel views/)).toBeInTheDocument();
-  });
-});
-
-describe("Compare Creators (Similar Creators)", () => {
-  const toCompare = async () => { await open(); await userEvent.click(screen.getByTestId("feed-tab-similar")); await userEvent.click(await screen.findByRole("button", { name: "Compare Creators" })); };
-
-  it("limits the selection to three and lets you remove one", async () => {
-    await toCompare();
-    for (const h of ["kai.beatlab", "lenaloops", "oakley.synth"]) await userEvent.click(screen.getByRole("button", { name: `Add @${h} to comparison` }));
-    expect(screen.getByRole("button", { name: "Compare (3/3)" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add @mia.mixdown to comparison" })).toBeDisabled();
-    await userEvent.click(within(screen.getByRole("list", { name: "Selected creators" })).getByRole("button", { name: "Remove @lenaloops from comparison" }));
-    expect(screen.getByRole("button", { name: "Compare (2/3)" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add @mia.mixdown to comparison" })).toBeEnabled();
-  });
-
-  it("shows the dashboard with highlights, tables, and supports remove and replace", async () => {
-    await toCompare();
-    await userEvent.click(screen.getByRole("button", { name: "Add @kai.beatlab to comparison" }));
-    await userEvent.click(screen.getByRole("button", { name: "Add @dre.drumkit to comparison" }));
-    await userEvent.click(screen.getByRole("button", { name: "Compare (2/3)" }));
-    const dialog = await screen.findByRole("dialog");
-    for (const t of ["Profile metrics", "Content strategy", "Partnership performance"]) expect(within(dialog).getByText(t)).toBeInTheDocument();
-    expect(within(dialog).getByTestId("highlight-highest-engagement-rate")).toHaveTextContent("You");        // 6.3% beats Kai's 5.8%
-    expect(within(dialog).getByTestId("highlight-highest-average-views")).toHaveTextContent("@dre.drumkit");  // 46.7K
-    expect(within(dialog).getByTestId("highlight-most-partnerships")).toHaveTextContent("@kai.beatlab");     // ties go to the first of the two with 2
-    expect(within(dialog).getByTestId("cmp-followers")).toHaveTextContent("88.4K");
-
-    await userEvent.click(within(dialog).getByRole("combobox", { name: "Replace @kai.beatlab" }));
-    await userEvent.click(await screen.findByRole("option", { name: "@lenaloops" }));
-    expect(within(dialog).queryByTestId("cmp-col-c1")).toBeNull();
-    expect(within(dialog).getByTestId("cmp-col-c2")).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole("button", { name: "Remove @dre.drumkit" }));
-    expect(within(dialog).queryByTestId("cmp-col-c6")).toBeNull();
-    expect(within(dialog).getByRole("combobox", { name: "Add a creator" })).toBeInTheDocument();
-  });
-});

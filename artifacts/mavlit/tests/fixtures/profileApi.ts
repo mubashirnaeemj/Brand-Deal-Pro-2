@@ -22,6 +22,17 @@ export function installProfileApi(initial: CreatorProfile) {
   let getFailure: string | null = null;
   let putFailure: string | null = null;
   let generationEnabled = false;
+  let similar: unknown = { ready: true, threshold: 70, min_partnership_score: 90, creators: [] };
+  let similarSameAudience: unknown | null = null;   // the answer to ?same_audience=true; the unfiltered one when not set
+  let similarFailure = false;
+  let brandIntel: unknown = { status: "completed", total: 0, brands: [] };
+  let brandIntelFailure = false;
+  let brandCreators: Record<string, unknown> = {};
+  let market: unknown = { ready: true, threshold: 70, audience_range: null, you: { name: null, avg_likes: null, avg_comments: null, handle: "me", followers: null, engagement_rate: null, avg_reel_views: null, posts_per_week: null, brand_partnerships: null, product_focused_pct: null, content_categories: null }, peers: { count: 0, avg_followers: null, avg_engagement: null, avg_reel_views: null, avg_posts_per_week: null, avg_partnerships: null, content_mix: {}, mix_count: 0, creators: [] }, missed_brands: [] };
+  let marketFailure = false;
+  let competitorList: Record<string, unknown>[] = [];
+  let competitorAddFailure: { status: number; detail: string } | null = null;
+  let nextCompetitorId = 500;
   let posts: FixturePost[] = [];
   let nextPostId = 1000;
   const missingPictures = new Set<number>();
@@ -102,6 +113,40 @@ export function installProfileApi(initial: CreatorProfile) {
         return reply(persisted);
       }
     }
+    if (url.origin === window.location.origin && method === "GET" && url.pathname === "/api/mavlit/feed/post-thumbnail") {
+      return url.searchParams.get("code") === "MISSING1" ? reply({ detail: "No picture for this post" }, 404)
+        : new Response(new Blob(["jpeg"], { type: "image/jpeg" }), { status: 200, headers: { "Content-Type": "image/jpeg" } });
+    }
+    const brandCreatorsRoute = url.pathname.match(/^\/api\/mavlit\/feed\/brand-intelligence\/(\d+)\/creators$/);
+    if (brandCreatorsRoute && url.origin === window.location.origin && method === "GET") {
+      return brandCreators[brandCreatorsRoute[1]] ? reply(brandCreators[brandCreatorsRoute[1]]) : reply({ detail: "Brand not found" }, 404);
+    }
+    const competitorRoute = url.pathname.match(/^\/api\/mavlit\/feed\/competitors(?:\/(\d+))?$/);
+    if (competitorRoute && url.origin === window.location.origin) {
+      const id = competitorRoute[1] ? Number(competitorRoute[1]) : null;
+      if (method === "GET" && id === null) return reply({ competitors: competitorList });
+      if (method === "POST" && id === null) {
+        if (competitorAddFailure) return reply({ detail: competitorAddFailure.detail }, competitorAddFailure.status);
+        const handle = String((body as { instagram: string }).instagram).replace(/^.*instagram\.com\//, "").replace(/^@/, "").replace(/\/$/, "").toLowerCase();
+        const added = { id: nextCompetitorId++, handle, status: "queued", stage: "Checking what we know about the creator", error: null, source: null, full_name: null, followers: null, posts_analyzed: null,
+          avg_likes: null, avg_comments: null, engagement_rate: null, avg_reel_views: null, posts_per_week: null, product_focused_pct: null, content_categories: null, partnership_count: 0, partnership_brands: [] };
+        competitorList = [added, ...competitorList];
+        return reply(added);
+      }
+      if (method === "DELETE" && id !== null) {
+        competitorList = competitorList.filter((c) => c.id !== id);
+        return reply({ removed: id });
+      }
+    }
+    if (url.origin === window.location.origin && method === "GET" && url.pathname === "/api/mavlit/feed/market-insights") {
+      return marketFailure ? reply({ detail: "down" }, 500) : reply(market);
+    }
+    if (url.origin === window.location.origin && method === "GET" && url.pathname === "/api/mavlit/feed/brand-intelligence") {
+      return brandIntelFailure ? reply({ detail: "down" }, 500) : reply(brandIntel);
+    }
+    if (url.origin === window.location.origin && method === "GET" && url.pathname === "/api/mavlit/feed/similar-creators") {
+      return similarFailure ? reply({ detail: "down" }, 500) : reply(url.searchParams.get("same_audience") === "true" && similarSameAudience ? similarSameAudience : similar);
+    }
     if (url.origin === window.location.origin && method === "GET" &&
         url.pathname === "/api/mavlit/brand-category-tags") {
       return reply({ tags_by_niche: Object.fromEntries(
@@ -123,6 +168,16 @@ export function installProfileApi(initial: CreatorProfile) {
     failGet(message: string | null) { getFailure = message; },
     failPut(message: string | null) { putFailure = message; },
     allowGeneration() { generationEnabled = true; },
+    setSimilarCreators(next: unknown, sameAudience: unknown | null = null) { similar = structuredClone(next); similarSameAudience = sameAudience === null ? null : structuredClone(sameAudience); },
+    failSimilarCreators(failed = true) { similarFailure = failed; },
+    setBrandIntelligence(next: unknown) { brandIntel = structuredClone(next); },
+    failBrandIntelligence(failed = true) { brandIntelFailure = failed; },
+    setMarketInsights(next: unknown) { market = structuredClone(next); },
+    setCompetitors(next: unknown[]) { competitorList = structuredClone(next) as Record<string, unknown>[]; },
+    failCompetitorAdd(failure: { status: number; detail: string } | null) { competitorAddFailure = failure; },
+    get competitorsOnServer() { return structuredClone(competitorList); },
+    failMarketInsights(failed = true) { marketFailure = failed; },
+    setBrandCreators(brandId: number, next: unknown) { brandCreators[String(brandId)] = structuredClone(next); },
     assertIsolated() {
       expect(unexpected, "Unlisted requests, including AI jobs, are forbidden").toEqual([]);
       expect(requests.every((request) => request.credentials === "include")).toBe(true);

@@ -1,6 +1,11 @@
 // Derived logic for Content Inspiration, "Why Them, Not Me?" and Compare Creators. Pure functions over the local mock data.
 import { CREATORS, IDEAS, ME, ME_PARTNERSHIPS, STRATEGY } from "@/data/feed";
 import type { ContentStrategy, FeedPartnership } from "@/data/feed";
+import { avatarHue } from "@/lib/similarCreators";
+import type { SimilarCreator, YouStats } from "@/lib/similarCreators";
+import { competitorKey } from "@/lib/competitors";
+import type { Competitor } from "@/lib/competitors";
+import type { FeedCreator } from "@/data/feed";
 import { brandById, creatorById, fmtCount, fmtPercent, partnershipsOfCreator, postEngagement, whyYoureSeeingThis } from "@/lib/feedData";
 
 // ── Content Inspiration ──────────────────────────────────────────────────────
@@ -44,6 +49,10 @@ export interface Comparable {
   strategy: ContentStrategy; mix: Record<string, number>;
   partnerships: FeedPartnership[]; uniqueBrands: number;
   topBrandCategories: string[]; topFormats: string[]; strongestCategory: { name: string; pct: number };
+  /** How many brand partnerships: the real count for you and for the creators of the Feed (`partnerships` is only the mock list behind the old prototype). */
+  partnershipCount: number;
+  /** What in this column is hardcoded sample data, by the name the page uses; empty when everything is real. */
+  sampleFields: string[];
 }
 
 const top = (items: string[], n = 2) => {
@@ -56,7 +65,134 @@ const STRATEGY_LABELS: [keyof ContentStrategy, string][] = [
 ];
 export const STRATEGY_ROWS = STRATEGY_LABELS;
 
+// ── Real creators (Similar Creators tab) ────────────────────────────────────
+// Everything the API has is real: the creator's handle, name, followers, engagement rate, likes and comments, posts per week, average Reel views,
+// partnership count and a summary of their partnership posts, and for you the same from your profile and saved posts. What it does not have yet
+// (the content mix until it was estimated, and the partnership summary of your own) comes from a mock creator picked by the username; the column
+// lists those fields in `sampleFields`, and the dialog says so.
+const REAL_PREFIX = "real:";
+const realCreators = new Map<string, { creator: FeedCreator; comparable: Comparable }>();
+let realMe: Comparable | null = null;
+export const isSampleData = (id: string) => id.startsWith(REAL_PREFIX);
+const sampleFor = (username: string) => CREATORS[avatarHue(username) % CREATORS.length];
+
+/** The strategy table of a real content mix (percent per category name); a category the table has no row for is only in `mix` and `strongest`. */
+function strategyFromMix(product: number, categories: { name: string; pct: number }[]): { strategy: ContentStrategy; mix: Record<string, number>; strongest: { name: string; pct: number } } {
+  const pct = (name: string) => categories.find((c) => c.name === name)?.pct ?? 0;
+  const biggest = [...categories].sort((a, b) => b.pct - a.pct || a.name.localeCompare(b.name))[0];
+  return {
+    strategy: { tutorial: pct("Tutorial"), productReview: pct("Product review"), lifestyle: pct("Lifestyle"), educational: pct("Educational"), entertainment: pct("Entertainment"), productFocused: product },
+    mix: Object.fromEntries(categories.map((c) => [c.name, c.pct])),
+    strongest: { name: biggest.name, pct: biggest.pct },
+  };
+}
+const hasMix = (product: number | null | undefined, categories: { name: string; pct: number }[] | null | undefined): categories is { name: string; pct: number }[] =>
+  product !== null && product !== undefined && !!categories?.length;
+
+const USE_REAL_CONTENT_MIX = false;
+
+/** One column of the comparison from real numbers, with the sample ones filling what is missing. */
+function build(base: Comparable, real: {
+  id: string; handle: string; name: string; isMe: boolean; followers: number | null; engagement: number | null; avgLikes: number | null; avgComments: number | null;
+  avgReelViews: number | null; postsPerWeek: number | null; partnershipCount: number | null;
+  summary: { uniqueBrands: number; topBrandCategories: string[]; topFormats: string[] } | null;
+  product: number | null; categories: { name: string; pct: number }[] | null;
+  /** Show the content mix the LLM estimated (else the prototype's sample mix). Competitors added by a user always do. */
+  realMix?: boolean;
+}): Comparable {
+  const sample: string[] = [];
+  const pick = <T,>(value: T | null, fallback: T, label: string): T => { if (value === null || value === undefined) { sample.push(label); return fallback; } return value; };
+  const followers = pick(real.followers, base.followers, "Followers");
+  const engagement = pick(real.engagement, base.engagement, "Engagement rate");
+  const interactions = (followers * engagement) / 100;
+  // The content strategy stays the prototype's sample data for now (flip USE_REAL_CONTENT_MIX to show the estimated mix once it exists for everyone).
+  const mix = (real.realMix ?? USE_REAL_CONTENT_MIX) && hasMix(real.product, real.categories) ? strategyFromMix(real.product as number, real.categories) : null;
+  if (!mix) sample.push("Content strategy");
+  const summary = real.summary;
+  return {
+    ...base, id: real.id, handle: real.handle, name: real.name, hue: avatarHue(real.handle), isMe: real.isMe,
+    followers, engagement,
+    avgLikes: pick(real.avgLikes, Math.round(interactions * 0.93), "Average likes"),
+    avgComments: pick(real.avgComments, Math.round(interactions * 0.07), "Average comments"),
+    avgReelViews: real.avgReelViews ?? 0,   // no view counts in the database: 0, never a made-up number
+    postsPerWeek: pick(real.postsPerWeek, base.postsPerWeek, "Posts per week"),
+    partnershipCount: pick(real.partnershipCount, base.partnerships.length, "Brand partnerships"),
+    uniqueBrands: summary ? summary.uniqueBrands : base.uniqueBrands,
+    topBrandCategories: summary ? summary.topBrandCategories : base.topBrandCategories,
+    topFormats: summary ? summary.topFormats : base.topFormats,
+    strategy: mix ? mix.strategy : base.strategy, mix: mix ? mix.mix : base.mix, strongestCategory: mix ? mix.strongest : base.strongestCategory,
+    sampleFields: sample,
+  };
+}
+
+/**
+ * Make the creators of the tab, and you, known to Compare. Returns each creator's id (the same id comparableFor() understands).
+ * `you` gives the "You" column your real name, handle and numbers; without it that column is the prototype's sample profile.
+ */
+export function registerRealCreators(list: SimilarCreator[], you?: YouStats | null): Map<string, string> {
+  realCreators.clear();
+  realMe = null;
+  if (you) {
+    const handle = (you.handle ?? "").replace(/^@/, "").trim() || "you";
+    realMe = build(comparableFor("me"), {
+      id: "me", handle, name: you.name?.trim() || handle, isMe: true, followers: you.followers, engagement: you.engagement_rate, avgLikes: you.avg_likes, avgComments: you.avg_comments,
+      avgReelViews: you.avg_reel_views, postsPerWeek: you.posts_per_week, partnershipCount: you.brand_partnerships,
+      summary: null,   // nothing in the data says which brands, categories and formats your own partnerships were
+      product: you.product_focused_pct, categories: you.content_categories,
+    });
+  }
+  const ids = new Map<string, string>();
+  for (const real of list) {
+    const id = `${REAL_PREFIX}${real.username}`;
+    const sample = sampleFor(real.username);
+    const name = real.full_name?.trim() || real.username;
+    const creator: FeedCreator = { ...sample, id, handle: real.username, name, hue: avatarHue(real.username), followers: real.followers ?? sample.followers, similarity: real.similarity, engagementRate: real.engagement_rate ?? sample.engagementRate };
+    realCreators.set(id, { creator, comparable: build(comparableFor(sample.id), {
+      id, handle: real.username, name, isMe: false, followers: real.followers, engagement: real.engagement_rate, avgLikes: real.avg_likes, avgComments: real.avg_comments,
+      avgReelViews: real.avg_reel_views, postsPerWeek: real.posts_per_week, partnershipCount: real.partnership_count,
+      summary: { uniqueBrands: real.unique_brands, topBrandCategories: real.top_brand_categories, topFormats: real.top_formats },
+      product: real.product_focused_pct, categories: real.content_categories,
+    }) });
+    ids.set(real.username, id);
+  }
+  return ids;
+}
+export const realCreatorFor = (id: string): FeedCreator | undefined => realCreators.get(id)?.creator;
+
+// ── Competitors the user added (Similar Creators > Compare > Add a competitor) ────────────────────────────────────────────────────────────────────
+// Their numbers are real (read from MAVLIT's creators or from their latest 20 posts), including the content mix the LLM estimated for them.
+const competitors = new Map<string, { handle: string; comparable: Comparable }>();
+
+/** Make the user's ready competitors known to Compare (a competitor that is still being looked up, or failed, is left out). */
+export function registerCompetitors(list: Competitor[]): void {
+  competitors.clear();
+  for (const c of list) {
+    if (c.status !== "ready") continue;
+    const id = competitorKey(c.id);
+    const sample = sampleFor(c.handle);
+    competitors.set(id, { handle: c.handle, comparable: build(comparableFor(sample.id), {
+      id, handle: c.handle, name: c.full_name?.trim() || c.handle, isMe: false, followers: c.followers, engagement: c.engagement_rate, avgLikes: c.avg_likes, avgComments: c.avg_comments,
+      avgReelViews: c.avg_reel_views, postsPerWeek: c.posts_per_week, partnershipCount: c.partnership_count,
+      summary: null, product: c.product_focused_pct, categories: c.content_categories, realMix: true,
+    }) });
+  }
+}
+/** The handle of a creator in the comparison, whether a similar creator or a competitor. */
+export const compareHandle = (id: string): string | undefined => realCreators.get(id)?.creator.handle ?? competitors.get(id)?.handle;
+
+/** The creators that can be added to a comparison: the tab's real creators (or the mock ones when there are none), then the user's competitors. */
+export const compareCandidates = (): { id: string; handle: string; similarity: number | null }[] => [
+  ...(realCreators.size ? [...realCreators.values()].map(({ creator }) => ({ id: creator.id, handle: creator.handle, similarity: creator.similarity as number | null }))
+    : CREATORS.map((c) => ({ id: c.id, handle: c.handle, similarity: c.similarity as number | null }))),
+  ...[...competitors.entries()].map(([id, { handle }]) => ({ id, handle, similarity: null as number | null })),
+];
+
 export function comparableFor(id: string): Comparable {
+  const real = realCreators.get(id);
+  if (real) return real.comparable;
+  const competitor = competitors.get(id);
+  if (competitor) return competitor.comparable;
+  if (id === "me" && realMe) return realMe;
   const isMe = id === "me";
   const base = isMe ? { ...ME, id: "me", engagement: ME.engagementRate } : (() => { const c = creatorById.get(id)!; return { ...c, engagement: c.engagementRate }; })();
   const posts = isMe ? ME_PARTNERSHIPS : partnershipsOfCreator(id);
@@ -70,63 +206,15 @@ export function comparableFor(id: string): Comparable {
     strategy, mix: base.mix, partnerships: posts, uniqueBrands: new Set(posts.map((p) => p.brandId)).size,
     topBrandCategories: top(posts.map((p) => brandById.get(p.brandId)!.category)),
     topFormats: top(posts.map((p) => p.type)),
-    strongestCategory: best,
+    strongestCategory: best, partnershipCount: posts.length, sampleFields: [],
   };
 }
 export const SIMILAR_IDS = CREATORS.map((c) => c.id);
-export const educational = (c: Comparable) => c.strategy.tutorial + c.strategy.educational;
-
-// ── Why Them, Not Me? ────────────────────────────────────────────────────────
-export interface MetricRow { key: string; label: string; me: number; them: number; show: (n: number) => string; higherIsBetter: boolean }
-export function metricRows(me: Comparable, them: Comparable): MetricRow[] {
-  const n = (x: number) => String(Math.round(x));
-  return [
-    { key: "followers", label: "Followers", me: me.followers, them: them.followers, show: fmtCount, higherIsBetter: true },
-    { key: "views", label: "Avg Reel views", me: me.avgReelViews, them: them.avgReelViews, show: fmtCount, higherIsBetter: true },
-    { key: "engagement", label: "Engagement rate", me: me.engagement, them: them.engagement, show: fmtPercent, higherIsBetter: true },
-    { key: "frequency", label: "Posts per week", me: me.postsPerWeek, them: them.postsPerWeek, show: (x) => x.toFixed(1), higherIsBetter: true },
-    { key: "deals", label: "Brand partnerships", me: me.partnerships.length, them: them.partnerships.length, show: n, higherIsBetter: true },
-    { key: "product", label: "Product-focused content", me: me.strategy.productFocused, them: them.strategy.productFocused, show: (x) => `${Math.round(x)}%`, higherIsBetter: true },
-    { key: "educational", label: "Tutorial / educational", me: educational(me), them: educational(them), show: (x) => `${Math.round(x)}%`, higherIsBetter: true },
-  ];
-}
-
-export interface Advice { theirAdvantages: string[]; yourAdvantages: string[]; improvements: string[] }
-export function whyThemNotMe(them: Comparable): Advice {
-  const me = comparableFor("me");
-  const rows = metricRows(me, them);
-  const lines = {
-    followers: (p: number, who: "them" | "you") => who === "them" ? `${p}% larger audience (${fmtCount(them.followers)} vs ${fmtCount(me.followers)}).` : `${p}% larger audience than @${them.handle}.`,
-    views: (p: number, who: "them" | "you") => who === "them" ? `${p}% more average Reel views.` : `${p}% more average Reel views than @${them.handle}.`,
-    engagement: (_: number, who: "them" | "you") => who === "them" ? `Higher engagement rate (${fmtPercent(them.engagement)} vs ${fmtPercent(me.engagement)}).` : `Higher engagement rate (${fmtPercent(me.engagement)} vs ${fmtPercent(them.engagement)}).`,
-    frequency: (_: number, who: "them" | "you") => who === "them" ? `Posts more often (${them.postsPerWeek.toFixed(1)} vs ${me.postsPerWeek.toFixed(1)} a week).` : `More consistent posting (${me.postsPerWeek.toFixed(1)} vs ${them.postsPerWeek.toFixed(1)} a week).`,
-    deals: (_: number, who: "them" | "you") => who === "them" ? `Has more previous brand partnerships (${them.partnerships.length} vs ${me.partnerships.length}).` : `More previous brand partnerships (${me.partnerships.length} vs ${them.partnerships.length}).`,
-    product: (_: number, who: "them" | "you") => who === "them" ? "Publishes more product demonstration content." : "Publishes more product-focused content.",
-    educational: (_: number, who: "them" | "you") => who === "them" ? "Publishes more tutorial and educational content." : "Stronger tutorial and educational focus.",
-  } as const;
-  const theirAdvantages: string[] = []; const yourAdvantages: string[] = [];
-  for (const r of rows) {
-    const ratio = r.them / (r.me || 1);
-    if (ratio >= 1.08) theirAdvantages.push(lines[r.key as keyof typeof lines](Math.round((ratio - 1) * 100), "them"));
-    else if (ratio <= 0.92) yourAdvantages.push(lines[r.key as keyof typeof lines](Math.round((1 / ratio - 1) * 100), "you"));
-  }
-  const missed = them.partnerships.map((p) => brandById.get(p.brandId)!).find((b) => !ME.partnerBrandIds.includes(b.id));
-  const improvements: string[] = [];
-  const gap = (key: string) => rows.find((r) => r.key === key)!.them / rows.find((r) => r.key === key)!.me >= 1.08;
-  if (gap("views")) improvements.push(`Improve average Reel views (${fmtCount(me.avgReelViews)} now, ${fmtCount(them.avgReelViews)} for @${them.handle}). Test stronger first-second hooks.`);
-  if (gap("product")) improvements.push(`Increase product demonstration content: ${me.strategy.productFocused}% of your posts vs ${them.strategy.productFocused}%.`);
-  if (gap("educational")) improvements.push(`Experiment with more educational Reels: ${educational(me)}% of your content vs ${educational(them)}%.`);
-  if (gap("frequency")) improvements.push(`Raise your posting rhythm toward ${them.postsPerWeek.toFixed(1)} posts a week.`);
-  if (gap("deals") && missed) improvements.push(`Create more content around brands in your niche, starting with ${missed.name}, which already works with @${them.handle}.`);
-  const fillers = ["Add a partnerships email and media-kit link to your bio.", "Turn your best tutorial into a numbered series brands can sponsor.", "Pin a Reel that shows your results with a product, for brands that visit your profile."];
-  for (const filler of fillers) if (improvements.length < 3) improvements.push(filler);
-  if (yourAdvantages.length === 0) yourAdvantages.push("No clear metric lead over this creator right now. Your edge is a more niche-specific voice.");
-  if (theirAdvantages.length === 0) theirAdvantages.push("No clear metric lead over you. Their edge, if any, is positioning.");
-  return { theirAdvantages, yourAdvantages, improvements: improvements.slice(0, 5) };
-}
 
 // ── Compare Creators ─────────────────────────────────────────────────────────
-export function bestOf<T extends { id: string }>(items: T[], pick: (item: T) => number): string {
-  return items.reduce((a, b) => (pick(b) > pick(a) ? b : a)).id;
+/** Everyone who has the best value, not just the first: two creators on the same number share the card. */
+export function leadersOf<T extends { id: string }>(items: T[], pick: (item: T) => number): T[] {
+  const best = Math.max(...items.map(pick));
+  return items.filter((item) => pick(item) === best);
 }
 export const MAX_COMPARE = 3;

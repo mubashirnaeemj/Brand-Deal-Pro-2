@@ -1,8 +1,7 @@
 import { Crown, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CREATORS } from "@/data/feed";
-import { STRATEGY_ROWS, bestOf, comparableFor, type Comparable } from "@/lib/feedCompare";
+import { STRATEGY_ROWS, compareCandidates, comparableFor, leadersOf, type Comparable } from "@/lib/feedCompare";
 import { fmtCount, fmtPercent } from "@/lib/feedData";
 import { cn } from "@/lib/utils";
 import { MetricBars, MixBars, SERIES_COLORS } from "./CompareCharts";
@@ -36,18 +35,17 @@ const Section = ({ title, cols, children }: { title: string; cols: number; child
 export default function CompareDialog({ ids, onChange, open, onOpenChange }: Props) {
   const cols = ["me", ...ids].map(comparableFor);
   const others = cols.slice(1);
-  const free = CREATORS.filter((c) => !ids.includes(c.id));
+  const free = compareCandidates().filter((c) => !ids.includes(c.id));
   const replace = (index: number, next: string) => onChange(ids.map((id, i) => (i === index ? next : id)));
-  const hiEng = bestOf(cols, (c) => c.engagement); const hiViews = bestOf(cols, (c) => c.avgReelViews);
-  const hiDeals = bestOf(cols, (c) => c.partnerships.length);
-  const strongest = cols.map((c) => ({ c, ...c.strongestCategory })).sort((a, b) => b.pct - a.pct)[0];
-  const byId = (id: string) => cols.find((c) => c.id === id)!;
+  // The four highlight cards. Whoever has the best value is named; when several are level they share the card instead of the first one winning.
+  const placeholders = cols.filter((c) => c.sampleFields.length).map((c) => `${c.isMe ? "You" : `@${c.handle}`}: ${c.sampleFields.join(", ")}`);   // what is hardcoded in each column
+  const strongestPct = (c: Comparable) => c.strongestCategory.pct;
   const highlights = [
-    { label: "Highest engagement rate", who: byId(hiEng), value: fmtPercent(byId(hiEng).engagement) },
-    { label: "Highest average views", who: byId(hiViews), value: fmtCount(byId(hiViews).avgReelViews) },
-    { label: "Most partnerships", who: byId(hiDeals), value: String(byId(hiDeals).partnerships.length) },
-    { label: "Strongest content category", who: strongest.c, value: `${strongest.name} ${strongest.pct}%` },
-  ];
+    { label: "Highest engagement rate", who: leadersOf(cols, (c) => c.engagement), value: (w: Comparable) => fmtPercent(w.engagement) },
+    { label: "Highest average views", who: leadersOf(cols, (c) => c.avgReelViews), value: (w: Comparable) => fmtCount(w.avgReelViews) },
+    { label: "Most partnerships", who: leadersOf(cols, (c) => c.partnershipCount), value: (w: Comparable) => String(w.partnershipCount) },
+    { label: "Strongest content category", who: leadersOf(cols, strongestPct), value: (w: Comparable) => `${w.strongestCategory.name} ${w.strongestCategory.pct}%` },
+  ].map((h) => ({ label: h.label, who: h.who, value: [...new Set(h.who.map(h.value))].join(" / ") }));
   const n = cols.length;
   const rowsPct = (key: keyof Comparable["strategy"]) => cols.map((c) => c.strategy[key]);
   const pct = (v: number) => `${v}%`;
@@ -61,6 +59,7 @@ export default function CompareDialog({ ids, onChange, open, onOpenChange }: Pro
             <DialogDescription className="text-sm text-muted-foreground">You against {others.length} similar creator{others.length === 1 ? "" : "s"}. Remove or replace anyone to change the comparison.</DialogDescription>
           </DialogHeader>
 
+          {placeholders.length > 0 && <p data-testid="sample-data-note" className="rounded-xl bg-secondary/50 p-3 text-xs text-muted-foreground">Placeholder (sample) data in this comparison, because we do not have it yet — {placeholders.join(" · ")}. Everything else is real.</p>}
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Creators being compared">
             {cols.map((c, i) => (
               <li key={c.id} data-testid={`cmp-col-${c.id}`} className="flex flex-col gap-2 rounded-2xl border bg-background/40 p-3" style={{ borderColor: `${SERIES_COLORS[i]}66` }}>
@@ -81,7 +80,7 @@ export default function CompareDialog({ ids, onChange, open, onOpenChange }: Pro
               <li className="flex flex-col justify-center gap-2 rounded-2xl border border-dashed border-border p-3">
                 <Select value="" onValueChange={(v) => onChange([...ids, v])}>
                   <SelectTrigger aria-label="Add a creator" className="h-9 text-xs"><SelectValue placeholder="Add a creator…" /></SelectTrigger>
-                  <SelectContent>{free.map((f) => <SelectItem key={f.id} value={f.id}>@{f.handle} · {f.similarity}% match</SelectItem>)}</SelectContent>
+                  <SelectContent>{free.map((f) => <SelectItem key={f.id} value={f.id}>@{f.handle} · {f.similarity === null ? "your competitor" : `${f.similarity}% match`}</SelectItem>)}</SelectContent>
                 </Select>
               </li>
             )}
@@ -92,7 +91,7 @@ export default function CompareDialog({ ids, onChange, open, onOpenChange }: Pro
               {highlights.map((h) => (
                 <li key={h.label} className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-3.5" data-testid={`highlight-${h.label.toLowerCase().replace(/\s+/g, "-")}`}>
                   <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-400"><Crown size={12} aria-hidden="true" />{h.label}</p>
-                  <p className="mt-1 text-sm font-extrabold text-white">{labelOf(h.who)}</p><p className="text-xs text-muted-foreground">{h.value}</p>
+                  <p className="mt-1 text-sm font-extrabold text-white">{h.who.map(labelOf).join(" & ")}</p><p className="text-xs text-muted-foreground">{h.value}</p>
                 </li>
               ))}
             </ul>
@@ -127,12 +126,6 @@ export default function CompareDialog({ ids, onChange, open, onOpenChange }: Pro
                   <Row label="Lifestyle" cols={cols} values={rowsPct("lifestyle")} best="max" text={pct} />
                   <Row label="Educational" cols={cols} values={rowsPct("educational")} best="max" text={pct} />
                   <Row label="Entertainment" cols={cols} values={rowsPct("entertainment")} best="max" text={pct} />
-                </Section>
-                <Section title="Partnership performance" cols={n}>
-                  <Row label="Total detected partnerships" cols={cols} values={cols.map((c) => c.partnerships.length)} best="max" text={(v) => String(v)} />
-                  <Row label="Unique brands" cols={cols} values={cols.map((c) => c.uniqueBrands)} best="max" text={(v) => String(v)} />
-                  <Row label="Top brand categories" cols={cols} values={cols.map(() => 0)} text={(_, c) => c.topBrandCategories.join(", ") || "None yet"} />
-                  <Row label="Common sponsored formats" cols={cols} values={cols.map(() => 0)} text={(_, c) => c.topFormats.join(", ") || "None yet"} />
                 </Section>
               </table>
             </div>

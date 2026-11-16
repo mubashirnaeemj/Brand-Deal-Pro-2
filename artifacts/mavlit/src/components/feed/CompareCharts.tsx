@@ -2,6 +2,9 @@ import { Bar, BarChart, Legend, PolarAngleAxis, PolarGrid, PolarRadiusAxis, Rada
 
 export const SERIES_COLORS = ["#8b5cf6", "#38bdf8", "#f59e0b", "#10b981"];   // You first, then up to three others
 const TOOLTIP_STYLE = { background: "#15151c", border: "1px solid #2a2a33", borderRadius: 12, fontSize: 12, color: "#fff" };
+// Recharts paints the tooltip's value in the series colour, which is black for these bars (and unreadable on the dark card): set the colours here.
+const TOOLTIP_TEXT = { itemStyle: { color: "#fff" }, labelStyle: { color: "#e4e4e7" } };
+const HOVER_CURSOR = { fill: "rgba(255,255,255,0.08)" };
 const AXIS = { fill: "#a1a1aa", fontSize: 11 };
 
 /** Horizontal stacked bars: one row per creator, one segment per category (percent). */
@@ -13,7 +16,7 @@ export function MixBars({ rows, keys, label, height = 220 }: { rows: Record<stri
         <BarChart data={rows} layout="vertical" margin={{ left: 8, right: 12 }}>
           <XAxis type="number" domain={[0, 100]} unit="%" tick={AXIS} axisLine={false} tickLine={false} />
           <YAxis type="category" dataKey="name" width={104} tick={{ ...AXIS, fill: "#e4e4e7", fontSize: 12 }} axisLine={false} tickLine={false} />
-          <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+          <Tooltip contentStyle={TOOLTIP_STYLE} {...TOOLTIP_TEXT} cursor={HOVER_CURSOR} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
           {keys.map((k, i) => <Bar key={k} dataKey={k} stackId="mix" fill={palette[i % palette.length]} />)}
         </BarChart>
@@ -32,7 +35,7 @@ export function IndexRadar({ axes, series, label }: { axes: string[]; series: { 
           <PolarGrid stroke="#2a2a33" /><PolarAngleAxis dataKey="axis" tick={AXIS} />
           <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
           {series.map((s) => <Radar key={s.name} name={s.name} dataKey={s.name} stroke={s.color} fill={s.color} fillOpacity={0.22} />)}
-          <Legend wrapperStyle={{ fontSize: 12 }} /><Tooltip contentStyle={TOOLTIP_STYLE} />
+          <Legend wrapperStyle={{ fontSize: 12 }} /><Tooltip contentStyle={TOOLTIP_STYLE} {...TOOLTIP_TEXT} />
         </RadarChart>
       </ResponsiveContainer>
     </div>
@@ -47,7 +50,7 @@ export function MetricBars({ data, label, unit = "" }: { data: { name: string; v
         <BarChart data={data} margin={{ left: -12, right: 8, top: 8 }}>
           <XAxis dataKey="name" tick={AXIS} axisLine={false} tickLine={false} interval={0} />
           <YAxis tick={AXIS} axisLine={false} tickLine={false} unit={unit} />
-          <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+          <Tooltip contentStyle={TOOLTIP_STYLE} {...TOOLTIP_TEXT} cursor={HOVER_CURSOR} />
           <Bar dataKey="value" radius={[6, 6, 0, 0]}
             shape={(props: { x?: number; y?: number; width?: number; height?: number; payload?: { color: string } }) => (
               <rect x={props.x} y={props.y} width={props.width} height={props.height} rx={6} fill={props.payload?.color} />

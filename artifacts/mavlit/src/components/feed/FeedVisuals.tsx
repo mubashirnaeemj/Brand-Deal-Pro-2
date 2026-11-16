@@ -1,7 +1,7 @@
 // Local-only visuals for the Feed prototype: no external images. Avatars, brand marks and post art are drawn from CSS/SVG.
-import { Bookmark, Eye, Heart, Layers, MessageCircle, Play, CircleDot } from "lucide-react";
+import { Bookmark, Eye, Heart, Image as ImageIcon, Layers, MessageCircle, Play, CircleDot } from "lucide-react";
 import type { ReactNode } from "react";
-import type { ContentType, FeedBrand, FeedCreator, FeedPartnership } from "@/data/feed";
+import type { FeedBrand, FeedCreator, FeedPartnership } from "@/data/feed";
 import { fmtCount } from "@/lib/feedData";
 import { cn } from "@/lib/utils";
 
@@ -26,17 +26,17 @@ export function BrandMark({ brand, size = 36 }: { brand: Pick<FeedBrand, "name" 
   );
 }
 
-const TYPE_ICON: Record<ContentType, typeof Play> = { Reel: Play, Video: Play, Carousel: Layers, Story: CircleDot };
+const TYPE_ICON: Record<string, typeof Play> = { Reel: Play, Video: Play, Carousel: Layers, Story: CircleDot, Photo: ImageIcon, Post: ImageIcon };
 
 function hash(text: string) { let h = 0; for (const ch of text) h = (Math.imul(h, 31) + ch.charCodeAt(0)) | 0; return Math.abs(h); }
 
 /** Sponsored-post thumbnail, generated from the brand colour and the post id. */
 export function PostArt({ post, brand, className, compact = false }: {
-  post: FeedPartnership; brand: FeedBrand; className?: string; compact?: boolean;
+  post: Pick<FeedPartnership, "id"> & { type: string }; brand: Pick<FeedBrand, "name" | "color">; className?: string; compact?: boolean;
 }) {
   const h = hash(post.id);
   const x1 = 15 + (h % 55); const y1 = 10 + ((h >> 3) % 40); const x2 = 40 + ((h >> 5) % 50); const y2 = 55 + ((h >> 7) % 35);
-  const Icon = TYPE_ICON[post.type];
+  const Icon = TYPE_ICON[post.type] ?? ImageIcon;
   return (
     <div className={cn("relative overflow-hidden bg-secondary", className)} data-testid={`post-art-${post.id}`}>
       <div className="absolute inset-0" style={{

@@ -37,6 +37,8 @@ export function applyProfileGeneration(form: ProfileForm, profile: CreatorProfil
         followers: profileToForm(profile).instagram.followers,
         // Scraped posts may carry no view counts; keep the creator's own entry then.
         highestViews: profileToForm(profile).instagram.highestViews || form.instagram.highestViews,
+        // The rate MAVLIT just calculated; when the posts had no likes, the creator's own entry stays.
+        engagementRate: profileToForm(profile).instagram.engagementRate || form.instagram.engagementRate,
       } : {}),
     } };
   }

@@ -18,7 +18,7 @@ const TABS = [
   { id: "for-you", label: "For You", Icon: Sparkles, hint: "Partnerships picked for your niche, content and profile." },
   { id: "similar", label: "Similar Creators", Icon: Users, hint: "Creators with similar content, audiences and follower counts, and who they partner with." },
   { id: "brands", label: "Brand Intelligence", Icon: Building2, hint: "Which brands work with creators like you, and what they look for." },
-  { id: "insights", label: "Market Insights", Icon: BarChart3, hint: "Where you stand against similar creators, and what to do next." },
+  { id: "insights", label: "Market Insights", Icon: BarChart3, hint: "Where you stand against creators with a similar audience size, and what to do next." },
   { id: "trending", label: "Trending", Icon: Flame, hint: "Creator market trends: what is growing in your niche and where brands are investing." },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -27,7 +27,6 @@ export default function Feed() {
   const [tab, setTab] = useState<TabId>("for-you");
   const [saved, setSaved] = useState<Set<string>>(() => new Set());
   const [savedInspiration, setSavedInspiration] = useState<Set<string>>(() => new Set());
-  const [compareIds, setCompareIds] = useState<string[]>([]);
   const [creator, setCreator] = useState<FeedCreator | null>(null);
   const [brand, setBrand] = useState<FeedBrand | null>(null);
   // The Feed-wide filter bar was removed: every tab always shows the full, unfiltered data.
@@ -67,9 +66,9 @@ export default function Feed() {
           <motion.div key={tab} role="tabpanel" id={`feed-panel-${tab}`} aria-labelledby={`feed-tab-${tab}`}
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: "easeOut" }}>
             {tab === "for-you" && <ForYouTab filters={filters} onClear={clear} saved={saved} onToggleSave={toggleSave} savedInspiration={savedInspiration} onToggleInspiration={toggleInspiration} onViewCreator={viewCreator} onViewBrand={viewBrand} />}
-            {tab === "similar" && <SimilarCreatorsTab filters={filters} onClear={clear} onViewCreator={viewCreator} compareIds={compareIds} onCompareChange={setCompareIds} />}
-            {tab === "brands" && <BrandIntelligenceTab filters={filters} onClear={clear} onViewBrand={viewBrand} />}
-            {tab === "insights" && <MarketInsightsTab filters={filters} onClear={clear} />}
+            {tab === "similar" && <SimilarCreatorsTab />}
+            {tab === "brands" && <BrandIntelligenceTab />}
+            {tab === "insights" && <MarketInsightsTab />}
             {tab === "trending" && <TrendingTab />}
           </motion.div>
         </div>

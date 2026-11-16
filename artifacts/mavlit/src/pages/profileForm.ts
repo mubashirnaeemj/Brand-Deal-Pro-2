@@ -22,8 +22,9 @@ export type ProfileForm = {
   gender: string;
   brandPreferences: string;
   pitchStylePreferences: string;
+  brandPartnerships: string;   // how many brand partnerships the creator has had (typed; used by "Why Them, Not Me?")
   primaryPlatforms: PlatformKey[];
-  instagram: PlatformDetails & { username: string; followers: string; highestViews: string };
+  instagram: PlatformDetails & { username: string; followers: string; highestViews: string; engagementRate: string };
   youtube: PlatformDetails & { channelName: string; subscribers: string };
 };
 
@@ -39,11 +40,13 @@ export function profileToForm(profile: CreatorProfile): ProfileForm {
     gender: text(profile.gender),
     brandPreferences: text(profile.brand_preferences),
     pitchStylePreferences: text(profile.pitch_style_preferences),
+    brandPartnerships: numberText(profile.brand_partnerships),
     primaryPlatforms: parsePlatforms(profile.primary_platform),
     instagram: {
       username: text(profile.instagram_handle),
       followers: numberText(profile.instagram_followers ?? (firstPlatform === "instagram" ? profile.follower_count : null)),
       highestViews: numberText(profile.instagram_highest_views),
+      engagementRate: numberText(profile.instagram_engagement_rate),
       primaryNiches: parsePrimaryNiches(profile.instagram_primary_niche ?? profile.content_niche),
       subNiches: normalizeSubNiches(profile.instagram_sub_niches ?? profile.sub_niches ?? []),
       excludedCategories: profile.instagram_excluded_categories ?? profile.excluded_categories ?? [],
@@ -77,6 +80,10 @@ export function validateProfile(form: ProfileForm, profile: CreatorProfile): str
   for (const [value, label] of [[form.instagram.followers, "Follower count"], [form.instagram.highestViews, "Highest Instagram reel / post views"], ...(form.primaryPlatforms.includes("youtube") ? [[form.youtube.subscribers, "Subscriber count"]] : [])]) {
     if (value.trim() && (!Number.isInteger(Number(value)) || Number(value) < 0)) return `${label} must be a non-negative whole number.`;
   }
+  const partnerships = form.brandPartnerships.trim();
+  if (partnerships && (!Number.isInteger(Number(partnerships)) || Number(partnerships) < 0 || Number(partnerships) > 100000)) return "Brand partnerships must be a whole number from 0 to 100000.";
+  const rate = form.instagram.engagementRate.trim();
+  if (rate && (!Number.isFinite(Number(rate)) || Number(rate) < 0 || Number(rate) > 100)) return "Engagement rate must be a number between 0 and 100.";
   for (const platform of ["instagram", "youtube"] as const) {
     if (!form.primaryPlatforms.includes(platform)) continue;
     const label = platform === "instagram" ? "Instagram" : "YouTube";
@@ -110,6 +117,7 @@ function profileValues(form: ProfileForm, profile: CreatorProfile): Partial<Crea
     full_name: form.fullName.trim(),
     brand_preferences: form.brandPreferences.trim() || null,
     pitch_style_preferences: form.pitchStylePreferences.trim() || null,
+    brand_partnerships: optionalNumber(form.brandPartnerships),
     creator_handle: instagramHandle || profile.creator_handle || "",
     age: optionalNumber(form.age),
     gender: form.gender.trim() || null,
@@ -117,6 +125,7 @@ function profileValues(form: ProfileForm, profile: CreatorProfile): Partial<Crea
     instagram_handle: instagramHandle || null,
     instagram_followers: optionalNumber(form.instagram.followers),
     instagram_highest_views: optionalNumber(form.instagram.highestViews),
+    instagram_engagement_rate: optionalNumber(form.instagram.engagementRate),
     follower_count: optionalNumber(form.primaryPlatforms[0] === "youtube" ? form.youtube.subscribers : form.instagram.followers),
     instagram_primary_niche: formatPrimaryNiches(form.instagram.primaryNiches),
     content_niche: formatPrimaryNiches(form.instagram.primaryNiches),

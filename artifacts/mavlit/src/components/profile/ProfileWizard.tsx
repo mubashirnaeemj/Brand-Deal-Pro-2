@@ -185,6 +185,22 @@ export default function ProfileWizard(p: ProfileWizardProps) {
                   The most views on any of your reels or videos.
                 </span>
               </label>}
+              {showAllFields && <label className={labelCls}>Previous brand partnerships
+                <input data-testid="input-brand-partnerships" type="number" min={0} max={100000} step={1} className={`${INPUT_CLASS} mt-1.5`} value={form.brandPartnerships}
+                  disabled={p.saving} placeholder="4"
+                  onChange={(e) => onChange({ ...form, brandPartnerships: e.target.value })} />
+                <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">
+                  How many brand partnerships you have done so far. It is compared with similar creators in the Feed.
+                </span>
+              </label>}
+              {showAllFields && <label className={labelCls}>Engagement rate
+                <input data-testid="input-engagement-rate" type="number" min={0} max={100} step={0.1} className={`${INPUT_CLASS} mt-1.5`} value={ig.engagementRate}
+                  disabled={p.saving} placeholder="3.5"
+                  onChange={(e) => setIg({ engagementRate: e.target.value })} />
+                <span className="mt-1 block text-[11px] normal-case tracking-normal text-muted-foreground">
+                  A percentage. MAVLIT calculates it when it generates your profile: (average likes + average comments) ÷ followers × 100. You can correct it.
+                </span>
+              </label>}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">

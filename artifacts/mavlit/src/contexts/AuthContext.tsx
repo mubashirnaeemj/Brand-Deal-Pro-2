@@ -61,6 +61,8 @@ export interface CreatorProfile {
   substack_subscribers: number | null;
   instagram_followers: number | null;
   instagram_highest_views?: number | null;
+  brand_partnerships?: number | null;   // typed by the creator on the profile page
+  instagram_engagement_rate?: number | null;   // calculated by MAVLIT when it generates the profile; read-only
   youtube_channel_name: string | null;
   youtube_subscribers: number | null;
   instagram_following: number | null;
@@ -220,6 +222,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // PUT is a replacement write; display and validate the persisted profile,
     // not an acknowledgement or an echo of the submitted body.
     const updated = await api.get<CreatorProfile>("/creator-profile/me");
+    // The Feed's Similar Creators compares the creator's saved numbers (brand partnerships, followers, engagement rate): a saved profile makes its cached list stale.
+    queryClient.invalidateQueries({ queryKey: ["feed"] });
     // Generation prerequisites are not the creator's final submission.
     if (options?.commit === false) return updated;
     setUser(updated);

@@ -110,6 +110,69 @@ describe("Instagram wizard generation", () => {
     expect(screen.getByTestId("input-highest-views")).toHaveValue(250000);
   });
 
+  it("fills the engagement rate from the completed job, lets the creator correct it, and keeps it after reload", async () => {
+    const rendered = await mount();
+    expect(screen.queryByTestId("input-engagement-rate")).not.toBeInTheDocument();   // nothing is generated yet
+    finish({ instagram_engagement_rate: 8.1 });
+    await tick(1500);
+    await tick(450);
+    const box = screen.getByTestId("input-engagement-rate");
+    expect(box).toHaveValue(8.1);
+    expect(box).not.toHaveAttribute("readonly");
+    fireEvent.change(box, { target: { value: "4.2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    await settle();
+    expect(fixture.writes.at(-1)!.body).toMatchObject({ instagram_engagement_rate: 4.2 });
+    expect(fixture.persisted).toMatchObject({ instagram_engagement_rate: 4.2 });
+    rendered.unmount();
+    renderProfile(<ProfileSettings />);
+    await settle();
+    details();
+    expect(screen.getByTestId("input-engagement-rate")).toHaveValue(4.2);
+  });
+
+  it("lets the creator type how many brand partnerships they have had, saves it and keeps it after reload", async () => {
+    const rendered = await mount();
+    expect(screen.queryByTestId("input-brand-partnerships")).not.toBeInTheDocument();   // like the other detail fields, it appears once the details are fetched
+    finish({});
+    await tick(1500);
+    await tick(450);
+    expect(screen.getByTestId("input-brand-partnerships")).toHaveValue(null);
+    fireEvent.change(screen.getByTestId("input-brand-partnerships"), { target: { value: "7" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    await settle();
+    expect(fixture.writes.at(-1)!.body).toMatchObject({ brand_partnerships: 7 });
+    expect(fixture.persisted).toMatchObject({ brand_partnerships: 7 });
+    rendered.unmount();
+    renderProfile(<ProfileSettings />);
+    await settle();
+    details();
+    expect(screen.getByTestId("input-brand-partnerships")).toHaveValue(7);
+  });
+
+  it("refuses a brand partnership count that is not a whole number", async () => {
+    await mount();
+    finish({});
+    await tick(1500);
+    await tick(450);
+    fireEvent.change(screen.getByTestId("input-brand-partnerships"), { target: { value: "2.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    await settle();
+    expect(screen.getByTestId("text-error")).toHaveTextContent("Brand partnerships must be a whole number");
+  });
+
+  it("is empty when no engagement rate could be calculated, and keeps what the creator typed", async () => {
+    await mount();
+    finish({ instagram_engagement_rate: null });
+    await tick(1500);
+    await tick(450);
+    expect(screen.getByTestId("input-engagement-rate")).toHaveValue(null);
+    fireEvent.change(screen.getByTestId("input-engagement-rate"), { target: { value: "3" } });
+    const typed = profileToForm(creatorProfile({ instagram_engagement_rate: 3, instagram_description_mode: "generate" }));
+    expect(applyProfileGeneration(typed, creatorProfile({ instagram_engagement_rate: null }), "instagram").instagram.engagementRate).toBe("3");
+    expect(applyProfileGeneration(typed, creatorProfile({ instagram_engagement_rate: 6.5 }), "instagram").instagram.engagementRate).toBe("6.5");
+  });
+
   it("keeps the typed highest views when the generated value is null, and does not need it to start", async () => {
     await mount();
     expect(screen.queryByTestId("input-highest-views")).not.toBeInTheDocument();

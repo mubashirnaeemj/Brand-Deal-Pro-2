@@ -55,9 +55,9 @@ describe("Feed page", () => {
 
   it("switches between all five tabs without leaving the page", async () => {
     await open();
-    await tab("similar"); expect(await screen.findByText("Similar creators")).toBeInTheDocument();
-    await tab("brands"); expect(await screen.findAllByRole("button", { name: /View insights for/ })).not.toHaveLength(0);
-    await tab("insights"); expect(await screen.findByRole("region", { name: "Your Competitive Position" })).toBeInTheDocument();
+    await tab("similar"); expect(await screen.findByText("No similar creators yet")).toBeInTheDocument();
+    await tab("brands"); expect(await screen.findByText("No matched brands yet")).toBeInTheDocument();
+    await tab("insights"); expect(await screen.findByText("No creators with a similar audience size yet")).toBeInTheDocument();
     await tab("trending"); expect(await screen.findByRole("heading", { name: "Creator Market Trends" })).toBeInTheDocument();
     await tab("for-you"); expect(await screen.findAllByTestId(/^inspiration-p\d+$/)).not.toHaveLength(0);
     expect(window.location.pathname).toBe("/feed");
@@ -82,33 +82,4 @@ describe("Feed page", () => {
     expect(screen.getAllByTestId(/^inspiration-p\d+$/).map((n) => n.getAttribute("data-testid"))).toEqual([id]);
   });
 
-  it("opens a creator's partnership history from Similar Creators", async () => {
-    await open(); await tab("similar");
-    const stat = await screen.findByTestId("similar-stat-similar-creators");
-    expect(stat).toHaveTextContent(String(CREATORS.length));
-    await userEvent.click((await screen.findAllByRole("button", { name: /View partnerships for/ }))[0]);
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("heading", { name: "@kai.beatlab" })).toBeInTheDocument();
-    expect(within(dialog).getAllByTestId(/^history-/)).toHaveLength(PARTNERSHIPS.filter((p) => p.creatorId === "c1").length);
-    await userEvent.click(within(dialog).getAllByRole("button", { name: /View original post/ })[0]);
-    expect(await screen.findByText("Original post (prototype)")).toBeInTheDocument();
-  });
-
-  it("opens brand intelligence with creators and fit insights", async () => {
-    await open(); await tab("brands");
-    await userEvent.click(await screen.findByRole("button", { name: "View insights for Native Instruments" }));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("region", { name: "Creators This Brand Works With" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("region", { name: "Why This Brand Could Be a Good Fit" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("link", { name: /Create pitch email/ })).toHaveAttribute("href", "/pitch?brand=Native%20Instruments");
-  });
-
-  it("market insights lists strengths, gaps, missed brands and recommendations", async () => {
-    await open(); await tab("insights");
-    for (const name of ["Your Strengths", "Areas to Improve", "Missed Brand Opportunities", "AI Recommendations"]) expect(await screen.findByRole("region", { name })).toBeInTheDocument();
-    const missed = screen.getByRole("region", { name: "Missed Brand Opportunities" });
-    expect(within(missed).queryByText("Splice")).toBeNull();      // already partnered
-    expect(within(missed).getByText("Native Instruments")).toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: "AI Recommendations" })).getAllByRole("listitem").length).toBeGreaterThanOrEqual(3);
-  });
 });

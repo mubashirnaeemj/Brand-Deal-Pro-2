@@ -90,18 +90,14 @@ describe("the sample numbers that stand in for a missing value", () => {
 describe("the content mix rows", () => {
   const mixes = { you: mix(40, { Tutorial: 30, "Product review": 20, Lifestyle: 10 }), them: mix(20, { Tutorial: 10, Entertainment: 50, Educational: 5 }) };
 
-  it("adds Product-focused content and up to five categories after the five numbers", () => {
+  it("adds Product-focused content after the five numbers, and no content category rows", () => {
     const rows = whyRows(you(), creator(), mixes);
-    expect(rows.map((r) => r.key).slice(0, 5)).toEqual(["followers", "views", "engagement", "frequency", "deals"]);
+    expect(rows.map((r) => r.key)).toEqual(["followers", "views", "engagement", "frequency", "deals", "product"]);
     expect(rows[5]).toMatchObject({ key: "product", label: "Product-focused content", me: 40, them: 20 });
-    // the categories with the biggest combined share: Entertainment 50, Tutorial 40, Product review 20, Lifestyle 10, Educational 5
-    expect(rows.slice(6).map((r) => r.key)).toEqual(["category:Entertainment", "category:Tutorial", "category:Product review", "category:Lifestyle", "category:Educational"]);
-    expect(rows.find((r) => r.key === "category:Entertainment")).toMatchObject({ me: 0, them: 50 });   // a category one of you has none of counts as 0%
     expect(rows[5].show(40)).toBe("40%");
-  });
-  it("keeps only five categories when there are more", () => {
-    const many = { you: mix(10, { A: 5, B: 5, C: 5, D: 5, E: 5, F: 5, G: 5 }), them: mix(10, {}) };
-    expect(whyRows(you(), creator(), many).filter((r) => r.key.startsWith("category:"))).toHaveLength(5);
+    for (const label of ["Entertainment content", "Lifestyle content", "Product review content", "Tutorial content", "Educational content"]) {
+      expect(rows.map((r) => r.label)).not.toContain(label);
+    }
   });
   it("turns the product-focused lead into a sentence but not the categories", () => {
     expect(whyAdvice(you(), creator(), mixes).yourAdvantages).toContain("Publishes more product-focused content (40% vs 20%).");

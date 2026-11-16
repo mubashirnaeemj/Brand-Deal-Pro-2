@@ -132,7 +132,7 @@ describe("Why Them, Not Me? and Compare Creators (sample numbers for the real cr
     for (const key of ["followers", "views", "engagement", "frequency", "deals"]) expect(within(dialog).getByTestId(`why-row-${key}`)).toBeInTheDocument();
     // the content mix rows are there too: the creator has no estimated mix, so theirs is the hardcoded sample (yours is real)
     expect(within(dialog).getByTestId("why-row-product")).toHaveTextContent("35%");
-    expect(within(dialog).getAllByTestId(/^why-row-category:/).length).toBeGreaterThan(0);
+    expect(within(dialog).queryByTestId(/^why-row-category:/)).toBeNull();                                     // the content categories are not rows
     expect(within(dialog).queryByTestId("why-missing")).toBeNull();                                             // nothing is left out
     expect(within(dialog).getByTestId("why-row-followers")).toHaveTextContent("12.4K");
     expect(within(dialog).getByTestId("why-row-views")).toHaveTextContent("30K");
@@ -159,7 +159,7 @@ describe("Why Them, Not Me? and Compare Creators (sample numbers for the real cr
     const dialog = await screen.findByRole("dialog");
     for (const key of ["views", "deals", "product"]) expect(within(dialog).getByTestId(`why-row-${key}`)).toBeInTheDocument();
     expect(within(dialog).getByTestId("why-row-deals")).toHaveTextContent("0");                                  // no post marked as a partnership: your count is 0, not a sample
-    expect(within(dialog).getAllByTestId(/^why-row-category:/).length).toBeGreaterThan(0);
+    expect(within(dialog).queryByTestId(/^why-row-category:/)).toBeNull();                                     // the content categories are not rows
     expect(within(dialog).getByTestId("why-row-views")).not.toHaveTextContent("30K");                           // the creator's views are the sample, not a number from the data
     expect(within(dialog).queryByTestId("why-missing")).toBeNull();                                              // none of the four is "not compared" any more
     expect(within(dialog).queryByText(/Sample data/)).toBeNull();                                                // and no line says so
@@ -313,8 +313,7 @@ describe("the creator's own content mix", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Why them, not me? @skinbyalice" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByTestId("why-row-product")).toHaveTextContent("55%");                      // theirs, from the API
-    expect(within(dialog).getByTestId("why-row-category:Product review")).toHaveTextContent("50%");
-    expect(within(dialog).getByTestId("why-row-category:Promotional")).toHaveTextContent("30%");           // a category only the 8-name list has
+    expect(within(dialog).queryByTestId(/^why-row-category:/)).toBeNull();                                  // the categories are in the chart, not rows
     expect(within(dialog).getByTestId("mix-source-note")).toHaveTextContent("Content mix estimated by MAVLIT from each creator's captions.");
   });
 });

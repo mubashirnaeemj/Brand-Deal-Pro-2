@@ -30,7 +30,6 @@ export function theirMix(them: SimilarCreator, sample: Comparable): Mix & { real
   return { ...sampleMix(sample), real: false };
 }
 
-const MIX_ROWS_SHOWN = 5;
 const pct = (n: number) => `${Math.round(n)}%`;
 
 const perWeek = (n: number) => n.toFixed(1);
@@ -54,13 +53,8 @@ export function whyRows(you: YouStats, them: SimilarCreator, mixes?: { you: Mix;
     ["deals", "Brand partnerships", you.brand_partnerships ?? 0, them.partnership_count, whole],   // no marked post: 0
   ];
   const rows: WhyRow[] = pairs.flatMap(([key, label, me, theirs, show]) => me === null || me === undefined || theirs === null || theirs === undefined ? [] : [{ key, label, me, them: theirs, show }]);
-  if (mixes) {
+  if (mixes) {   // only the product-focused share is compared: the content categories are not rows (they are shown in the distribution chart)
     rows.push({ key: "product", label: "Product-focused content", me: mixes.you.product, them: mixes.them.product, show: pct });
-    // the content categories either of you leans on most: the five with the biggest combined share
-    const names = [...new Set([...Object.keys(mixes.you.categories), ...Object.keys(mixes.them.categories)])]
-      .sort((a, b) => (mixes.you.categories[b] ?? 0) + (mixes.them.categories[b] ?? 0) - (mixes.you.categories[a] ?? 0) - (mixes.them.categories[a] ?? 0) || a.localeCompare(b))
-      .slice(0, MIX_ROWS_SHOWN);
-    for (const name of names) rows.push({ key: `category:${name}`, label: `${name} content`, me: mixes.you.categories[name] ?? 0, them: mixes.them.categories[name] ?? 0, show: pct });
   }
   return rows;
 }
